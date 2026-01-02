@@ -13,14 +13,12 @@ impl Default for Display {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, Default)]
 pub enum FlexDirection {
     Row,
     #[default]
     Column,
 }
-
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct ItemStyle {
