@@ -1,4 +1,4 @@
-use layout::*;
+use ui_layout::*;
 
 #[test]
 fn layout_mvp() {

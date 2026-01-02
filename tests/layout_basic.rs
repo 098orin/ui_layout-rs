@@ -1,4 +1,4 @@
-use layout::*;
+use ui_layout::*;
 
 #[test]
 fn flex_row_basic() {
