@@ -1,4 +1,4 @@
-# layout
+# ui_layout
 
 A minimal layout engine for Rust GUI development.
 
