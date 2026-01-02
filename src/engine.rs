@@ -35,38 +35,98 @@ impl LayoutEngine {
     }
 
     fn layout_column(node: &mut LayoutNode) {
-        let mut y = node.rect.y + node.style.padding;
+        let inner_width = node.rect.width - node.style.padding * 2.0;
+        let inner_height = node.rect.height - node.style.padding * 2.0;
+
+        // 固定幅と grow 合計を計算
+        let mut fixed_height = 0.0;
+        let mut total_grow = 0.0;
+
+        for child in &node.children {
+            if let Some(h) = child.style.height {
+                fixed_height += h;
+            } else {
+                total_grow += child.style.item_style.flex_grow;
+            }
+        }
+
+        let remaining = (inner_height - fixed_height).max(0.0);
+
+        // 配置
+        let mut cursor_y = node.style.padding;
 
         for child in &mut node.children {
-            let height = child.style.height.unwrap_or(0.0);
+            let width = if let Some(w) = child.style.width {
+                w
+            } else {
+                inner_width
+            };
+
+            let height = if let Some(h) = child.style.height {
+                h
+            } else if total_grow > 0.0 {
+                remaining * (child.style.item_style.flex_grow / total_grow)
+            } else {
+                inner_height
+            };
 
             let rect = Rect {
-                x: node.rect.x + node.style.padding,
-                y,
-                width: node.rect.width - node.style.padding * 2.0,
+                x: node.style.padding, // 親基準
+                y: cursor_y,
+                width,
                 height,
             };
 
             Self::layout_node(child, rect);
-            y += height;
+            cursor_y += height;
         }
     }
 
     fn layout_row(node: &mut LayoutNode) {
-        let mut x = node.rect.x + node.style.padding;
+        let inner_width = node.rect.width - node.style.padding * 2.0;
+        let inner_height = node.rect.height - node.style.padding * 2.0;
+
+        // 固定幅と grow 合計を計算
+        let mut fixed_width = 0.0;
+        let mut total_grow = 0.0;
+
+        for child in &node.children {
+            if let Some(w) = child.style.width {
+                fixed_width += w;
+            } else {
+                total_grow += child.style.item_style.flex_grow;
+            }
+        }
+
+        let remaining = (inner_width - fixed_width).max(0.0);
+
+        // 配置
+        let mut cursor_x = node.style.padding;
 
         for child in &mut node.children {
-            let width = child.style.width.unwrap_or(0.0);
+            let width = if let Some(w) = child.style.width {
+                w
+            } else if total_grow > 0.0 {
+                remaining * (child.style.item_style.flex_grow / total_grow)
+            } else {
+                0.0
+            };
+
+            let height = if let Some(h) = child.style.height {
+                h
+            } else {
+                inner_height
+            };
 
             let rect = Rect {
-                x,
-                y: node.rect.y + node.style.padding,
+                x: cursor_x, // 親基準
+                y: node.style.padding,
                 width,
-                height: node.rect.height - node.style.padding * 2.0,
+                height,
             };
 
             Self::layout_node(child, rect);
-            x += width;
+            cursor_x += width;
         }
     }
 }
