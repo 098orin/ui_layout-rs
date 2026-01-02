@@ -28,6 +28,7 @@ impl LayoutEngine {
                 }
             },
             Display::Block => {
+                // TODO: block layout (currently treated as column)
                 Self::layout_column(node);
             }
             Display::None => {}
@@ -38,7 +39,6 @@ impl LayoutEngine {
         let inner_width = node.rect.width - node.style.padding * 2.0;
         let inner_height = node.rect.height - node.style.padding * 2.0;
 
-        // 固定幅と grow 合計を計算
         let mut fixed_height = 0.0;
         let mut total_grow = 0.0;
 
@@ -52,7 +52,6 @@ impl LayoutEngine {
 
         let remaining = (inner_height - fixed_height).max(0.0);
 
-        // 配置
         let mut cursor_y = node.style.padding;
 
         for child in &mut node.children {
@@ -71,7 +70,7 @@ impl LayoutEngine {
             };
 
             let rect = Rect {
-                x: node.style.padding, // 親基準
+                x: node.style.padding,
                 y: cursor_y,
                 width,
                 height,
@@ -86,7 +85,6 @@ impl LayoutEngine {
         let inner_width = node.rect.width - node.style.padding * 2.0;
         let inner_height = node.rect.height - node.style.padding * 2.0;
 
-        // 固定幅と grow 合計を計算
         let mut fixed_width = 0.0;
         let mut total_grow = 0.0;
 
@@ -100,7 +98,6 @@ impl LayoutEngine {
 
         let remaining = (inner_width - fixed_width).max(0.0);
 
-        // 配置
         let mut cursor_x = node.style.padding;
 
         for child in &mut node.children {
@@ -119,7 +116,7 @@ impl LayoutEngine {
             };
 
             let rect = Rect {
-                x: cursor_x, // 親基準
+                x: cursor_x,
                 y: node.style.padding,
                 width,
                 height,
