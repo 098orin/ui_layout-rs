@@ -37,15 +37,13 @@ impl LayoutEngine {
         let mut total_grow = 0.0;
 
         for child in &node.children {
+            let margin = child.style.spacing.margin_top + child.style.spacing.margin_bottom;
+
             if let Some(h) = child.style.size.height {
-                fixed_height +=
-                    h + child.style.spacing.margin_top + child.style.spacing.margin_bottom;
+                fixed_height += h + margin;
             } else {
-                if let Some(basis) = child.style.item_style.flex_basis {
-                    fixed_height +=
-                        basis + child.style.spacing.margin_top + child.style.spacing.margin_bottom;
-                }
-                total_grow += child.style.item_style.flex_grow;
+                fixed_height += child.style.item_style.flex_basis.unwrap_or(0.0) + margin;
+                total_grow += child.style.item_style.flex_grow.max(0.0);
             }
         }
 
