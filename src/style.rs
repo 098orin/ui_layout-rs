@@ -26,13 +26,22 @@ pub struct ItemStyle {
 }
 
 #[derive(Debug, Clone, Copy, Default)]
+pub struct SizeStyle {
+    pub width: Option<f32>,
+    pub height: Option<f32>,
+    pub min_width: Option<f32>,
+    pub max_width: Option<f32>,
+    pub min_height: Option<f32>,
+    pub max_height: Option<f32>,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
 pub struct Style {
     pub display: Display,
 
     pub item_style: ItemStyle,
 
-    pub width: Option<f32>,
-    pub height: Option<f32>,
+    pub size: SizeStyle,
 
     pub padding: f32,
 }

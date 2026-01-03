@@ -43,7 +43,7 @@ impl LayoutEngine {
         let mut total_grow = 0.0;
 
         for child in &node.children {
-            if let Some(h) = child.style.height {
+            if let Some(h) = child.style.size.height {
                 fixed_height += h;
             } else {
                 total_grow += child.style.item_style.flex_grow;
@@ -55,19 +55,23 @@ impl LayoutEngine {
         let mut cursor_y = node.style.padding;
 
         for child in &mut node.children {
-            let width = if let Some(w) = child.style.width {
-                w
-            } else {
-                inner_width
-            };
+            let width = clamp(
+                child.style.size.width.unwrap_or(inner_width),
+                child.style.size.min_width,
+                child.style.size.max_width,
+            );
 
-            let height = if let Some(h) = child.style.height {
-                h
-            } else if total_grow > 0.0 {
-                remaining * (child.style.item_style.flex_grow / total_grow)
-            } else {
-                inner_height
-            };
+            let height = clamp(
+                if let Some(h) = child.style.size.height {
+                    h
+                } else if total_grow > 0.0 {
+                    remaining * (child.style.item_style.flex_grow / total_grow)
+                } else {
+                    inner_height
+                },
+                child.style.size.min_height,
+                child.style.size.max_height,
+            );
 
             let rect = Rect {
                 x: node.style.padding,
@@ -89,7 +93,7 @@ impl LayoutEngine {
         let mut total_grow = 0.0;
 
         for child in &node.children {
-            if let Some(w) = child.style.width {
+            if let Some(w) = child.style.size.width {
                 fixed_width += w;
             } else {
                 total_grow += child.style.item_style.flex_grow;
@@ -101,19 +105,23 @@ impl LayoutEngine {
         let mut cursor_x = node.style.padding;
 
         for child in &mut node.children {
-            let width = if let Some(w) = child.style.width {
-                w
-            } else if total_grow > 0.0 {
-                remaining * (child.style.item_style.flex_grow / total_grow)
-            } else {
-                0.0
-            };
+            let width = clamp(
+                if let Some(w) = child.style.size.width {
+                    w
+                } else if total_grow > 0.0 {
+                    remaining * (child.style.item_style.flex_grow / total_grow)
+                } else {
+                    0.0
+                },
+                child.style.size.min_width,
+                child.style.size.max_width,
+            );
 
-            let height = if let Some(h) = child.style.height {
-                h
-            } else {
-                inner_height
-            };
+            let height = clamp(
+                child.style.size.height.unwrap_or(inner_height),
+                child.style.size.min_height,
+                child.style.size.max_height,
+            );
 
             let rect = Rect {
                 x: cursor_x,

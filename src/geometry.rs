@@ -5,9 +5,3 @@ pub struct Rect {
     pub width: f32,
     pub height: f32,
 }
-
-#[derive(Debug, Clone, Copy, Default)]
-pub struct Size {
-    pub width: f32,
-    pub height: f32,
-}
