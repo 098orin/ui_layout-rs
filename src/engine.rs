@@ -129,7 +129,7 @@ impl LayoutEngine {
     fn layout_flex(node: &mut LayoutNode, axis: Axis) {
         let spacing = &node.style.spacing;
 
-        let gap = axis.gap(&node.style);
+        let gap = axis.gap(&node.style).max(0.0);
         let gap_count = node.children.len().saturating_sub(1) as f32;
 
         let inner_main = axis.main(&node.rect)
