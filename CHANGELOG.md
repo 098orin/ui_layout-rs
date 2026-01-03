@@ -7,6 +7,23 @@ and this project loosely follows Semantic Versioning.
 
 ---
 
+## [0.3.0] - 2026-01-03
+
+### Added
+- Row and column gaps for Flex layout (`row_gap` / `column_gap`)
+- `justify_content` support: Start, Center, End, SpaceBetween, SpaceAround, SpaceEvenly
+- `align_items` support: Start, Center, End, Stretch
+- Axis-aware padding and margin calculations now fully applied in Flex layout
+- Tests for gap and alignment behavior added
+
+### Changed
+- Negative gap values are now clamped to zero to match CSS behavior
+- Layout calculations refactored for better clarity and maintainability
+- Flex layout now fully respects min/max sizes alongside flex-grow/flex-basis
+- Cross-axis margin and padding calculations reorganized for consistency and maintainability
+
+---
+
 ## [0.2.0] - 2026-01-03
 
 ### Added

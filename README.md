@@ -18,6 +18,8 @@ custom GUI frameworks, editors, and experimental UI engines.
 - Block layout
 - Recursive tree-based layout
 - Parent-relative positioning
+- Row and column gaps (`row_gap` / `column_gap`)
+- Justify content (`justify_content`) and align items (`align_items`)
 
 ## Non-goals
 
@@ -39,22 +41,24 @@ custom GUI frameworks, editors, and experimental UI engines.
 use layout::*;
 
 LayoutEngine::layout(&mut root, 800.0, 600.0);
-````
+```
+
+For more examples and to understand the behavior of gaps, alignment, and sizing,
+see the unit tests in the [`tests/`](tests/) directory. They provide practical usage patterns and expected layouts.
+
 
 ## Status
 
 See [CHANGELOG.md](CHANGELOG.md) for a detailed list of changes.
 
-* Version: **0.2.0**
-* API is still evolving
-* Focused on Flexbox-like block layouts
+* Version: **0.3.0**
+* API is evolving but now includes full Flexbox-like alignment and gaps
 
 Future versions may add:
 
-* `justify-content`
-* `align-items`
-* `gap`
-* Improved flex sizing rules
+* `grid`
+* Additional flex sizing rules (wrap, fr units, etc.)
+* Absolute / fixed positioning
 
 ## License
 
