@@ -29,22 +29,24 @@ impl LayoutEngine {
     }
 
     fn layout_column(node: &mut LayoutNode) {
-        let inner_width = node.rect.width - node.style.padding * 2.0;
-        let inner_height = node.rect.height - node.style.padding * 2.0;
+        let s = &node.style.spacing;
+        let inner_width = node.rect.width - s.padding_left - s.padding_right;
+        let inner_height = node.rect.height - s.padding_top - s.padding_bottom;
 
         let mut fixed_height = 0.0;
         let mut total_grow = 0.0;
 
         for child in &node.children {
             if let Some(h) = child.style.size.height {
-                fixed_height += h;
+                fixed_height +=
+                    h + child.style.spacing.margin_top + child.style.spacing.margin_bottom;
             } else {
                 total_grow += child.style.item_style.flex_grow;
             }
         }
 
         let remaining = (inner_height - fixed_height).max(0.0);
-        let mut cursor_y = node.style.padding;
+        let mut cursor_y = s.padding_top;
 
         for child in &mut node.children {
             let width = clamp(
@@ -66,34 +68,36 @@ impl LayoutEngine {
             );
 
             let rect = Rect {
-                x: node.style.padding,
-                y: cursor_y,
+                x: s.padding_left + child.style.spacing.margin_left,
+                y: cursor_y + child.style.spacing.margin_top,
                 width,
                 height,
             };
 
             Self::layout_node(child, rect);
-            cursor_y += height;
+            cursor_y += height + child.style.spacing.margin_top + child.style.spacing.margin_bottom;
         }
     }
 
     fn layout_row(node: &mut LayoutNode) {
-        let inner_width = node.rect.width - node.style.padding * 2.0;
-        let inner_height = node.rect.height - node.style.padding * 2.0;
+        let s = &node.style.spacing;
+        let inner_width = node.rect.width - s.padding_left - s.padding_right;
+        let inner_height = node.rect.height - s.padding_top - s.padding_bottom;
 
         let mut fixed_width = 0.0;
         let mut total_grow = 0.0;
 
         for child in &node.children {
             if let Some(w) = child.style.size.width {
-                fixed_width += w;
+                fixed_width +=
+                    w + child.style.spacing.margin_left + child.style.spacing.margin_right;
             } else {
                 total_grow += child.style.item_style.flex_grow;
             }
         }
 
         let remaining = (inner_width - fixed_width).max(0.0);
-        let mut cursor_x = node.style.padding;
+        let mut cursor_x = s.padding_left;
 
         for child in &mut node.children {
             let width = clamp(
@@ -115,20 +119,21 @@ impl LayoutEngine {
             );
 
             let rect = Rect {
-                x: cursor_x,
-                y: node.style.padding,
+                x: cursor_x + child.style.spacing.margin_left,
+                y: s.padding_top + child.style.spacing.margin_top,
                 width,
                 height,
             };
 
             Self::layout_node(child, rect);
-            cursor_x += width;
+            cursor_x += width + child.style.spacing.margin_left + child.style.spacing.margin_right;
         }
     }
 
     fn layout_block(node: &mut LayoutNode) {
-        let inner_width = node.rect.width - node.style.padding * 2.0;
-        let mut cursor_y = node.style.padding;
+        let s = &node.style.spacing;
+        let inner_width = node.rect.width - s.padding_left - s.padding_right;
+        let mut cursor_y = s.padding_top;
 
         for child in &mut node.children {
             let width = clamp(
@@ -144,14 +149,14 @@ impl LayoutEngine {
             );
 
             let rect = Rect {
-                x: node.style.padding,
-                y: cursor_y,
+                x: s.padding_left + child.style.spacing.margin_left,
+                y: cursor_y + child.style.spacing.margin_top,
                 width,
                 height,
             };
 
             Self::layout_node(child, rect);
-            cursor_y += height;
+            cursor_y += height + child.style.spacing.margin_top + child.style.spacing.margin_bottom;
         }
     }
 }

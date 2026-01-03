@@ -36,6 +36,18 @@ pub struct SizeStyle {
 }
 
 #[derive(Debug, Clone, Copy, Default)]
+pub struct Spacing {
+    pub margin_top: f32,
+    pub margin_bottom: f32,
+    pub margin_left: f32,
+    pub margin_right: f32,
+    pub padding_top: f32,
+    pub padding_bottom: f32,
+    pub padding_left: f32,
+    pub padding_right: f32,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
 pub struct Style {
     pub display: Display,
 
@@ -43,5 +55,5 @@ pub struct Style {
 
     pub size: SizeStyle,
 
-    pub padding: f32,
+    pub spacing: Spacing,
 }
