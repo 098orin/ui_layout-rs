@@ -7,62 +7,85 @@ enum Axis {
     Horizontal, // row
     Vertical,   // column
 }
+
 impl Axis {
-    fn main_size(&self, rect: &Rect) -> f32 {
+    // --- size helpers ---
+    fn main(&self, r: &Rect) -> f32 {
         match self {
-            Axis::Horizontal => rect.width,
-            Axis::Vertical => rect.height,
+            Self::Horizontal => r.width,
+            Self::Vertical => r.height,
         }
     }
-    fn cross_size(&self, rect: &Rect) -> f32 {
+    fn cross(&self, r: &Rect) -> f32 {
         match self {
-            Axis::Horizontal => rect.height,
-            Axis::Vertical => rect.width,
-        }
-    }
-
-    fn padding_start(&self, s: &Spacing) -> f32 {
-        match self {
-            Axis::Horizontal => s.padding_left,
-            Axis::Vertical => s.padding_top,
-        }
-    }
-    fn padding_end(&self, s: &Spacing) -> f32 {
-        match self {
-            Axis::Horizontal => s.padding_right,
-            Axis::Vertical => s.padding_bottom,
+            Self::Horizontal => r.height,
+            Self::Vertical => r.width,
         }
     }
 
-    fn margin_start(&self, s: &Spacing) -> f32 {
+    // --- padding ---
+    fn padding_main_start(&self, s: &Spacing) -> f32 {
         match self {
-            Axis::Horizontal => s.margin_left,
-            Axis::Vertical => s.margin_top,
+            Self::Horizontal => s.padding_left,
+            Self::Vertical => s.padding_top,
         }
     }
-    fn margin_end(&self, s: &Spacing) -> f32 {
+    fn padding_main_end(&self, s: &Spacing) -> f32 {
         match self {
-            Axis::Horizontal => s.margin_right,
-            Axis::Vertical => s.margin_bottom,
+            Self::Horizontal => s.padding_right,
+            Self::Vertical => s.padding_bottom,
+        }
+    }
+    fn padding_cross(&self, s: &Spacing) -> f32 {
+        match self {
+            Self::Horizontal => s.padding_top + s.padding_bottom,
+            Self::Vertical => s.padding_left + s.padding_right,
         }
     }
 
-    fn size(&self, size: &SizeStyle) -> Option<f32> {
+    // --- margin ---
+    fn margin_main(&self, s: &Spacing) -> f32 {
         match self {
-            Axis::Horizontal => size.width,
-            Axis::Vertical => size.height,
+            Self::Horizontal => s.margin_left + s.margin_right,
+            Self::Vertical => s.margin_top + s.margin_bottom,
         }
     }
-    fn min_size(&self, size: &SizeStyle) -> Option<f32> {
+    fn margin_cross_start(&self, s: &Spacing) -> f32 {
         match self {
-            Axis::Horizontal => size.min_width,
-            Axis::Vertical => size.min_height,
+            Self::Horizontal => s.margin_top,
+            Self::Vertical => s.margin_left,
         }
     }
-    fn max_size(&self, size: &SizeStyle) -> Option<f32> {
+    fn margin_cross_end(&self, s: &Spacing) -> f32 {
         match self {
-            Axis::Horizontal => size.max_width,
-            Axis::Vertical => size.max_height,
+            Self::Horizontal => s.margin_bottom,
+            Self::Vertical => s.margin_right,
+        }
+    }
+
+    // --- size style ---
+    fn size(&self, s: &SizeStyle) -> Option<f32> {
+        match self {
+            Self::Horizontal => s.width,
+            Self::Vertical => s.height,
+        }
+    }
+    fn min(&self, s: &SizeStyle) -> Option<f32> {
+        match self {
+            Self::Horizontal => s.min_width,
+            Self::Vertical => s.min_height,
+        }
+    }
+    fn max(&self, s: &SizeStyle) -> Option<f32> {
+        match self {
+            Self::Horizontal => s.max_width,
+            Self::Vertical => s.max_height,
+        }
+    }
+    fn cross_size(&self, s: &SizeStyle) -> (Option<f32>, Option<f32>, Option<f32>) {
+        match self {
+            Self::Horizontal => (s.height, s.min_height, s.max_height),
+            Self::Vertical => (s.width, s.min_width, s.max_width),
         }
     }
 }
@@ -96,28 +119,24 @@ impl LayoutEngine {
     }
 
     fn layout_flex(node: &mut LayoutNode, axis: Axis) {
-        let s = &node.style.spacing;
+        let spacing = &node.style.spacing;
 
-        let inner_main = axis.main_size(&node.rect) - axis.padding_start(s) - axis.padding_end(s);
-
-        let inner_cross = axis.cross_size(&node.rect)
-            - match axis {
-                Axis::Horizontal => s.padding_top + s.padding_bottom,
-                Axis::Vertical => s.padding_left + s.padding_right,
-            };
+        let inner_main = axis.main(&node.rect)
+            - axis.padding_main_start(spacing)
+            - axis.padding_main_end(spacing);
+        let inner_cross = axis.cross(&node.rect) - axis.padding_cross(spacing);
 
         // --- first pass ---
         let mut fixed = 0.0;
         let mut total_grow = 0.0;
 
         for child in &node.children {
-            let margin =
-                axis.margin_start(&child.style.spacing) + axis.margin_end(&child.style.spacing);
+            fixed += match axis.size(&child.style.size) {
+                Some(v) => v,
+                None => child.style.item_style.flex_basis.unwrap_or(0.0),
+            } + axis.margin_main(&child.style.spacing);
 
-            if let Some(v) = axis.size(&child.style.size) {
-                fixed += v + margin;
-            } else {
-                fixed += child.style.item_style.flex_basis.unwrap_or(0.0) + margin;
+            if axis.size(&child.style.size).is_none() {
                 total_grow += child.style.item_style.flex_grow.max(0.0);
             }
         }
@@ -125,76 +144,64 @@ impl LayoutEngine {
         let remaining = (inner_main - fixed).max(0.0);
 
         // --- second pass ---
-        let mut sizes = Vec::with_capacity(node.children.len());
+        let sizes: Vec<f32> = node
+            .children
+            .iter()
+            .map(|child| {
+                let base = axis.size(&child.style.size).unwrap_or_else(|| {
+                    if total_grow > 0.0 {
+                        child.style.item_style.flex_basis.unwrap_or(0.0)
+                            + remaining * (child.style.item_style.flex_grow.max(0.0) / total_grow)
+                    } else {
+                        child.style.item_style.flex_basis.unwrap_or(0.0)
+                    }
+                });
 
-        for child in &node.children {
-            let v = clamp(
-                if let Some(v) = axis.size(&child.style.size) {
-                    v
-                } else if total_grow > 0.0 {
-                    child.style.item_style.flex_basis.unwrap_or(0.0)
-                        + remaining * (child.style.item_style.flex_grow.max(0.0) / total_grow)
-                } else {
-                    child.style.item_style.flex_basis.unwrap_or(0.0)
-                },
-                axis.min_size(&child.style.size),
-                axis.max_size(&child.style.size),
-            );
-
-            sizes.push(v);
-        }
+                clamp(
+                    base,
+                    axis.min(&child.style.size),
+                    axis.max(&child.style.size),
+                )
+            })
+            .collect();
 
         // --- justify-content ---
-        let mut used = 0.0;
-        for (child, size) in node.children.iter().zip(&sizes) {
-            used += size
-                + axis.margin_start(&child.style.spacing)
-                + axis.margin_end(&child.style.spacing);
-        }
+        let used: f32 = node
+            .children
+            .iter()
+            .zip(&sizes)
+            .map(|(c, s)| s + axis.margin_main(&c.style.spacing))
+            .sum();
 
         let remaining = (inner_main - used).max(0.0);
-
         let (start_offset, gap) =
             resolve_justify_content(node.style.justify_content, remaining, node.children.len());
 
         // --- final layout ---
-        let mut cursor = axis.padding_start(s) + start_offset;
+        let mut cursor = axis.padding_main_start(spacing) + start_offset;
 
         for (child, main_size) in node.children.iter_mut().zip(sizes) {
+            let (item, min, max) = axis.cross_size(&child.style.size);
+
             let (cross_size, cross_offset) = compute_cross(
                 node.style.align_items,
                 inner_cross,
-                match axis {
-                    Axis::Horizontal => child.style.size.height,
-                    Axis::Vertical => child.style.size.width,
-                },
-                match axis {
-                    Axis::Horizontal => child.style.size.min_height,
-                    Axis::Vertical => child.style.size.min_width,
-                },
-                match axis {
-                    Axis::Horizontal => child.style.size.max_height,
-                    Axis::Vertical => child.style.size.max_width,
-                },
-                match axis {
-                    Axis::Horizontal => child.style.spacing.margin_top,
-                    Axis::Vertical => child.style.spacing.margin_left,
-                },
-                match axis {
-                    Axis::Horizontal => child.style.spacing.margin_bottom,
-                    Axis::Vertical => child.style.spacing.margin_right,
-                },
+                item,
+                min,
+                max,
+                axis.margin_cross_start(&child.style.spacing),
+                axis.margin_cross_end(&child.style.spacing),
             );
 
             let rect = match axis {
                 Axis::Horizontal => Rect {
                     x: cursor + child.style.spacing.margin_left,
-                    y: s.padding_top + cross_offset,
+                    y: spacing.padding_top + cross_offset,
                     width: main_size,
                     height: cross_size,
                 },
                 Axis::Vertical => Rect {
-                    x: s.padding_left + cross_offset,
+                    x: spacing.padding_left + cross_offset,
                     y: cursor + child.style.spacing.margin_top,
                     width: cross_size,
                     height: main_size,
@@ -203,17 +210,14 @@ impl LayoutEngine {
 
             Self::layout_node(child, rect);
 
-            cursor += main_size
-                + axis.margin_start(&child.style.spacing)
-                + axis.margin_end(&child.style.spacing)
-                + gap;
+            cursor += main_size + axis.margin_main(&child.style.spacing) + gap;
         }
     }
 
     fn layout_block(node: &mut LayoutNode) {
         let s = &node.style.spacing;
         let inner_width = node.rect.width - s.padding_left - s.padding_right;
-        let mut cursor_y = s.padding_top;
+        let mut y = s.padding_top;
 
         for child in &mut node.children {
             let width = clamp(
@@ -230,26 +234,22 @@ impl LayoutEngine {
 
             let rect = Rect {
                 x: s.padding_left + child.style.spacing.margin_left,
-                y: cursor_y + child.style.spacing.margin_top,
+                y: y + child.style.spacing.margin_top,
                 width,
                 height,
             };
 
             Self::layout_node(child, rect);
-            cursor_y += height + child.style.spacing.margin_top + child.style.spacing.margin_bottom;
+            y += height + child.style.spacing.margin_top + child.style.spacing.margin_bottom;
         }
     }
 }
 
+// ========= helpers =========
+
 fn clamp(value: f32, min: Option<f32>, max: Option<f32>) -> f32 {
-    let mut v = value;
-    if let Some(min) = min {
-        v = v.max(min);
-    }
-    if let Some(max) = max {
-        v = v.min(max);
-    }
-    v
+    let v = min.map_or(value, |m| value.max(m));
+    max.map_or(v, |m| v.min(m))
 }
 
 fn resolve_justify_content(justify: JustifyContent, remaining: f32, count: usize) -> (f32, f32) {
@@ -285,20 +285,20 @@ fn resolve_justify_content(justify: JustifyContent, remaining: f32, count: usize
 
 fn compute_cross(
     align: AlignItems,
-    container_size: f32,
-    item_size: Option<f32>,
+    container: f32,
+    item: Option<f32>,
     min: Option<f32>,
     max: Option<f32>,
     margin_start: f32,
     margin_end: f32,
 ) -> (f32, f32) {
-    let mut size = clamp(item_size.unwrap_or(container_size), min, max);
+    let mut size = clamp(item.unwrap_or(container), min, max);
 
-    if matches!(align, AlignItems::Stretch) && item_size.is_none() {
-        size = clamp(container_size - margin_start - margin_end, min, max);
+    if matches!(align, AlignItems::Stretch) && item.is_none() {
+        size = clamp(container - margin_start - margin_end, min, max);
     }
 
-    let free = container_size - size - margin_start - margin_end;
+    let free = container - size - margin_start - margin_end;
 
     let offset = match align {
         AlignItems::Start | AlignItems::Stretch => margin_start,
