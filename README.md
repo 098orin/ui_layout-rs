@@ -40,6 +40,8 @@ LayoutEngine::layout(&mut root, 800.0, 600.0);
 
 ## Status
 
+See [CHANGELOG.md](CHANGELOG.md) for a detailed list of changes.
+
 * Version: **0.2.0**
 * API is still evolving
 * Focused on Flexbox-like block layouts
