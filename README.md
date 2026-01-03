@@ -1,5 +1,8 @@
 # ui_layout
 
+[![Crates.io](https://img.shields.io/crates/v/ui_layout.svg)](https://crates.io/crates/ui_layout)
+[![Docs.rs](https://docs.rs/ui_layout/badge.svg)](https://docs.rs/ui_layout)
+
 A minimal Flexbox-inspired layout engine for Rust GUI development.
 
 This crate provides a small, predictable layout system designed for
