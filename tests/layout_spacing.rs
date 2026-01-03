@@ -62,13 +62,13 @@ fn layout_with_spacing() {
     // Root padding affects child x/y
     assert_eq!(child1.x, 5.0 + 4.0); // root.padding_left + child.margin_left
     assert_eq!(child1.y, 10.0 + 2.0); // root.padding_top + child.margin_top
-    assert_eq!(child1.width, 100.0 - 5.0 - 5.0); // root width minus horizontal padding
+    assert_eq!(child1.width, 100.0 - 5.0 - 5.0 - 4.0 - 5.0); // inner_width - margin_left - margin_right
     assert_eq!(child1.height, 50.0);
 
     // Child2 position accounts for child1 height + margins
     assert_eq!(child2.x, 5.0 + 3.0); // root.padding_left + child2.margin_left
     assert_eq!(child2.y, 10.0 + 2.0 + 50.0 + 3.0 + 1.0);
     // root.padding_top + child1.margin_top + child1.height + child1.margin_bottom + child2.margin_top
-    assert_eq!(child2.width, 100.0 - 5.0 - 5.0); // root width minus horizontal padding
+    assert_eq!(child2.width, 100.0 - 5.0 - 5.0 - 3.0 - 4.0);
     assert_eq!(child2.height, 30.0);
 }
