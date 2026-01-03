@@ -13,7 +13,7 @@ fn flex_row_basic() {
             width: Some(200.0),
             ..Default::default()
         },
-        spacing: Spacing::default(),
+        ..Default::default()
     });
 
     // Editor (takes all remaining space)
@@ -23,8 +23,7 @@ fn flex_row_basic() {
             flex_grow: 1.0,
             ..Default::default()
         },
-        size: SizeStyle::default(),
-        spacing: Spacing::default(),
+        ..Default::default()
     });
 
     // Parent (Row)
@@ -33,9 +32,7 @@ fn flex_row_basic() {
             display: Display::Flex {
                 flex_direction: FlexDirection::Row,
             },
-            item_style: ItemStyle::default(),
-            size: SizeStyle::default(),
-            spacing: Spacing::default(),
+            ..Default::default()
         },
         vec![sidebar, editor],
     );

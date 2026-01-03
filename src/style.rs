@@ -49,12 +49,21 @@ pub struct Spacing {
 }
 
 #[derive(Debug, Clone, Copy, Default)]
+pub enum JustifyContent {
+    #[default]
+    Start,
+    Center,
+    End,
+    SpaceBetween,
+    SpaceAround,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
 pub struct Style {
     pub display: Display,
-
     pub item_style: ItemStyle,
-
     pub size: SizeStyle,
-
     pub spacing: Spacing,
+
+    pub justify_content: JustifyContent,
 }
