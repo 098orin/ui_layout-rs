@@ -1,4 +1,4 @@
-use crate::{Display, FlexDirection, JustifyContent, LayoutNode, Rect};
+use crate::{AlignItems, Display, FlexDirection, JustifyContent, LayoutNode, Rect};
 
 pub struct LayoutEngine;
 
@@ -33,6 +33,7 @@ impl LayoutEngine {
         let inner_width = node.rect.width - s.padding_left - s.padding_right;
         let inner_height = node.rect.height - s.padding_top - s.padding_bottom;
 
+        // --- first pass: fixed + grow ---
         let mut fixed_height = 0.0;
         let mut total_grow = 0.0;
 
@@ -49,7 +50,7 @@ impl LayoutEngine {
 
         let remaining = (inner_height - fixed_height).max(0.0);
 
-        // final sizes for children (size resolution phase)
+        // --- second pass: resolve final heights ---
         let mut sizes: Vec<f32> = Vec::with_capacity(node.children.len());
 
         for child in &node.children {
@@ -69,7 +70,7 @@ impl LayoutEngine {
             sizes.push(h);
         }
 
-        // used / remaining (for justify)
+        // --- justify-content ---
         let mut used = 0.0;
         for (child, height) in node.children.iter().zip(&sizes) {
             used += height + child.style.spacing.margin_top + child.style.spacing.margin_bottom;
@@ -78,21 +79,25 @@ impl LayoutEngine {
         let remaining = (inner_height - used).max(0.0);
         let count = node.children.len();
 
-        // justify-content
-        let (start_offset, gap) =
+        let (start_offset, justify_gap) =
             resolve_justify_content(node.style.justify_content, remaining, count);
 
+        // --- final layout ---
         let mut cursor_y = s.padding_top + start_offset;
 
         for (child, height) in node.children.iter_mut().zip(sizes) {
-            let width = clamp(
-                child.style.size.width.unwrap_or(inner_width),
+            let (width, x_offset) = compute_cross(
+                node.style.align_items,
+                inner_width,
+                child.style.size.width,
                 child.style.size.min_width,
                 child.style.size.max_width,
+                child.style.spacing.margin_left,
+                child.style.spacing.margin_right,
             );
 
             let rect = Rect {
-                x: s.padding_left + child.style.spacing.margin_left,
+                x: s.padding_left + x_offset,
                 y: cursor_y + child.style.spacing.margin_top,
                 width,
                 height,
@@ -100,8 +105,10 @@ impl LayoutEngine {
 
             Self::layout_node(child, rect);
 
-            cursor_y +=
-                height + child.style.spacing.margin_top + child.style.spacing.margin_bottom + gap;
+            cursor_y += height
+                + child.style.spacing.margin_top
+                + child.style.spacing.margin_bottom
+                + justify_gap;
         }
     }
 
@@ -110,6 +117,7 @@ impl LayoutEngine {
         let inner_width = node.rect.width - s.padding_left - s.padding_right;
         let inner_height = node.rect.height - s.padding_top - s.padding_bottom;
 
+        // --- first pass: fixed + grow ---
         let mut fixed_width = 0.0;
         let mut total_grow = 0.0;
 
@@ -126,7 +134,7 @@ impl LayoutEngine {
 
         let remaining = (inner_width - fixed_width).max(0.0);
 
-        // final sizes for children (size resolution phase)
+        // --- second pass: resolve final widths ---
         let mut sizes: Vec<f32> = Vec::with_capacity(node.children.len());
 
         for child in &node.children {
@@ -146,7 +154,7 @@ impl LayoutEngine {
             sizes.push(w);
         }
 
-        // used / remaining (for justify)
+        // --- justify-content ---
         let mut used = 0.0;
         for (child, width) in node.children.iter().zip(&sizes) {
             used += width + child.style.spacing.margin_left + child.style.spacing.margin_right;
@@ -155,30 +163,36 @@ impl LayoutEngine {
         let remaining = (inner_width - used).max(0.0);
         let count = node.children.len();
 
-        // justify-content
-        let (start_offset, gap) =
+        let (start_offset, justify_gap) =
             resolve_justify_content(node.style.justify_content, remaining, count);
 
+        // --- final layout ---
         let mut cursor_x = s.padding_left + start_offset;
 
         for (child, width) in node.children.iter_mut().zip(sizes) {
-            let height = clamp(
-                child.style.size.height.unwrap_or(inner_height),
+            let (height, y_offset) = compute_cross(
+                node.style.align_items,
+                inner_height,
+                child.style.size.height,
                 child.style.size.min_height,
                 child.style.size.max_height,
+                child.style.spacing.margin_top,
+                child.style.spacing.margin_bottom,
             );
 
             let rect = Rect {
                 x: cursor_x + child.style.spacing.margin_left,
-                y: s.padding_top + child.style.spacing.margin_top,
+                y: s.padding_top + y_offset,
                 width,
                 height,
             };
 
             Self::layout_node(child, rect);
 
-            cursor_x +=
-                width + child.style.spacing.margin_left + child.style.spacing.margin_right + gap;
+            cursor_x += width
+                + child.style.spacing.margin_left
+                + child.style.spacing.margin_right
+                + justify_gap;
         }
     }
 
@@ -253,4 +267,30 @@ fn resolve_justify_content(justify: JustifyContent, remaining: f32, count: usize
             }
         }
     }
+}
+
+fn compute_cross(
+    align: AlignItems,
+    container_size: f32,
+    item_size: Option<f32>,
+    min: Option<f32>,
+    max: Option<f32>,
+    margin_start: f32,
+    margin_end: f32,
+) -> (f32, f32) {
+    let mut size = clamp(item_size.unwrap_or(container_size), min, max);
+
+    if matches!(align, AlignItems::Stretch) && item_size.is_none() {
+        size = clamp(container_size - margin_start - margin_end, min, max);
+    }
+
+    let free = container_size - size - margin_start - margin_end;
+
+    let offset = match align {
+        AlignItems::Start | AlignItems::Stretch => margin_start,
+        AlignItems::Center => margin_start + free / 2.0,
+        AlignItems::End => margin_start + free,
+    };
+
+    (size, offset)
 }
