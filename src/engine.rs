@@ -229,7 +229,6 @@ fn resolve_justify_content(justify: JustifyContent, remaining: f32, count: usize
         JustifyContent::Start => (0.0, 0.0),
         JustifyContent::Center => (remaining / 2.0, 0.0),
         JustifyContent::End => (remaining, 0.0),
-
         JustifyContent::SpaceBetween => {
             if count > 1 {
                 (0.0, remaining / (count as f32 - 1.0))
@@ -237,7 +236,6 @@ fn resolve_justify_content(justify: JustifyContent, remaining: f32, count: usize
                 (0.0, 0.0)
             }
         }
-
         JustifyContent::SpaceAround => {
             if count > 0 {
                 let gap = remaining / count as f32;
@@ -246,7 +244,6 @@ fn resolve_justify_content(justify: JustifyContent, remaining: f32, count: usize
                 (0.0, 0.0)
             }
         }
-
         JustifyContent::SpaceEvenly => {
             if count > 0 {
                 let gap = remaining / (count as f32 + 1.0);
