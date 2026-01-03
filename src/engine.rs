@@ -79,34 +79,8 @@ impl LayoutEngine {
         let count = node.children.len();
 
         // justify-content
-        let (start_offset, gap) = match node.style.justify_content {
-            JustifyContent::Start => (0.0, 0.0),
-            JustifyContent::Center => (remaining / 2.0, 0.0),
-            JustifyContent::End => (remaining, 0.0),
-            JustifyContent::SpaceBetween => {
-                if count > 1 {
-                    (0.0, remaining / (count as f32 - 1.0))
-                } else {
-                    (0.0, 0.0)
-                }
-            }
-            JustifyContent::SpaceAround => {
-                if count > 0 {
-                    let gap = remaining / count as f32;
-                    (gap / 2.0, gap)
-                } else {
-                    (0.0, 0.0)
-                }
-            }
-            JustifyContent::SpaceEvenly => {
-                if count > 0 {
-                    let gap = remaining / (count as f32 + 1.0);
-                    (gap, gap)
-                } else {
-                    (0.0, 0.0)
-                }
-            }
-        };
+        let (start_offset, gap) =
+            resolve_justify_content(node.style.justify_content, remaining, count);
 
         let mut cursor_y = s.padding_top + start_offset;
 
@@ -182,34 +156,8 @@ impl LayoutEngine {
         let count = node.children.len();
 
         // justify-content
-        let (start_offset, gap) = match node.style.justify_content {
-            JustifyContent::Start => (0.0, 0.0),
-            JustifyContent::Center => (remaining / 2.0, 0.0),
-            JustifyContent::End => (remaining, 0.0),
-            JustifyContent::SpaceBetween => {
-                if count > 1 {
-                    (0.0, remaining / (count as f32 - 1.0))
-                } else {
-                    (0.0, 0.0)
-                }
-            }
-            JustifyContent::SpaceAround => {
-                if count > 0 {
-                    let gap = remaining / count as f32;
-                    (gap / 2.0, gap)
-                } else {
-                    (0.0, 0.0)
-                }
-            }
-            JustifyContent::SpaceEvenly => {
-                if count > 0 {
-                    let gap = remaining / (count as f32 + 1.0);
-                    (gap, gap)
-                } else {
-                    (0.0, 0.0)
-                }
-            }
-        };
+        let (start_offset, gap) =
+            resolve_justify_content(node.style.justify_content, remaining, count);
 
         let mut cursor_x = s.padding_left + start_offset;
 
@@ -274,4 +222,38 @@ fn clamp(value: f32, min: Option<f32>, max: Option<f32>) -> f32 {
         v = v.min(max);
     }
     v
+}
+
+fn resolve_justify_content(justify: JustifyContent, remaining: f32, count: usize) -> (f32, f32) {
+    match justify {
+        JustifyContent::Start => (0.0, 0.0),
+        JustifyContent::Center => (remaining / 2.0, 0.0),
+        JustifyContent::End => (remaining, 0.0),
+
+        JustifyContent::SpaceBetween => {
+            if count > 1 {
+                (0.0, remaining / (count as f32 - 1.0))
+            } else {
+                (0.0, 0.0)
+            }
+        }
+
+        JustifyContent::SpaceAround => {
+            if count > 0 {
+                let gap = remaining / count as f32;
+                (gap / 2.0, gap)
+            } else {
+                (0.0, 0.0)
+            }
+        }
+
+        JustifyContent::SpaceEvenly => {
+            if count > 0 {
+                let gap = remaining / (count as f32 + 1.0);
+                (gap, gap)
+            } else {
+                (0.0, 0.0)
+            }
+        }
+    }
 }
