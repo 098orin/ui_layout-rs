@@ -41,6 +41,10 @@ impl LayoutEngine {
                 fixed_height +=
                     h + child.style.spacing.margin_top + child.style.spacing.margin_bottom;
             } else {
+                if let Some(basis) = child.style.item_style.flex_basis {
+                    fixed_height +=
+                        basis + child.style.spacing.margin_top + child.style.spacing.margin_bottom;
+                }
                 total_grow += child.style.item_style.flex_grow;
             }
         }
@@ -59,7 +63,8 @@ impl LayoutEngine {
                 if let Some(h) = child.style.size.height {
                     h
                 } else if total_grow > 0.0 {
-                    remaining * (child.style.item_style.flex_grow / total_grow)
+                    child.style.item_style.flex_basis.unwrap_or(0.0)
+                        + remaining * (child.style.item_style.flex_grow / total_grow)
                 } else {
                     inner_height
                 },
@@ -92,6 +97,10 @@ impl LayoutEngine {
                 fixed_width +=
                     w + child.style.spacing.margin_left + child.style.spacing.margin_right;
             } else {
+                if let Some(basis) = child.style.item_style.flex_basis {
+                    fixed_width +=
+                        basis + child.style.spacing.margin_left + child.style.spacing.margin_right;
+                }
                 total_grow += child.style.item_style.flex_grow;
             }
         }
@@ -104,7 +113,8 @@ impl LayoutEngine {
                 if let Some(w) = child.style.size.width {
                     w
                 } else if total_grow > 0.0 {
-                    remaining * (child.style.item_style.flex_grow / total_grow)
+                    child.style.item_style.flex_basis.unwrap_or(0.0)
+                        + remaining * (child.style.item_style.flex_grow / total_grow)
                 } else {
                     0.0
                 },

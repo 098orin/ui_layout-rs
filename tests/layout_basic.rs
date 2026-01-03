@@ -5,7 +5,10 @@ fn flex_row_basic() {
     // Left sidebar (fixed width)
     let sidebar = LayoutNode::new(Style {
         display: Display::Block,
-        item_style: ItemStyle { flex_grow: 0.0 },
+        item_style: ItemStyle {
+            flex_grow: 0.0,
+            ..Default::default()
+        },
         size: SizeStyle {
             width: Some(200.0),
             ..Default::default()
@@ -16,7 +19,10 @@ fn flex_row_basic() {
     // Editor (takes all remaining space)
     let editor = LayoutNode::new(Style {
         display: Display::Block,
-        item_style: ItemStyle { flex_grow: 1.0 },
+        item_style: ItemStyle {
+            flex_grow: 1.0,
+            ..Default::default()
+        },
         size: SizeStyle::default(),
         spacing: Spacing::default(),
     });
@@ -71,7 +77,10 @@ fn layout_mvp() {
 
     let editor = LayoutNode::new(Style {
         display: Display::Block,
-        item_style: ItemStyle { flex_grow: 1.0 },
+        item_style: ItemStyle {
+            flex_grow: 1.0,
+            ..Default::default()
+        },
         size: SizeStyle::default(),
         ..Style::default()
     });
@@ -81,7 +90,10 @@ fn layout_mvp() {
             display: Display::Flex {
                 flex_direction: FlexDirection::Row,
             },
-            item_style: ItemStyle { flex_grow: 1.0 },
+            item_style: ItemStyle {
+                flex_grow: 1.0,
+                ..Default::default()
+            },
             size: SizeStyle::default(),
             ..Style::default()
         },

@@ -23,6 +23,7 @@ pub enum FlexDirection {
 #[derive(Debug, Clone, Copy, Default)]
 pub struct ItemStyle {
     pub flex_grow: f32,
+    pub flex_basis: Option<f32>,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
