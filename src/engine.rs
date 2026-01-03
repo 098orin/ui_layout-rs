@@ -132,10 +132,11 @@ impl LayoutEngine {
         let gap = axis.gap(&node.style).max(0.0);
         let gap_count = node.children.len().saturating_sub(1) as f32;
 
-        let inner_main = axis.main(&node.rect)
+        let inner_main = (axis.main(&node.rect)
             - axis.padding_main_start(spacing)
-            - axis.padding_main_end(spacing);
-        let inner_cross = axis.cross(&node.rect) - axis.padding_cross(spacing);
+            - axis.padding_main_end(spacing))
+        .max(0.0);
+        let inner_cross = (axis.cross(&node.rect) - axis.padding_cross(spacing)).max(0.0);
 
         // --- first pass ---
         let mut fixed = gap * gap_count;
@@ -173,6 +174,7 @@ impl LayoutEngine {
                     axis.min(&child.style.size),
                     axis.max(&child.style.size),
                 )
+                .max(0.0)
             })
             .collect();
 
@@ -209,14 +211,14 @@ impl LayoutEngine {
                 Axis::Horizontal => Rect {
                     x: cursor + child.style.spacing.margin_left,
                     y: spacing.padding_top + cross_offset,
-                    width: main_size,
+                    width: main_size.max(0.0),
                     height: cross_size,
                 },
                 Axis::Vertical => Rect {
                     x: spacing.padding_left + cross_offset,
                     y: cursor + child.style.spacing.margin_top,
                     width: cross_size,
-                    height: main_size,
+                    height: main_size.max(0.0),
                 },
             };
 
@@ -309,6 +311,8 @@ fn compute_cross(
     if matches!(align, AlignItems::Stretch) && item.is_none() {
         size = clamp(container - margin_start - margin_end, min, max);
     }
+
+    size = size.max(0.0);
 
     let free = container - size - margin_start - margin_end;
 
