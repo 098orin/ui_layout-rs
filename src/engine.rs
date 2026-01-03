@@ -20,12 +20,8 @@ impl LayoutEngine {
 
         match node.style.display {
             Display::Flex { flex_direction } => match flex_direction {
-                FlexDirection::Column => {
-                    Self::layout_column(node);
-                }
-                FlexDirection::Row => {
-                    Self::layout_row(node);
-                }
+                FlexDirection::Column => Self::layout_column(node),
+                FlexDirection::Row => Self::layout_row(node),
             },
             Display::Block => Self::layout_block(node),
             Display::None => {}
@@ -48,7 +44,6 @@ impl LayoutEngine {
         }
 
         let remaining = (inner_height - fixed_height).max(0.0);
-
         let mut cursor_y = node.style.padding;
 
         for child in &mut node.children {
@@ -98,7 +93,6 @@ impl LayoutEngine {
         }
 
         let remaining = (inner_width - fixed_width).max(0.0);
-
         let mut cursor_x = node.style.padding;
 
         for child in &mut node.children {
@@ -162,7 +156,6 @@ impl LayoutEngine {
     }
 }
 
-/// min/max を考慮した clamp
 fn clamp(value: f32, min: Option<f32>, max: Option<f32>) -> f32 {
     let mut v = value;
     if let Some(min) = min {
