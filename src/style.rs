@@ -56,6 +56,7 @@ pub enum JustifyContent {
     End,
     SpaceBetween,
     SpaceAround,
+    SpaceEvenly,
 }
 
 #[derive(Debug, Clone, Copy, Default)]

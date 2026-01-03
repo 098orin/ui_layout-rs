@@ -98,6 +98,14 @@ impl LayoutEngine {
                     (0.0, 0.0)
                 }
             }
+            JustifyContent::SpaceEvenly => {
+                if count > 0 {
+                    let gap = remaining / (count as f32 + 1.0);
+                    (gap, gap)
+                } else {
+                    (0.0, 0.0)
+                }
+            }
         };
 
         let mut cursor_y = s.padding_top + start_offset;
@@ -189,6 +197,14 @@ impl LayoutEngine {
                 if count > 0 {
                     let gap = remaining / count as f32;
                     (gap / 2.0, gap)
+                } else {
+                    (0.0, 0.0)
+                }
+            }
+            JustifyContent::SpaceEvenly => {
+                if count > 0 {
+                    let gap = remaining / (count as f32 + 1.0);
+                    (gap, gap)
                 } else {
                     (0.0, 0.0)
                 }
