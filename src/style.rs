@@ -60,6 +60,15 @@ pub enum JustifyContent {
 }
 
 #[derive(Debug, Clone, Copy, Default)]
+pub enum AlignItems {
+    Start,
+    Center,
+    End,
+    #[default]
+    Stretch,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
 pub struct Style {
     pub display: Display,
     pub item_style: ItemStyle,
@@ -67,4 +76,5 @@ pub struct Style {
     pub spacing: Spacing,
 
     pub justify_content: JustifyContent,
+    pub align_items: AlignItems,
 }
