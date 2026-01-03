@@ -77,4 +77,6 @@ pub struct Style {
 
     pub justify_content: JustifyContent,
     pub align_items: AlignItems,
+    pub column_gap: f32,
+    pub row_gap: f32,
 }

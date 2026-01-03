@@ -1,5 +1,5 @@
 use crate::{
-    AlignItems, Display, FlexDirection, JustifyContent, LayoutNode, Rect, SizeStyle, Spacing,
+    AlignItems, Display, FlexDirection, JustifyContent, LayoutNode, Rect, SizeStyle, Spacing, Style,
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -88,6 +88,14 @@ impl Axis {
             Self::Vertical => (s.width, s.min_width, s.max_width),
         }
     }
+
+    // --- gap ---
+    fn gap(&self, style: &Style) -> f32 {
+        match self {
+            Self::Horizontal => style.column_gap,
+            Self::Vertical => style.row_gap,
+        }
+    }
 }
 
 pub struct LayoutEngine;
@@ -121,13 +129,16 @@ impl LayoutEngine {
     fn layout_flex(node: &mut LayoutNode, axis: Axis) {
         let spacing = &node.style.spacing;
 
+        let gap = axis.gap(&node.style);
+        let gap_count = node.children.len().saturating_sub(1) as f32;
+
         let inner_main = axis.main(&node.rect)
             - axis.padding_main_start(spacing)
             - axis.padding_main_end(spacing);
         let inner_cross = axis.cross(&node.rect) - axis.padding_cross(spacing);
 
         // --- first pass ---
-        let mut fixed = 0.0;
+        let mut fixed = gap * gap_count;
         let mut total_grow = 0.0;
 
         for child in &node.children {
@@ -171,10 +182,11 @@ impl LayoutEngine {
             .iter()
             .zip(&sizes)
             .map(|(c, s)| s + axis.margin_main(&c.style.spacing))
-            .sum();
+            .sum::<f32>()
+            + gap * gap_count;
 
         let remaining = (inner_main - used).max(0.0);
-        let (start_offset, gap) =
+        let (start_offset, justify_gap) =
             resolve_justify_content(node.style.justify_content, remaining, node.children.len());
 
         // --- final layout ---
@@ -210,7 +222,7 @@ impl LayoutEngine {
 
             Self::layout_node(child, rect);
 
-            cursor += main_size + axis.margin_main(&child.style.spacing) + gap;
+            cursor += main_size + axis.margin_main(&child.style.spacing) + gap + justify_gap;
         }
     }
 
