@@ -1,4 +1,4 @@
-use crate::{Display, FlexDirection, LayoutNode, Rect};
+use crate::{Display, FlexDirection, JustifyContent, LayoutNode, Rect};
 
 pub struct LayoutEngine;
 
@@ -48,26 +48,65 @@ impl LayoutEngine {
         }
 
         let remaining = (inner_height - fixed_height).max(0.0);
-        let mut cursor_y = s.padding_top;
 
-        for child in &mut node.children {
-            let width = clamp(
-                child.style.size.width.unwrap_or(inner_width),
-                child.style.size.min_width,
-                child.style.size.max_width,
-            );
+        // final sizes for children (size resolution phase)
+        let mut sizes: Vec<f32> = Vec::with_capacity(node.children.len());
 
-            let height = clamp(
+        for child in &node.children {
+            let h = clamp(
                 if let Some(h) = child.style.size.height {
                     h
                 } else if total_grow > 0.0 {
                     child.style.item_style.flex_basis.unwrap_or(0.0)
-                        + remaining * (child.style.item_style.flex_grow / total_grow)
+                        + remaining * (child.style.item_style.flex_grow.max(0.0) / total_grow)
                 } else {
-                    inner_height
+                    child.style.item_style.flex_basis.unwrap_or(0.0)
                 },
                 child.style.size.min_height,
                 child.style.size.max_height,
+            );
+
+            sizes.push(h);
+        }
+
+        // used / remaining (for justify)
+        let mut used = 0.0;
+        for (child, height) in node.children.iter().zip(&sizes) {
+            used += height + child.style.spacing.margin_top + child.style.spacing.margin_bottom;
+        }
+
+        let remaining = (inner_height - used).max(0.0);
+        let count = node.children.len();
+
+        // justify-content
+        let (start_offset, gap) = match node.style.justify_content {
+            JustifyContent::Start => (0.0, 0.0),
+            JustifyContent::Center => (remaining / 2.0, 0.0),
+            JustifyContent::End => (remaining, 0.0),
+            JustifyContent::SpaceBetween => {
+                if count > 1 {
+                    (0.0, remaining / (count as f32 - 1.0))
+                } else {
+                    (0.0, 0.0)
+                }
+            }
+            JustifyContent::SpaceAround => {
+                if count > 0 {
+                    let gap = remaining / count as f32;
+                    (gap / 2.0, gap)
+                } else {
+                    (0.0, 0.0)
+                }
+            }
+        };
+
+        let mut cursor_y = s.padding_top + start_offset;
+
+        for (child, height) in node.children.iter_mut().zip(sizes) {
+            let width = clamp(
+                child.style.size.width.unwrap_or(inner_width),
+                child.style.size.min_width,
+                child.style.size.max_width,
             );
 
             let rect = Rect {
@@ -78,7 +117,9 @@ impl LayoutEngine {
             };
 
             Self::layout_node(child, rect);
-            cursor_y += height + child.style.spacing.margin_top + child.style.spacing.margin_bottom;
+
+            cursor_y +=
+                height + child.style.spacing.margin_top + child.style.spacing.margin_bottom + gap;
         }
     }
 
@@ -102,22 +143,61 @@ impl LayoutEngine {
         }
 
         let remaining = (inner_width - fixed_width).max(0.0);
-        let mut cursor_x = s.padding_left;
 
-        for child in &mut node.children {
-            let width = clamp(
+        // final sizes for children (size resolution phase)
+        let mut sizes: Vec<f32> = Vec::with_capacity(node.children.len());
+
+        for child in &node.children {
+            let w = clamp(
                 if let Some(w) = child.style.size.width {
                     w
                 } else if total_grow > 0.0 {
                     child.style.item_style.flex_basis.unwrap_or(0.0)
-                        + remaining * (child.style.item_style.flex_grow / total_grow)
+                        + remaining * (child.style.item_style.flex_grow.max(0.0) / total_grow)
                 } else {
-                    0.0
+                    child.style.item_style.flex_basis.unwrap_or(0.0)
                 },
                 child.style.size.min_width,
                 child.style.size.max_width,
             );
 
+            sizes.push(w);
+        }
+
+        // used / remaining (for justify)
+        let mut used = 0.0;
+        for (child, width) in node.children.iter().zip(&sizes) {
+            used += width + child.style.spacing.margin_left + child.style.spacing.margin_right;
+        }
+
+        let remaining = (inner_width - used).max(0.0);
+        let count = node.children.len();
+
+        // justify-content
+        let (start_offset, gap) = match node.style.justify_content {
+            JustifyContent::Start => (0.0, 0.0),
+            JustifyContent::Center => (remaining / 2.0, 0.0),
+            JustifyContent::End => (remaining, 0.0),
+            JustifyContent::SpaceBetween => {
+                if count > 1 {
+                    (0.0, remaining / (count as f32 - 1.0))
+                } else {
+                    (0.0, 0.0)
+                }
+            }
+            JustifyContent::SpaceAround => {
+                if count > 0 {
+                    let gap = remaining / count as f32;
+                    (gap / 2.0, gap)
+                } else {
+                    (0.0, 0.0)
+                }
+            }
+        };
+
+        let mut cursor_x = s.padding_left + start_offset;
+
+        for (child, width) in node.children.iter_mut().zip(sizes) {
             let height = clamp(
                 child.style.size.height.unwrap_or(inner_height),
                 child.style.size.min_height,
@@ -132,7 +212,9 @@ impl LayoutEngine {
             };
 
             Self::layout_node(child, rect);
-            cursor_x += width + child.style.spacing.margin_left + child.style.spacing.margin_right;
+
+            cursor_x +=
+                width + child.style.spacing.margin_left + child.style.spacing.margin_right + gap;
         }
     }
 
