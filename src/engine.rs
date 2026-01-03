@@ -27,10 +27,7 @@ impl LayoutEngine {
                     Self::layout_row(node);
                 }
             },
-            Display::Block => {
-                // TODO: block layout (currently treated as column)
-                Self::layout_column(node);
-            }
+            Display::Block => Self::layout_block(node),
             Display::None => {}
         }
     }
@@ -134,4 +131,45 @@ impl LayoutEngine {
             cursor_x += width;
         }
     }
+
+    fn layout_block(node: &mut LayoutNode) {
+        let inner_width = node.rect.width - node.style.padding * 2.0;
+        let mut cursor_y = node.style.padding;
+
+        for child in &mut node.children {
+            let width = clamp(
+                child.style.size.width.unwrap_or(inner_width),
+                child.style.size.min_width,
+                child.style.size.max_width,
+            );
+
+            let height = clamp(
+                child.style.size.height.unwrap_or(0.0),
+                child.style.size.min_height,
+                child.style.size.max_height,
+            );
+
+            let rect = Rect {
+                x: node.style.padding,
+                y: cursor_y,
+                width,
+                height,
+            };
+
+            Self::layout_node(child, rect);
+            cursor_y += height;
+        }
+    }
+}
+
+/// min/max を考慮した clamp
+fn clamp(value: f32, min: Option<f32>, max: Option<f32>) -> f32 {
+    let mut v = value;
+    if let Some(min) = min {
+        v = v.max(min);
+    }
+    if let Some(max) = max {
+        v = v.min(max);
+    }
+    v
 }
