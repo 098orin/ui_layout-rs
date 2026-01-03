@@ -1,4 +1,71 @@
-use crate::{AlignItems, Display, FlexDirection, JustifyContent, LayoutNode, Rect};
+use crate::{
+    AlignItems, Display, FlexDirection, JustifyContent, LayoutNode, Rect, SizeStyle, Spacing,
+};
+
+#[derive(Debug, Clone, Copy)]
+enum Axis {
+    Horizontal, // row
+    Vertical,   // column
+}
+impl Axis {
+    fn main_size(&self, rect: &Rect) -> f32 {
+        match self {
+            Axis::Horizontal => rect.width,
+            Axis::Vertical => rect.height,
+        }
+    }
+    fn cross_size(&self, rect: &Rect) -> f32 {
+        match self {
+            Axis::Horizontal => rect.height,
+            Axis::Vertical => rect.width,
+        }
+    }
+
+    fn padding_start(&self, s: &Spacing) -> f32 {
+        match self {
+            Axis::Horizontal => s.padding_left,
+            Axis::Vertical => s.padding_top,
+        }
+    }
+    fn padding_end(&self, s: &Spacing) -> f32 {
+        match self {
+            Axis::Horizontal => s.padding_right,
+            Axis::Vertical => s.padding_bottom,
+        }
+    }
+
+    fn margin_start(&self, s: &Spacing) -> f32 {
+        match self {
+            Axis::Horizontal => s.margin_left,
+            Axis::Vertical => s.margin_top,
+        }
+    }
+    fn margin_end(&self, s: &Spacing) -> f32 {
+        match self {
+            Axis::Horizontal => s.margin_right,
+            Axis::Vertical => s.margin_bottom,
+        }
+    }
+
+    fn size(&self, size: &SizeStyle) -> Option<f32> {
+        match self {
+            Axis::Horizontal => size.width,
+            Axis::Vertical => size.height,
+        }
+    }
+    fn min_size(&self, size: &SizeStyle) -> Option<f32> {
+        match self {
+            Axis::Horizontal => size.min_width,
+            Axis::Vertical => size.min_height,
+        }
+    }
+    fn max_size(&self, size: &SizeStyle) -> Option<f32> {
+        match self {
+            Axis::Horizontal => size.max_width,
+            Axis::Vertical => size.max_height,
+        }
+    }
+}
 
 pub struct LayoutEngine;
 
@@ -20,179 +87,126 @@ impl LayoutEngine {
 
         match node.style.display {
             Display::Flex { flex_direction } => match flex_direction {
-                FlexDirection::Column => Self::layout_column(node),
-                FlexDirection::Row => Self::layout_row(node),
+                FlexDirection::Column => Self::layout_flex(node, Axis::Vertical),
+                FlexDirection::Row => Self::layout_flex(node, Axis::Horizontal),
             },
             Display::Block => Self::layout_block(node),
             Display::None => {}
         }
     }
 
-    fn layout_column(node: &mut LayoutNode) {
+    fn layout_flex(node: &mut LayoutNode, axis: Axis) {
         let s = &node.style.spacing;
-        let inner_width = node.rect.width - s.padding_left - s.padding_right;
-        let inner_height = node.rect.height - s.padding_top - s.padding_bottom;
 
-        // --- first pass: fixed + grow ---
-        let mut fixed_height = 0.0;
+        let inner_main = axis.main_size(&node.rect) - axis.padding_start(s) - axis.padding_end(s);
+
+        let inner_cross = axis.cross_size(&node.rect)
+            - match axis {
+                Axis::Horizontal => s.padding_top + s.padding_bottom,
+                Axis::Vertical => s.padding_left + s.padding_right,
+            };
+
+        // --- first pass ---
+        let mut fixed = 0.0;
         let mut total_grow = 0.0;
 
         for child in &node.children {
-            let margin = child.style.spacing.margin_top + child.style.spacing.margin_bottom;
+            let margin =
+                axis.margin_start(&child.style.spacing) + axis.margin_end(&child.style.spacing);
 
-            if let Some(h) = child.style.size.height {
-                fixed_height += h + margin;
+            if let Some(v) = axis.size(&child.style.size) {
+                fixed += v + margin;
             } else {
-                fixed_height += child.style.item_style.flex_basis.unwrap_or(0.0) + margin;
+                fixed += child.style.item_style.flex_basis.unwrap_or(0.0) + margin;
                 total_grow += child.style.item_style.flex_grow.max(0.0);
             }
         }
 
-        let remaining = (inner_height - fixed_height).max(0.0);
+        let remaining = (inner_main - fixed).max(0.0);
 
-        // --- second pass: resolve final heights ---
-        let mut sizes: Vec<f32> = Vec::with_capacity(node.children.len());
+        // --- second pass ---
+        let mut sizes = Vec::with_capacity(node.children.len());
 
         for child in &node.children {
-            let h = clamp(
-                if let Some(h) = child.style.size.height {
-                    h
+            let v = clamp(
+                if let Some(v) = axis.size(&child.style.size) {
+                    v
                 } else if total_grow > 0.0 {
                     child.style.item_style.flex_basis.unwrap_or(0.0)
                         + remaining * (child.style.item_style.flex_grow.max(0.0) / total_grow)
                 } else {
                     child.style.item_style.flex_basis.unwrap_or(0.0)
                 },
-                child.style.size.min_height,
-                child.style.size.max_height,
+                axis.min_size(&child.style.size),
+                axis.max_size(&child.style.size),
             );
 
-            sizes.push(h);
+            sizes.push(v);
         }
 
         // --- justify-content ---
         let mut used = 0.0;
-        for (child, height) in node.children.iter().zip(&sizes) {
-            used += height + child.style.spacing.margin_top + child.style.spacing.margin_bottom;
+        for (child, size) in node.children.iter().zip(&sizes) {
+            used += size
+                + axis.margin_start(&child.style.spacing)
+                + axis.margin_end(&child.style.spacing);
         }
 
-        let remaining = (inner_height - used).max(0.0);
-        let count = node.children.len();
+        let remaining = (inner_main - used).max(0.0);
 
-        let (start_offset, justify_gap) =
-            resolve_justify_content(node.style.justify_content, remaining, count);
+        let (start_offset, gap) =
+            resolve_justify_content(node.style.justify_content, remaining, node.children.len());
 
         // --- final layout ---
-        let mut cursor_y = s.padding_top + start_offset;
+        let mut cursor = axis.padding_start(s) + start_offset;
 
-        for (child, height) in node.children.iter_mut().zip(sizes) {
-            let (width, x_offset) = compute_cross(
+        for (child, main_size) in node.children.iter_mut().zip(sizes) {
+            let (cross_size, cross_offset) = compute_cross(
                 node.style.align_items,
-                inner_width,
-                child.style.size.width,
-                child.style.size.min_width,
-                child.style.size.max_width,
-                child.style.spacing.margin_left,
-                child.style.spacing.margin_right,
-            );
-
-            let rect = Rect {
-                x: s.padding_left + x_offset,
-                y: cursor_y + child.style.spacing.margin_top,
-                width,
-                height,
-            };
-
-            Self::layout_node(child, rect);
-
-            cursor_y += height
-                + child.style.spacing.margin_top
-                + child.style.spacing.margin_bottom
-                + justify_gap;
-        }
-    }
-
-    fn layout_row(node: &mut LayoutNode) {
-        let s = &node.style.spacing;
-        let inner_width = node.rect.width - s.padding_left - s.padding_right;
-        let inner_height = node.rect.height - s.padding_top - s.padding_bottom;
-
-        // --- first pass: fixed + grow ---
-        let mut fixed_width = 0.0;
-        let mut total_grow = 0.0;
-
-        for child in &node.children {
-            let margin = child.style.spacing.margin_left + child.style.spacing.margin_right;
-
-            if let Some(w) = child.style.size.width {
-                fixed_width += w + margin;
-            } else {
-                fixed_width += child.style.item_style.flex_basis.unwrap_or(0.0) + margin;
-                total_grow += child.style.item_style.flex_grow.max(0.0);
-            }
-        }
-
-        let remaining = (inner_width - fixed_width).max(0.0);
-
-        // --- second pass: resolve final widths ---
-        let mut sizes: Vec<f32> = Vec::with_capacity(node.children.len());
-
-        for child in &node.children {
-            let w = clamp(
-                if let Some(w) = child.style.size.width {
-                    w
-                } else if total_grow > 0.0 {
-                    child.style.item_style.flex_basis.unwrap_or(0.0)
-                        + remaining * (child.style.item_style.flex_grow.max(0.0) / total_grow)
-                } else {
-                    child.style.item_style.flex_basis.unwrap_or(0.0)
+                inner_cross,
+                match axis {
+                    Axis::Horizontal => child.style.size.height,
+                    Axis::Vertical => child.style.size.width,
                 },
-                child.style.size.min_width,
-                child.style.size.max_width,
+                match axis {
+                    Axis::Horizontal => child.style.size.min_height,
+                    Axis::Vertical => child.style.size.min_width,
+                },
+                match axis {
+                    Axis::Horizontal => child.style.size.max_height,
+                    Axis::Vertical => child.style.size.max_width,
+                },
+                match axis {
+                    Axis::Horizontal => child.style.spacing.margin_top,
+                    Axis::Vertical => child.style.spacing.margin_left,
+                },
+                match axis {
+                    Axis::Horizontal => child.style.spacing.margin_bottom,
+                    Axis::Vertical => child.style.spacing.margin_right,
+                },
             );
 
-            sizes.push(w);
-        }
-
-        // --- justify-content ---
-        let mut used = 0.0;
-        for (child, width) in node.children.iter().zip(&sizes) {
-            used += width + child.style.spacing.margin_left + child.style.spacing.margin_right;
-        }
-
-        let remaining = (inner_width - used).max(0.0);
-        let count = node.children.len();
-
-        let (start_offset, justify_gap) =
-            resolve_justify_content(node.style.justify_content, remaining, count);
-
-        // --- final layout ---
-        let mut cursor_x = s.padding_left + start_offset;
-
-        for (child, width) in node.children.iter_mut().zip(sizes) {
-            let (height, y_offset) = compute_cross(
-                node.style.align_items,
-                inner_height,
-                child.style.size.height,
-                child.style.size.min_height,
-                child.style.size.max_height,
-                child.style.spacing.margin_top,
-                child.style.spacing.margin_bottom,
-            );
-
-            let rect = Rect {
-                x: cursor_x + child.style.spacing.margin_left,
-                y: s.padding_top + y_offset,
-                width,
-                height,
+            let rect = match axis {
+                Axis::Horizontal => Rect {
+                    x: cursor + child.style.spacing.margin_left,
+                    y: s.padding_top + cross_offset,
+                    width: main_size,
+                    height: cross_size,
+                },
+                Axis::Vertical => Rect {
+                    x: s.padding_left + cross_offset,
+                    y: cursor + child.style.spacing.margin_top,
+                    width: cross_size,
+                    height: main_size,
+                },
             };
 
             Self::layout_node(child, rect);
 
-            cursor_x += width
-                + child.style.spacing.margin_left
-                + child.style.spacing.margin_right
-                + justify_gap;
+            cursor += main_size
+                + axis.margin_start(&child.style.spacing)
+                + axis.margin_end(&child.style.spacing)
+                + gap;
         }
     }
 
