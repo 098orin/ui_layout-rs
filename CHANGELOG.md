@@ -9,6 +9,9 @@ and this project loosely follows Semantic Versioning.
 
 ## [0.4.0] - 2026-01-04
 
+> [!WARNING]
+> This version is yanked.
+
 ### Added
 
 * `align_self` support for flex items
