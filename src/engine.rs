@@ -236,7 +236,11 @@ impl LayoutEngine {
         let children_len = node.children.len();
 
         for (i, (child, main_size)) in node.children.iter_mut().zip(&sizes).enumerate() {
-            let child_cross_fallback = axis.cross_size(&child.style.size).0.unwrap_or(0.0)
+            let child_cross_fallback = axis
+                .cross_size(&child.style.size)
+                .0
+                .or(inner_cross)
+                .unwrap_or(0.0)
                 + axis.margin_cross_start(&child.style.spacing)
                 + axis.margin_cross_end(&child.style.spacing);
 
@@ -345,14 +349,12 @@ impl LayoutEngine {
         }
 
         // resolve auto size
-        let computed_width =
-            resolved_width.unwrap_or(max_child_width + s.padding_left + s.padding_right);
+        let computed_width = available
+            .width
+            .or(resolved_width)
+            .unwrap_or(max_child_width + s.padding_left + s.padding_right);
 
-        let computed_height = node
-            .style
-            .size
-            .height
-            .unwrap_or(cursor_y + s.padding_bottom);
+        let computed_height = available.height.unwrap_or(cursor_y + s.padding_bottom);
 
         // max, min
         let final_width = clamp(
