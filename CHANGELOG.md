@@ -7,6 +7,14 @@ and this project loosely follows Semantic Versioning.
 
 ---
 
+## [0.4.2] - 2026-01-04
+
+### Fixed
+
+* Corrected child coordinate calculation bug in block layouts.
+
+---
+
 ## [0.4.1] - 2026-01-04
 
 ### Fixed
