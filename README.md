@@ -51,11 +51,12 @@ see the unit tests in the [`tests/`](tests/) directory. They provide practical u
 
 See [CHANGELOG.md](CHANGELOG.md) for a detailed list of changes.
 
-* Version: **0.3.0**
+* Version: **0.4.0**
 * API is evolving but now includes full Flexbox-like alignment and gaps
 
 Future versions may add:
 
+* `flex_shrink`
 * `grid`
 * Additional flex sizing rules (wrap, fr units, etc.)
 * Absolute / fixed positioning

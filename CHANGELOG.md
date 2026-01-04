@@ -7,6 +7,24 @@ and this project loosely follows Semantic Versioning.
 
 ---
 
+## [0.4.0] - 2026-01-04
+
+### Added
+
+* `align_self` support for flex items
+* Automatic size resolution for items with `width` or `height` set to `None`
+* Support for negative available space in flex layouts (no panics, layout adjusts automatically)
+
+### Changed
+
+* Layout engine applies `align_self` over parent `align_items`
+
+### Fixed
+
+* Improved calculation of flex layouts when container space is smaller than total children sizes
+
+---
+
 ## [0.3.0] - 2026-01-03
 
 ### Added
