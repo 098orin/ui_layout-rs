@@ -197,6 +197,9 @@ impl LayoutEngine {
             gap,
         );
 
+        // --- redistribute remaining flex_grow after clamp ---
+        Self::redistribute_flex_grow_after_layout(node, axis, inner_main, gap);
+
         // --- final container size ---
         let content_main = Self::calculate_content_main(node, axis, gap);
 
@@ -333,6 +336,73 @@ impl LayoutEngine {
             cursor += axis.main(&child.rect) + axis.margin_main(&child.style.spacing) + gap;
         }
         max_cross
+    }
+
+    fn redistribute_flex_grow_after_layout(
+        node: &mut LayoutNode,
+        axis: Axis,
+        inner_main: f32,
+        gap: f32,
+    ) {
+        // --- sizes of children ---
+        let mut sizes: Vec<f32> = node.children.iter().map(|c| axis.main(&c.rect)).collect();
+
+        // --- compute from free space ---
+        let content_main: f32 =
+            sizes.iter().sum::<f32>() + gap * (node.children.len().saturating_sub(1) as f32);
+        let mut remaining = (inner_main - content_main).max(0.0);
+
+        let mut iteration = 0;
+        while remaining > 0.0 && iteration < 10 {
+            let total_grow: f32 = node
+                .children
+                .iter()
+                .zip(&sizes)
+                .filter(|(c, s)| *s < &axis.max(&c.style.size).unwrap_or(f32::INFINITY))
+                .map(|(c, _)| c.style.item_style.flex_grow.max(0.0))
+                .sum();
+
+            if total_grow <= 0.0 {
+                break;
+            }
+
+            let mut leftover = 0.0;
+            for (i, child) in node.children.iter().enumerate() {
+                let grow = child.style.item_style.flex_grow.max(0.0);
+                if grow == 0.0 {
+                    continue;
+                }
+
+                let extra = remaining * (grow / total_grow);
+                let clamped = clamp(
+                    sizes[i] + extra,
+                    axis.min(&child.style.size),
+                    axis.max(&child.style.size),
+                );
+                leftover += (sizes[i] + extra - clamped).max(0.0);
+                sizes[i] = clamped;
+            }
+
+            remaining = leftover;
+            iteration += 1;
+        }
+
+        // --- update rect ---
+        let mut cursor = 0.0;
+        for (child, size) in node.children.iter_mut().zip(sizes.iter()) {
+            match axis {
+                Axis::Horizontal => {
+                    child.rect.width = *size;
+                    child.rect.x = cursor + child.style.spacing.margin_left;
+                    cursor += *size + axis.margin_main(&child.style.spacing) + gap;
+                }
+                Axis::Vertical => {
+                    child.rect.height = *size;
+                    child.rect.y = cursor + child.style.spacing.margin_top;
+                    cursor += *size + axis.margin_main(&child.style.spacing) + gap;
+                }
+            }
+        }
     }
 
     fn calculate_content_main(node: &LayoutNode, axis: Axis, gap: f32) -> f32 {
