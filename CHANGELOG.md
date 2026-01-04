@@ -7,6 +7,14 @@ and this project loosely follows Semantic Versioning.
 
 ---
 
+## [0.4.1] - 2026-01-04
+
+### Fixed
+
+* Corrected child coordinate calculation bug in flex layouts, ensuring positions match expected values.
+
+---
+
 ## [0.4.0] - 2026-01-04
 
 > [!WARNING]
