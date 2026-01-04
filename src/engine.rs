@@ -347,13 +347,15 @@ impl LayoutEngine {
         // --- sizes of children ---
         let mut sizes: Vec<f32> = node.children.iter().map(|c| axis.main(&c.rect)).collect();
 
-        // --- compute from free space ---
-        let content_main: f32 =
-            sizes.iter().sum::<f32>() + gap * (node.children.len().saturating_sub(1) as f32);
-        let mut remaining = (inner_main - content_main).max(0.0);
-
         let mut iteration = 0;
-        while remaining > 0.0 && iteration < 10 {
+        loop {
+            let content_main: f32 =
+                sizes.iter().sum::<f32>() + gap * (node.children.len().saturating_sub(1) as f32);
+            let remaining = (inner_main - content_main).max(0.0);
+            if remaining <= 0.0 || iteration >= 10 {
+                break;
+            }
+
             let total_grow: f32 = node
                 .children
                 .iter()
@@ -383,11 +385,28 @@ impl LayoutEngine {
                 sizes[i] = clamped;
             }
 
-            remaining = leftover;
+            // --- Relayout children ---
+            for (child, size) in node.children.iter_mut().zip(sizes.iter()) {
+                let available = match axis {
+                    Axis::Horizontal => ResolvingSize {
+                        width: Some(*size),
+                        height: Some(child.rect.height),
+                    },
+                    Axis::Vertical => ResolvingSize {
+                        width: Some(child.rect.width),
+                        height: Some(*size),
+                    },
+                };
+                LayoutEngine::layout_node(child, available, child.rect.x, child.rect.y);
+            }
+
+            if leftover <= 0.0 {
+                break;
+            }
+
             iteration += 1;
         }
 
-        // --- update rect ---
         let mut cursor = 0.0;
         for (child, size) in node.children.iter_mut().zip(sizes.iter()) {
             match axis {
