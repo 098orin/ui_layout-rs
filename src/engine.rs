@@ -161,9 +161,17 @@ impl LayoutEngine {
         origin_x: f32,
         origin_y: f32,
     ) {
-        let s = &node.style.spacing;
+        let (padding_main_start, padding_main_end, padding_cross) = {
+            let s = &node.style.spacing;
+            (
+                axis.padding_main_start(s),
+                axis.padding_main_end(s),
+                axis.padding_cross(s),
+            )
+        };
+        let gap = axis.gap(&node.style).max(0.0);
 
-        // --- resolve own size ---
+        // --- own size ---
         let own_main = axis
             .size(&node.style.size)
             .or(axis.main_available(available));
@@ -172,25 +180,69 @@ impl LayoutEngine {
             .0
             .or(axis.cross_available(available));
 
-        let inner_main =
-            (own_main.unwrap_or(0.0) - axis.padding_main_start(s) - axis.padding_main_end(s))
-                .max(0.0);
+        let inner_main = (own_main.unwrap_or(0.0) - padding_main_start - padding_main_end).max(0.0);
+        let inner_cross = own_cross.map(|v| (v - padding_cross).max(0.0));
 
-        let inner_cross = own_cross.map(|v| (v - axis.padding_cross(s)).max(0.0));
+        // --- size constraints ---
+        let main_constraints = Self::resolve_main_constraints(node, axis, inner_main, gap);
 
-        // --- gap ---
-        let gap = axis.gap(&node.style).max(0.0);
+        // --- layout children ---
+        // ここで node を &mut で渡すが、s はもう使っていないので安全
+        let max_child_cross = Self::layout_flex_children(
+            node,
+            axis,
+            &main_constraints,
+            inner_cross,
+            origin_x,
+            origin_y,
+            gap,
+        );
+
+        // --- final container size ---
+        let content_main = Self::calculate_content_main(node, axis, gap);
+
+        let final_main = own_main.unwrap_or(content_main + padding_main_start + padding_main_end);
+        let final_cross = own_cross.unwrap_or(max_child_cross + padding_cross);
+
+        let (width, height) = match axis {
+            Axis::Horizontal => (final_main, final_cross),
+            Axis::Vertical => (final_cross, final_main),
+        };
+
+        node.rect = Rect {
+            x: origin_x,
+            y: origin_y,
+            width: width.max(0.0),
+            height: height.max(0.0),
+        };
+
+        // --- JustifyContent ---
+        Self::apply_justify_content(
+            node,
+            axis,
+            origin_x,
+            origin_y,
+            final_main,
+            content_main,
+            gap,
+        );
+    }
+
+    fn resolve_main_constraints(
+        node: &LayoutNode,
+        axis: Axis,
+        inner_main: f32,
+        gap: f32,
+    ) -> Vec<Option<f32>> {
         let gap_count = node.children.len().saturating_sub(1) as f32;
-
-        // --- first pass: fixed & grow ---
         let mut fixed = gap * gap_count;
         let mut total_grow = 0.0;
 
         for child in &node.children {
-            fixed += match axis.size(&child.style.size) {
-                Some(v) => v,
-                None => child.style.item_style.flex_basis.unwrap_or(0.0),
-            } + axis.margin_main(&child.style.spacing);
+            fixed += axis
+                .size(&child.style.size)
+                .unwrap_or(child.style.item_style.flex_basis.unwrap_or(0.0))
+                + axis.margin_main(&child.style.spacing);
 
             if axis.size(&child.style.size).is_none() {
                 total_grow += child.style.item_style.flex_grow.max(0.0);
@@ -199,9 +251,7 @@ impl LayoutEngine {
 
         let remaining = (inner_main - fixed).max(0.0);
 
-        // --- second pass: main size constraints (Option) ---
-        let main_constraints: Vec<Option<f32>> = node
-            .children
+        node.children
             .iter()
             .map(|child| {
                 if let Some(v) = axis.size(&child.style.size) {
@@ -222,33 +272,37 @@ impl LayoutEngine {
                         axis.max(&child.style.size),
                     ));
                 }
-
-                None // auto
+                None
             })
-            .collect();
+            .collect()
+    }
 
-        // --- pass 1: layout children WITHOUT justify-content ---
+    /// Return: Max cross size
+    fn layout_flex_children(
+        node: &mut LayoutNode,
+        axis: Axis,
+        main_constraints: &[Option<f32>],
+        inner_cross: Option<f32>,
+        origin_x: f32,
+        origin_y: f32,
+        gap: f32,
+    ) -> f32 {
+        let s = &node.style.spacing;
         let mut cursor = axis.padding_main_start(s);
         let mut max_cross: f32 = 0.0;
 
-        for (child, main_opt) in node.children.iter_mut().zip(&main_constraints) {
-            let child_cross_fallback = axis
-                .cross_size(&child.style.size)
-                .0
-                .or(inner_cross)
-                .unwrap_or(0.0)
-                + axis.margin_cross_start(&child.style.spacing)
-                + axis.margin_cross_end(&child.style.spacing);
-
-            let align = child
-                .style
-                .item_style
-                .align_self
-                .unwrap_or(node.style.align_items);
-
+        for (child, main_opt) in node.children.iter_mut().zip(main_constraints) {
             let (cross_size, cross_offset) = compute_cross(
-                align,
-                inner_cross.unwrap_or(child_cross_fallback),
+                child
+                    .style
+                    .item_style
+                    .align_self
+                    .unwrap_or(node.style.align_items),
+                inner_cross.unwrap_or_else(|| {
+                    axis.cross_size(&child.style.size).0.unwrap_or(0.0)
+                        + axis.margin_cross_start(&child.style.spacing)
+                        + axis.margin_cross_end(&child.style.spacing)
+                }),
                 axis.cross_size(&child.style.size).0,
                 axis.cross_size(&child.style.size).1,
                 axis.cross_size(&child.style.size).2,
@@ -267,7 +321,6 @@ impl LayoutEngine {
                 },
             };
 
-            // --- correct x/y computation ---
             let (cx, cy) = match axis {
                 Axis::Horizontal => (
                     origin_x + cursor + child.style.spacing.margin_left,
@@ -281,31 +334,44 @@ impl LayoutEngine {
 
             Self::layout_node(child, child_available, cx, cy);
 
-            let child_cross = axis.cross(&child.rect)
+            let child_outer_cross = axis.cross(&child.rect)
                 + axis.margin_cross_start(&child.style.spacing)
                 + axis.margin_cross_end(&child.style.spacing);
-
-            max_cross = max_cross.max(child_cross);
+            max_cross = max_cross.max(child_outer_cross);
 
             cursor += axis.main(&child.rect) + axis.margin_main(&child.style.spacing) + gap;
         }
+        max_cross
+    }
 
-        // --- pass 2: justify-content (AFTER layout) ---
-        let content_main: f32 = node
-            .children
+    fn calculate_content_main(node: &LayoutNode, axis: Axis, gap: f32) -> f32 {
+        let gap_count = node.children.len().saturating_sub(1) as f32;
+        node.children
             .iter()
             .map(|c| axis.main(&c.rect) + axis.margin_main(&c.style.spacing))
             .sum::<f32>()
-            + gap * gap_count;
+            + (gap * gap_count)
+    }
 
+    /// Fix with JustifyContent
+    fn apply_justify_content(
+        node: &mut LayoutNode,
+        axis: Axis,
+        origin_x: f32,
+        origin_y: f32,
+        final_main: f32,
+        content_main: f32,
+        gap: f32,
+    ) {
+        let s = &node.style.spacing;
+        let inner_main =
+            (final_main - axis.padding_main_start(s) - axis.padding_main_end(s)).max(0.0);
         let remaining = (inner_main - content_main).max(0.0);
 
         let (start_offset, justify_gap) =
             resolve_justify_content(node.style.justify_content, remaining, node.children.len());
 
-        // reposition children according to justify-content
         let mut cursor = axis.padding_main_start(s) + start_offset;
-
         let children_len = node.children.len();
 
         for (i, child) in node.children.iter_mut().enumerate() {
@@ -317,29 +383,11 @@ impl LayoutEngine {
                     child.rect.y = origin_y + cursor + child.style.spacing.margin_top;
                 }
             }
-
             cursor += axis.main(&child.rect) + axis.margin_main(&child.style.spacing);
             if i + 1 < children_len {
                 cursor += gap + justify_gap;
             }
         }
-
-        // --- auto size resolution ---
-        let final_main = own_main
-            .unwrap_or(content_main + axis.padding_main_start(s) + axis.padding_main_end(s));
-        let final_cross = own_cross.unwrap_or(max_cross + axis.padding_cross(s));
-
-        let (width, height) = match axis {
-            Axis::Horizontal => (final_main, final_cross),
-            Axis::Vertical => (final_cross, final_main),
-        };
-
-        node.rect = Rect {
-            x: origin_x,
-            y: origin_y,
-            width: width.max(0.0),
-            height: height.max(0.0),
-        };
     }
 
     fn layout_block(node: &mut LayoutNode, available: ResolvingSize, origin_x: f32, origin_y: f32) {
