@@ -104,17 +104,21 @@ impl LayoutEngine {
     pub fn layout(root: &mut LayoutNode, max_width: f32, max_height: f32) {
         Self::layout_node(
             root,
-            Rect {
+            Some(Rect {
                 x: 0.0,
                 y: 0.0,
                 width: max_width,
                 height: max_height,
-            },
+            }),
         );
     }
 
-    fn layout_node(node: &mut LayoutNode, bounds: Rect) {
-        node.rect = bounds;
+    fn layout_node(node: &mut LayoutNode, bounds: Option<Rect>) {
+        if let Some(rect) = bounds {
+            node.rect = rect;
+        } else {
+            Self::layout_none_rect(node);
+        }
 
         match node.style.display {
             Display::Flex { flex_direction } => match flex_direction {
@@ -124,6 +128,89 @@ impl LayoutEngine {
             Display::Block => Self::layout_block(node),
             Display::None => {}
         }
+    }
+
+    fn layout_none_rect(node: &mut LayoutNode) {
+        for child in node.children.iter_mut() {
+            Self::layout_node(child, None);
+        }
+
+        let mut width = 0.0;
+        let mut height = 0.0;
+
+        match node.style.display {
+            Display::Flex { flex_direction } => {
+                let axis = match flex_direction {
+                    FlexDirection::Row => Axis::Horizontal,
+                    FlexDirection::Column => Axis::Vertical,
+                };
+
+                let gap = axis.gap(&node.style).max(0.0);
+                let gap_count = node.children.len().saturating_sub(1) as f32;
+
+                let mut main_sum = 0.0;
+                let mut cross_max: f32 = 0.0;
+
+                for child in &node.children {
+                    let r = child.rect;
+                    let main = axis.main(&r) + axis.margin_main(&child.style.spacing);
+                    let cross: f32 = axis.cross(&r)
+                        + axis.margin_cross_start(&child.style.spacing)
+                        + axis.margin_cross_end(&child.style.spacing);
+                    main_sum += main;
+                    cross_max = cross_max.max(cross);
+                }
+
+                main_sum += gap * gap_count;
+
+                match flex_direction {
+                    FlexDirection::Row => {
+                        width = main_sum
+                            + node.style.spacing.padding_left
+                            + node.style.spacing.padding_right;
+                        height = cross_max
+                            + node.style.spacing.padding_top
+                            + node.style.spacing.padding_bottom;
+                    }
+                    FlexDirection::Column => {
+                        width = cross_max
+                            + node.style.spacing.padding_left
+                            + node.style.spacing.padding_right;
+                        height = main_sum
+                            + node.style.spacing.padding_top
+                            + node.style.spacing.padding_bottom;
+                    }
+                }
+            }
+            Display::Block => {
+                let mut max_width: f32 = 0.0;
+                let mut total_height = 0.0;
+                for child in &node.children {
+                    let r = child.rect;
+                    max_width = max_width.max(
+                        r.width
+                            + child.style.spacing.margin_left
+                            + child.style.spacing.margin_right,
+                    );
+                    total_height += r.height
+                        + child.style.spacing.margin_top
+                        + child.style.spacing.margin_bottom;
+                }
+                width =
+                    max_width + node.style.spacing.padding_left + node.style.spacing.padding_right;
+                height = total_height
+                    + node.style.spacing.padding_top
+                    + node.style.spacing.padding_bottom;
+            }
+            Display::None => {}
+        }
+
+        node.rect = Rect {
+            x: 0.0,
+            y: 0.0,
+            width,
+            height,
+        };
     }
 
     fn layout_flex(node: &mut LayoutNode, axis: Axis) {
@@ -222,7 +309,7 @@ impl LayoutEngine {
                 },
             };
 
-            Self::layout_node(child, rect);
+            Self::layout_node(child, Some(rect));
 
             cursor += main_size + axis.margin_main(&child.style.spacing) + gap + justify_gap;
         }
@@ -253,7 +340,7 @@ impl LayoutEngine {
                 height,
             };
 
-            Self::layout_node(child, rect);
+            Self::layout_node(child, Some(rect));
             y += height + child.style.spacing.margin_top + child.style.spacing.margin_bottom;
         }
     }
