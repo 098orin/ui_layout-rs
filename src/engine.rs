@@ -402,8 +402,8 @@ impl LayoutEngine {
             Self::layout_node(
                 child,
                 child_available,
-                origin_x + s.padding_left + child.style.spacing.margin_left,
-                origin_y + cursor_y + child.style.spacing.margin_top,
+                s.padding_left + child.style.spacing.margin_left,
+                cursor_y + child.style.spacing.margin_top,
             );
 
             cursor_y += child.rect.height
