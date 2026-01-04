@@ -187,14 +187,13 @@ impl LayoutEngine {
         let main_constraints = Self::resolve_main_constraints(node, axis, inner_main, gap);
 
         // --- layout children ---
-        // ここで node を &mut で渡すが、s はもう使っていないので安全
         let max_child_cross = Self::layout_flex_children(
             node,
             axis,
             &main_constraints,
             inner_cross,
-            origin_x,
-            origin_y,
+            node.style.spacing.margin_top,
+            node.style.spacing.margin_left,
             gap,
         );
 

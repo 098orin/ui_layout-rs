@@ -90,31 +90,15 @@ fn nested_flex_coordinate_bug() {
     let a_style = &r.children[0].style;
     let b_style = &r.children[1].style;
 
-    // cross axis = height of row = auto = max(child height + margin) + padding_top + padding_bottom
-    // child alignment = End → offset = container_height - child_height - margin_bottom - padding_bottom
-    let row_inner_height =
-        r.rect.height - r.style.spacing.padding_top - r.style.spacing.padding_bottom;
-    assert_eq!(
-        a.y,
-        r.rect.y + r.style.spacing.padding_top + row_inner_height
-            - 10.0
-            - 1.0
-            - r.style.spacing.padding_bottom
-    );
-    assert_eq!(
-        b.y,
-        r.rect.y + r.style.spacing.padding_top + row_inner_height
-            - 20.0
-            - 2.0
-            - r.style.spacing.padding_bottom
-    );
-    assert_eq!(
-        c.y,
-        r.rect.y + r.style.spacing.padding_top + row_inner_height
-            - 15.0
-            - 1.0
-            - r.style.spacing.padding_bottom
-    );
+    // stretched
+    assert_eq!(r.rect.width, 200.0 - 10.0 - 10.0);
+    // max height of the children+ padding + margin
+    assert_eq!(r.rect.height, 20.0 + 2.0 + 2.0 + 2.0 + 2.0);
+
+    // padding top + margin top
+    assert_eq!(a.y, 2.0 + 1.0);
+    assert_eq!(b.y, 2.0 + 2.0);
+    assert_eq!(c.y, 2.0 + 1.0);
 
     // main axis x
     assert_eq!(a.x, r.rect.x + r.style.spacing.padding_left);
