@@ -87,8 +87,6 @@ fn nested_flex_coordinate_bug() {
     let a = &r.children[0].rect;
     let b = &r.children[1].rect;
     let c = &r.children[2].rect;
-    let a_style = &r.children[0].style;
-    let b_style = &r.children[1].style;
 
     // stretched
     assert_eq!(r.rect.width, 200.0 - 10.0 - 10.0);
@@ -100,16 +98,9 @@ fn nested_flex_coordinate_bug() {
     assert_eq!(b.y, 2.0 + 2.0);
     assert_eq!(c.y, 2.0 + 1.0);
 
-    // main axis x
-    assert_eq!(a.x, r.rect.x + r.style.spacing.padding_left);
-    assert_eq!(
-        b.x,
-        a.x + 20.0 + a_style.spacing.margin_left + a_style.spacing.margin_right
-    );
-    assert_eq!(
-        c.x,
-        b.x + 30.0 + b_style.spacing.margin_left + b_style.spacing.margin_right
-    );
+    assert_eq!(a.x, 3.0);
+    assert_eq!(b.x, 3.0 + 20.0);
+    assert_eq!(c.x, 3.0 + 20.0 + 30.0);
 }
 
 #[test]

@@ -216,15 +216,7 @@ impl LayoutEngine {
         };
 
         // --- JustifyContent ---
-        Self::apply_justify_content(
-            node,
-            axis,
-            origin_x,
-            origin_y,
-            final_main,
-            content_main,
-            gap,
-        );
+        Self::apply_justify_content(node, axis, final_main, content_main, gap);
     }
 
     fn resolve_main_constraints(
@@ -287,7 +279,7 @@ impl LayoutEngine {
         gap: f32,
     ) -> f32 {
         let s = &node.style.spacing;
-        let mut cursor = 0.0;
+        let mut cursor = 0.0; // origin has margin_main
         let mut max_cross: f32 = 0.0;
 
         for (child, main_opt) in node.children.iter_mut().zip(main_constraints) {
@@ -356,8 +348,6 @@ impl LayoutEngine {
     fn apply_justify_content(
         node: &mut LayoutNode,
         axis: Axis,
-        origin_x: f32,
-        origin_y: f32,
         final_main: f32,
         content_main: f32,
         gap: f32,
@@ -376,10 +366,10 @@ impl LayoutEngine {
         for (i, child) in node.children.iter_mut().enumerate() {
             match axis {
                 Axis::Horizontal => {
-                    child.rect.x = origin_x + cursor + child.style.spacing.margin_left;
+                    child.rect.x = cursor + child.style.spacing.margin_left;
                 }
                 Axis::Vertical => {
-                    child.rect.y = origin_y + cursor + child.style.spacing.margin_top;
+                    child.rect.y = cursor + child.style.spacing.margin_top;
                 }
             }
             cursor += axis.main(&child.rect) + axis.margin_main(&child.style.spacing);
