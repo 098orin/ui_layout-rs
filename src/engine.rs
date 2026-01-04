@@ -217,8 +217,7 @@ impl LayoutEngine {
             })
             .collect();
 
-        // --- used main for justify-content ---
-        let used_main: f32 = node
+        let content_main = node
             .children
             .iter()
             .zip(&sizes)
@@ -226,7 +225,7 @@ impl LayoutEngine {
             .sum::<f32>()
             + gap * gap_count;
 
-        let remaining = (inner_main - used_main).max(0.0);
+        let remaining = (inner_main - content_main).max(0.0);
 
         let (start_offset, justify_gap) =
             resolve_justify_content(node.style.justify_content, remaining, node.children.len());
@@ -288,16 +287,8 @@ impl LayoutEngine {
         }
 
         // --- auto size resolution ---
-        let auto_main = node
-            .children
-            .iter()
-            .zip(&sizes)
-            .map(|(c, s)| s + axis.margin_main(&c.style.spacing))
-            .sum::<f32>()
-            + gap * gap_count;
-
-        let final_main =
-            own_main.unwrap_or(auto_main + axis.padding_main_start(s) + axis.padding_main_end(s));
+        let final_main = own_main
+            .unwrap_or(content_main + axis.padding_main_start(s) + axis.padding_main_end(s));
 
         let final_cross = own_cross.unwrap_or(max_cross + axis.padding_cross(s));
 
