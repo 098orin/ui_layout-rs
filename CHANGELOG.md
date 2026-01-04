@@ -7,6 +7,19 @@ and this project loosely follows Semantic Versioning.
 
 ---
 
+## [0.4.3] - 2026-01-04
+
+### Added
+
+* Improved `flex_grow` distribution in Flex layouts:
+  - After initial layout and clamp to min/max sizes, remaining space is redistributed among eligible flex items
+  - Supports correct re-layout of children with Auto sizing, ensuring grandchildren sizes are recalculated
+  - Handles edge cases where multiple items hit max/min constraints, redistributing leftover space iteratively
+  - Prevent flex items from exceeding parent size after redistribution
+  - Ensure grandchildren of flex items are recalculated when parent size changes due to flex_grow redistribution
+
+---
+
 ## [0.4.2] - 2026-01-04
 
 ### Fixed
