@@ -287,7 +287,7 @@ impl LayoutEngine {
         gap: f32,
     ) -> f32 {
         let s = &node.style.spacing;
-        let mut cursor = axis.padding_main_start(s);
+        let mut cursor = 0.0;
         let mut max_cross: f32 = 0.0;
 
         for (child, main_opt) in node.children.iter_mut().zip(main_constraints) {
