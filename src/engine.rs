@@ -234,8 +234,14 @@ impl LayoutEngine {
                 + axis.margin_cross_start(&child.style.spacing)
                 + axis.margin_cross_end(&child.style.spacing);
 
+            let align = child
+                .style
+                .item_style
+                .align_self
+                .unwrap_or(node.style.align_items);
+
             let (cross_size, cross_offset) = compute_cross(
-                node.style.align_items,
+                align,
                 inner_cross.unwrap_or(child_cross_fallback),
                 axis.cross_size(&child.style.size).0,
                 axis.cross_size(&child.style.size).1,
