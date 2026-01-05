@@ -7,6 +7,15 @@ and this project loosely follows Semantic Versioning.
 
 ---
 
+## [0.4.6] - 2026-01-05
+
+### Fixed
+- Fixed an issue where flex children were not relaid out after their parent
+  size changed due to flex-grow redistribution, causing nested layouts to
+  use stale sizes.
+
+---
+
 ## [0.4.5] - 2026-01-05
 
 ### Fixed
