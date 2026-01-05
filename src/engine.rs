@@ -436,21 +436,6 @@ impl LayoutEngine {
             remaining -= used_delta;
         }
 
-        for (child, size) in node.children.iter_mut().zip(&sizes) {
-            let available = match axis {
-                Axis::Horizontal => ResolvingSize {
-                    width: Some(*size),
-                    height: Some(child.rect.height),
-                },
-                Axis::Vertical => ResolvingSize {
-                    width: Some(child.rect.width),
-                    height: Some(*size),
-                },
-            };
-
-            LayoutEngine::layout_node(child, available, child.rect.x, child.rect.y);
-        }
-
         let mut cursor = 0.0;
         for (child, size) in node.children.iter_mut().zip(&sizes) {
             match axis {
