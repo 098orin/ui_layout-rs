@@ -2,7 +2,6 @@ use ui_layout::*;
 
 #[test]
 fn flex_grow_redistribute_max() {
-    // grow1: max_width
     let grow1 = LayoutNode::new(Style {
         display: Display::Block,
         size: SizeStyle {
@@ -16,10 +15,8 @@ fn flex_grow_redistribute_max() {
         ..Default::default()
     });
 
-    // grow2: no max_width
     let grow2 = LayoutNode::new(Style {
         display: Display::Block,
-        size: SizeStyle::default(),
         item_style: ItemStyle {
             flex_grow: 1.0,
             ..Default::default()
@@ -39,20 +36,98 @@ fn flex_grow_redistribute_max() {
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
-    let r_grow1 = &root.children[0].rect;
-    let r_grow2 = &root.children[1].rect;
+    let r1 = &root.children[0].rect;
+    let r2 = &root.children[1].rect;
 
-    println!("grow1: {:?}", r_grow1);
-    println!("grow2: {:?}", r_grow2);
+    assert_eq!(r1.width, 250.0);
+    assert_eq!(r2.width, 550.0);
+    assert_eq!(r1.width + r2.width, 800.0);
+}
 
-    // max_width
-    assert_eq!(r_grow1.width, 250.0);
+#[test]
+fn flex_grow_redistribute_min() {
+    let min_item = LayoutNode::new(Style {
+        display: Display::Block,
+        size: SizeStyle {
+            min_width: Some(300.0),
+            ..Default::default()
+        },
+        item_style: ItemStyle {
+            flex_grow: 1.0,
+            ..Default::default()
+        },
+        ..Default::default()
+    });
 
-    // else
-    let expected_grow2_width = 800.0 - r_grow1.width;
-    assert_eq!(r_grow2.width, expected_grow2_width);
+    let grow_item = LayoutNode::new(Style {
+        display: Display::Block,
+        item_style: ItemStyle {
+            flex_grow: 3.0,
+            ..Default::default()
+        },
+        ..Default::default()
+    });
 
-    // total
-    let total: f32 = r_grow1.width + r_grow2.width;
-    assert_eq!(total, 800.0);
+    let mut root = LayoutNode::with_children(
+        Style {
+            display: Display::Flex {
+                flex_direction: FlexDirection::Row,
+            },
+            ..Default::default()
+        },
+        vec![min_item, grow_item],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    let r1 = &root.children[0].rect;
+    let r2 = &root.children[1].rect;
+
+    assert!(r1.width >= 300.0);
+    assert_eq!(r1.width + r2.width, 800.0);
+}
+
+#[test]
+fn flex_basis_and_max() {
+    let a = LayoutNode::new(Style {
+        display: Display::Block,
+        size: SizeStyle {
+            max_width: Some(200.0),
+            ..Default::default()
+        },
+        item_style: ItemStyle {
+            flex_basis: Some(150.0),
+            flex_grow: 1.0,
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let b = LayoutNode::new(Style {
+        display: Display::Block,
+        item_style: ItemStyle {
+            flex_basis: Some(100.0),
+            flex_grow: 1.0,
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            display: Display::Flex {
+                flex_direction: FlexDirection::Row,
+            },
+            ..Default::default()
+        },
+        vec![a, b],
+    );
+
+    LayoutEngine::layout(&mut root, 500.0, 600.0);
+
+    let r1 = &root.children[0].rect;
+    let r2 = &root.children[1].rect;
+
+    assert!(r1.width <= 200.0);
+    assert_eq!(r1.width + r2.width, 500.0);
 }
