@@ -475,8 +475,7 @@ impl LayoutEngine {
         // width: style > available > auto(None)
         let resolved_width = node.style.size.width.or(available.width);
 
-        let inner_width =
-            (resolved_width.unwrap_or(0.0) - s.padding_left - s.padding_right).max(0.0);
+        let inner_width = resolved_width.map(|w| (w - s.padding_left - s.padding_right).max(0.0));
 
         let mut cursor_y = s.padding_top;
         let mut max_child_width: f32 = 0.0;
@@ -484,7 +483,7 @@ impl LayoutEngine {
         // --- children ---
         for child in &mut node.children {
             let child_available = ResolvingSize {
-                width: Some(inner_width.max(0.0)),
+                width: inner_width,
                 height: None, // not fixed
             };
 
