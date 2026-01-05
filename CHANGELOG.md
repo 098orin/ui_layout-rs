@@ -7,6 +7,18 @@ and this project loosely follows Semantic Versioning.
 
 ---
 
+## [0.4.5] - 2026-01-05
+
+### Fixed
+
+* Fixed incorrect `flex-grow` redistribution when min constraints caused the total flex item size to overflow or underflow the container.
+  - Remaining space is now handled as a signed value, allowing negative overflow to be redistributed proportionally instead of being clamped to zero.
+  - Flex items are now correctly frozen at their max size when distributing positive remaining space, and at their min size when redistributing negative remaining space, ensuring total sizes converge to the container
+  size.
+
+
+---
+
 ## [0.4.4] - 2026-01-05
 
 ### Fixed
