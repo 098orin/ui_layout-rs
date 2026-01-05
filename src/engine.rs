@@ -451,6 +451,19 @@ impl LayoutEngine {
                 }
             }
         }
+        // --- relayout children (preserve coordinate space) ---
+        for child in node.children.iter_mut() {
+            if child.children.is_empty() {
+                continue;
+            }
+
+            let available = ResolvingSize {
+                width: Some(child.rect.width),
+                height: Some(child.rect.height),
+            };
+
+            LayoutEngine::layout_node(child, available, child.rect.x, child.rect.y);
+        }
     }
 
     fn calculate_content_main(node: &LayoutNode, axis: Axis, gap: f32) -> f32 {
