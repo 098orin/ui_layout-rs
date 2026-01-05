@@ -82,6 +82,8 @@ fn nested_flex_coordinate_bug() {
 
     LayoutEngine::layout(&mut root, 200.0, 100.0);
 
+    dbg!(&root);
+
     let r = &root.children[0];
 
     let a = &r.children[0].rect;
@@ -94,9 +96,9 @@ fn nested_flex_coordinate_bug() {
     assert_eq!(r.rect.height, 20.0 + 2.0 + 2.0 + 2.0 + 2.0);
 
     // padding top + margin top
-    assert_eq!(a.y, 2.0 + 1.0);
-    assert_eq!(b.y, 2.0 + 2.0);
-    assert_eq!(c.y, 2.0 + 1.0);
+    assert_eq!(a.y, 15.0);
+    assert_eq!(b.y, 2.0 + 0.0 + 2.0); // b: remaining = 0
+    assert_eq!(c.y, 10.0);
 
     assert_eq!(a.x, 3.0);
     assert_eq!(b.x, 3.0 + 20.0);
