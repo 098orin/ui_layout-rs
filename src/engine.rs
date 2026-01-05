@@ -344,71 +344,115 @@ impl LayoutEngine {
         inner_main: f32,
         gap: f32,
     ) {
-        // --- sizes of children ---
+        let count = node.children.len();
+        if count == 0 {
+            return;
+        }
+
         let mut sizes: Vec<f32> = node.children.iter().map(|c| axis.main(&c.rect)).collect();
 
+        let mut frozen = vec![false; count];
+
+        let mut used = gap * (count.saturating_sub(1) as f32);
+        for (child, size) in node.children.iter().zip(&sizes) {
+            used += *size + axis.margin_main(&child.style.spacing);
+        }
+
+        let mut remaining = inner_main - used;
+
         let mut iteration = 0;
-        loop {
-            let content_main: f32 =
-                sizes.iter().sum::<f32>() + gap * (node.children.len().saturating_sub(1) as f32);
-            let remaining = (inner_main - content_main).max(0.0);
-            if remaining <= 0.0 || iteration >= 10 {
-                break;
-            }
+        while remaining.abs() > 0.01 && iteration < 10 {
+            iteration += 1;
 
             let total_grow: f32 = node
                 .children
                 .iter()
-                .zip(&sizes)
-                .filter(|(c, s)| *s < &axis.max(&c.style.size).unwrap_or(f32::INFINITY))
-                .map(|(c, _)| c.style.item_style.flex_grow.max(0.0))
+                .enumerate()
+                .filter(|(i, c)| {
+                    if frozen[*i] {
+                        return false;
+                    }
+
+                    if remaining > 0.0 {
+                        axis.max(&c.style.size)
+                            .map(|m| sizes[*i] < m)
+                            .unwrap_or(true)
+                    } else if remaining < 0.0 {
+                        axis.min(&c.style.size)
+                            .map(|m| sizes[*i] > m)
+                            .unwrap_or(true)
+                    } else {
+                        return true;
+                    }
+                })
+                .map(|(_, c)| c.style.item_style.flex_grow.max(0.0))
                 .sum();
 
             if total_grow <= 0.0 {
                 break;
             }
 
-            let mut leftover = 0.0;
+            let mut used_delta = 0.0;
+
             for (i, child) in node.children.iter().enumerate() {
-                let grow = child.style.item_style.flex_grow.max(0.0);
-                if grow == 0.0 {
+                if frozen[i] {
                     continue;
                 }
 
-                let extra = remaining * (grow / total_grow);
-                let clamped = clamp(
-                    sizes[i] + extra,
-                    axis.min(&child.style.size),
-                    axis.max(&child.style.size),
-                );
-                leftover += (sizes[i] + extra - clamped).max(0.0);
+                let grow = child.style.item_style.flex_grow.max(0.0);
+                if grow == 0.0 {
+                    frozen[i] = true;
+                    continue;
+                }
+
+                let delta = remaining * (grow / total_grow);
+                let target = sizes[i] + delta;
+
+                let min = axis.min(&child.style.size);
+                let max = axis.max(&child.style.size);
+
+                let clamped = clamp(target, min, max);
+                let applied = clamped - sizes[i];
+
                 sizes[i] = clamped;
+                used_delta += applied;
+
+                // update frozen
+                if remaining > 0.0 {
+                    if max.map(|m| clamped >= m).unwrap_or(false) {
+                        frozen[i] = true;
+                    }
+                } else {
+                    if min.map(|m| clamped <= m).unwrap_or(false) {
+                        frozen[i] = true;
+                    }
+                }
             }
 
-            // --- Relayout children ---
-            for (child, size) in node.children.iter_mut().zip(sizes.iter()) {
-                let available = match axis {
-                    Axis::Horizontal => ResolvingSize {
-                        width: Some(*size),
-                        height: Some(child.rect.height),
-                    },
-                    Axis::Vertical => ResolvingSize {
-                        width: Some(child.rect.width),
-                        height: Some(*size),
-                    },
-                };
-                LayoutEngine::layout_node(child, available, child.rect.x, child.rect.y);
-            }
-
-            if leftover <= 0.0 {
+            if used_delta.abs() < 0.01 {
                 break;
             }
 
-            iteration += 1;
+            remaining -= used_delta;
+        }
+
+        for (child, size) in node.children.iter_mut().zip(&sizes) {
+            let available = match axis {
+                Axis::Horizontal => ResolvingSize {
+                    width: Some(*size),
+                    height: Some(child.rect.height),
+                },
+                Axis::Vertical => ResolvingSize {
+                    width: Some(child.rect.width),
+                    height: Some(*size),
+                },
+            };
+
+            LayoutEngine::layout_node(child, available, child.rect.x, child.rect.y);
         }
 
         let mut cursor = 0.0;
-        for (child, size) in node.children.iter_mut().zip(sizes.iter()) {
+        for (child, size) in node.children.iter_mut().zip(&sizes) {
             match axis {
                 Axis::Horizontal => {
                     child.rect.width = *size;
