@@ -7,6 +7,14 @@ and this project loosely follows Semantic Versioning.
 
 ---
 
+## [0.4.4] - 2026-01-05
+
+### Fixed
+
+* Block layout now correctly respects height
+
+---
+
 ## [0.4.3] - 2026-01-04
 
 ### Added

@@ -1,6 +1,6 @@
 [package]
 name = "ui_layout"
-version = "0.4.3"
+version = "0.4.4"
 edition = "2024"
 
 description = "A minimal Flexbox-inspired layout engine for Rust GUI"

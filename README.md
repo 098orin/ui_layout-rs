@@ -8,6 +8,9 @@ A minimal Flexbox-inspired layout engine for Rust GUI development.
 This crate provides a small, predictable layout system designed for
 custom GUI frameworks, editors, and experimental UI engines.
 
+> [!NOTE]
+> This crate is under active development; patch releases may be frequent.
+
 ## Features
 
 - Flex layout (Row / Column)
@@ -51,7 +54,7 @@ see the unit tests in the [`tests/`](tests/) directory. They provide practical u
 
 See [CHANGELOG.md](CHANGELOG.md) for a detailed list of changes.
 
-* Version: **0.4.3**
+* Version: **0.4.4**
 * API is evolving but now includes full Flexbox-like alignment and gaps
 
 Future versions may add:
