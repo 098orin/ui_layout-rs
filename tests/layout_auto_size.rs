@@ -138,3 +138,68 @@ fn block_auto_size() {
 
     assert_eq!(root.children[1].rect.y, 10.0 + 5.0);
 }
+
+#[test]
+fn nested_block_size() {
+    let child1_1 = LayoutNode::new(Style {
+        display: Display::Block,
+        size: SizeStyle {
+            width: Some(50.0),
+            height: Some(20.0),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let child1_2 = LayoutNode::new(Style {
+        display: Display::Block,
+        size: SizeStyle {
+            width: Some(70.0),
+            height: Some(10.0),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let child1 = LayoutNode::with_children(
+        Style {
+            display: Display::Block,
+            ..Default::default()
+        },
+        vec![child1_1, child1_2],
+    );
+
+    let child2 = LayoutNode::new(Style {
+        display: Display::Block,
+        size: SizeStyle {
+            width: Some(40.0),
+            height: Some(15.0),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let inner = LayoutNode::with_children(
+        Style {
+            display: Display::Block,
+            ..Default::default()
+        },
+        vec![child1, child2],
+    );
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            display: Display::Block,
+            ..Default::default()
+        },
+        vec![inner],
+    );
+
+    LayoutEngine::layout(&mut root, 300.0, 200.0);
+
+    println!("{:#?}", root);
+
+    let inner_size = root.children[0].rect;
+
+    assert_eq!(inner_size.height, 45.0);
+}

@@ -511,7 +511,11 @@ impl LayoutEngine {
             .or(resolved_width)
             .unwrap_or(max_child_width + s.padding_left + s.padding_right);
 
-        let computed_height = available.height.unwrap_or(cursor_y + s.padding_bottom);
+        let computed_height = node
+            .style
+            .size
+            .height
+            .unwrap_or(available.height.unwrap_or(cursor_y + s.padding_bottom));
 
         // max, min
         let final_width = clamp(
