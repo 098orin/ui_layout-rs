@@ -203,3 +203,80 @@ fn nested_block_size() {
 
     assert_eq!(inner_size.height, 45.0);
 }
+
+#[test]
+fn nested_too_big_flex() {
+    let child = LayoutNode::new(Style {
+        display: Display::Block,
+        size: SizeStyle {
+            width: Some(60.0),
+            height: Some(16.0),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let inner1 = LayoutNode::with_children(
+        Style {
+            display: Display::Flex {
+                flex_direction: FlexDirection::Row,
+            },
+            ..Default::default()
+        },
+        vec![child],
+    );
+
+    let inner2 = LayoutNode::new(Style {
+        display: Display::Flex {
+            flex_direction: FlexDirection::Row,
+        },
+        size: SizeStyle {
+            height: Some(700.0),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let outer = LayoutNode::with_children(
+        Style {
+            display: Display::Flex {
+                flex_direction: FlexDirection::Column,
+            },
+            ..Default::default()
+        },
+        vec![inner1, inner2],
+    );
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            display: Display::Flex {
+                flex_direction: FlexDirection::Row,
+            },
+            ..Default::default()
+        },
+        vec![outer],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    println!("{:#?}", root);
+
+    assert!(root.rect.width > 0.0);
+    assert!(root.rect.height > 0.0);
+
+    let outer = &root.children[0];
+    assert!(outer.rect.width > 0.0);
+    assert!(outer.rect.height > 0.0);
+
+    let inner1 = &outer.children[0];
+    assert!(inner1.rect.width > 0.0);
+    assert!(inner1.rect.height > 0.0);
+
+    let child = &inner1.children[0];
+    assert!(child.rect.width > 0.0);
+    assert!(child.rect.height > 0.0);
+
+    let inner2 = &outer.children[1];
+    assert!(inner2.rect.width > 0.0);
+    assert!(inner2.rect.height > 0.0);
+}
