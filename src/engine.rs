@@ -180,17 +180,17 @@ impl LayoutEngine {
             .0
             .or(axis.cross_available(available));
 
-        let inner_main = (own_main.unwrap_or(0.0) - padding_main_start - padding_main_end).max(0.0);
+        let inner_main = own_main.map(|v| (v - padding_main_start - padding_main_end).max(0.0));
         let inner_cross = own_cross.map(|v| (v - padding_cross).max(0.0));
 
-        // --- size constraints ---
-        let main_constraints = Self::resolve_main_constraints(node, axis, inner_main, gap);
+        // --- minimum sizes ---
+        let main_sizes = Self::resolve_main_minimum_sizes(node, axis);
 
         // --- layout children ---
         let max_child_cross = Self::layout_flex_children(
             node,
             axis,
-            &main_constraints,
+            &main_sizes,
             inner_cross,
             node.style.spacing.margin_top,
             node.style.spacing.margin_left,
@@ -198,7 +198,12 @@ impl LayoutEngine {
         );
 
         // --- redistribute remaining flex_grow after clamp ---
-        Self::redistribute_flex_grow_after_layout(node, axis, inner_main, gap);
+        Self::redistribute_flex_grow_after_layout(
+            node,
+            axis,
+            inner_main.unwrap_or(Self::calculate_content_main(node, axis, gap)),
+            gap,
+        );
 
         // --- final container size ---
         let content_main = Self::calculate_content_main(node, axis, gap);
@@ -222,29 +227,7 @@ impl LayoutEngine {
         Self::apply_justify_content(node, axis, final_main, content_main, gap);
     }
 
-    fn resolve_main_constraints(
-        node: &LayoutNode,
-        axis: Axis,
-        inner_main: f32,
-        gap: f32,
-    ) -> Vec<Option<f32>> {
-        let gap_count = node.children.len().saturating_sub(1) as f32;
-        let mut fixed = gap * gap_count;
-        let mut total_grow = 0.0;
-
-        for child in &node.children {
-            fixed += axis
-                .size(&child.style.size)
-                .unwrap_or(child.style.item_style.flex_basis.unwrap_or(0.0))
-                + axis.margin_main(&child.style.spacing);
-
-            if axis.size(&child.style.size).is_none() {
-                total_grow += child.style.item_style.flex_grow.max(0.0);
-            }
-        }
-
-        let remaining = (inner_main - fixed).max(0.0);
-
+    fn resolve_main_minimum_sizes(node: &LayoutNode, axis: Axis) -> Vec<Option<f32>> {
         node.children
             .iter()
             .map(|child| {
@@ -255,16 +238,8 @@ impl LayoutEngine {
                         axis.max(&child.style.size),
                     ));
                 }
-
-                let grow = child.style.item_style.flex_grow.max(0.0);
-                if total_grow > 0.0 && grow > 0.0 {
-                    let base = child.style.item_style.flex_basis.unwrap_or(0.0);
-                    let size = base + remaining * (grow / total_grow);
-                    return Some(clamp(
-                        size,
-                        axis.min(&child.style.size),
-                        axis.max(&child.style.size),
-                    ));
+                if let Some(v) = axis.min(&child.style.size) {
+                    return Some(v);
                 }
                 None
             })
@@ -275,7 +250,7 @@ impl LayoutEngine {
     fn layout_flex_children(
         node: &mut LayoutNode,
         axis: Axis,
-        main_constraints: &[Option<f32>],
+        main_sizes: &[Option<f32>],
         inner_cross: Option<f32>,
         origin_x: f32,
         origin_y: f32,
@@ -285,7 +260,7 @@ impl LayoutEngine {
         let mut cursor = 0.0; // origin has margin_main
         let mut max_cross: f32 = 0.0;
 
-        for (child, main_opt) in node.children.iter_mut().zip(main_constraints) {
+        for (child, main_opt) in node.children.iter_mut().zip(main_sizes) {
             let (cross_size, cross_offset) = compute_cross(
                 child
                     .style
