@@ -224,23 +224,23 @@ impl LayoutEngine {
         let mut max_cross: f32 = 0.0;
 
         for (child, main_opt) in node.children.iter_mut().zip(main_sizes) {
-            let (cross_size, cross_offset) = compute_cross(
-                child
-                    .style
-                    .item_style
-                    .align_self
-                    .unwrap_or(node.style.align_items),
-                inner_cross.unwrap_or_else(|| {
-                    axis.cross_size(&child.style.size).0.unwrap_or(0.0)
-                        + axis.margin_cross_start(&child.style.spacing)
-                        + axis.margin_cross_end(&child.style.spacing)
-                }),
-                axis.cross_size(&child.style.size).0,
-                axis.cross_size(&child.style.size).1,
-                axis.cross_size(&child.style.size).2,
-                axis.margin_cross_start(&child.style.spacing),
-                axis.margin_cross_end(&child.style.spacing),
-            );
+            let (cross_size, cross_offset) = if let Some(container_size) = inner_cross {
+                compute_cross(
+                    child
+                        .style
+                        .item_style
+                        .align_self
+                        .unwrap_or(node.style.align_items),
+                    container_size,
+                    axis.cross_size(&child.style.size).0,
+                    axis.cross_size(&child.style.size).1,
+                    axis.cross_size(&child.style.size).2,
+                    axis.margin_cross_start(&child.style.spacing),
+                    axis.margin_cross_end(&child.style.spacing),
+                )
+            } else {
+                (0.0, 0.0)
+            };
 
             match axis {
                 Axis::Horizontal => {
@@ -281,6 +281,37 @@ impl LayoutEngine {
 
             cursor += axis.main(&child.rect) + axis.margin_main(&child.style.spacing) + gap;
         }
+
+        if inner_cross.is_none() {
+            let inner_cross = max_cross;
+            for child in node.children.iter_mut() {
+                let (cross_size, _) = compute_cross(
+                    child
+                        .style
+                        .item_style
+                        .align_self
+                        .unwrap_or(node.style.align_items),
+                    inner_cross,
+                    axis.cross_size(&child.style.size).0,
+                    axis.cross_size(&child.style.size).1,
+                    axis.cross_size(&child.style.size).2,
+                    axis.margin_cross_start(&child.style.spacing),
+                    axis.margin_cross_end(&child.style.spacing),
+                );
+
+                match axis {
+                    Axis::Horizontal => {
+                        child.style.size.height = Some(cross_size);
+                    }
+                    Axis::Vertical => {
+                        child.style.size.width = Some(cross_size);
+                    }
+                }
+
+                Self::layout_node(child, child.rect.x, child.rect.y);
+            }
+        }
+
         max_cross
     }
 
