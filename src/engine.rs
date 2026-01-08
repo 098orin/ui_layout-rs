@@ -2,6 +2,22 @@ use crate::{
     AlignItems, Display, FlexDirection, JustifyContent, LayoutNode, Rect, SizeStyle, Spacing, Style,
 };
 
+/// resolved size; auto size
+#[derive(Debug, Clone, Copy, Default)]
+pub struct ResolvedSize {
+    pub width: Option<f32>,
+    pub height: Option<f32>,
+}
+
+impl ResolvedSize {
+    pub fn empty() -> Self {
+        Self {
+            width: None,
+            height: None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 enum Axis {
     Horizontal, // row
@@ -20,6 +36,19 @@ impl Axis {
         match self {
             Self::Horizontal => r.height,
             Self::Vertical => r.width,
+        }
+    }
+    fn resolved_main(&self, r: &ResolvedSize) -> Option<f32> {
+        match self {
+            Axis::Horizontal => r.width,
+            Axis::Vertical => r.height,
+        }
+    }
+
+    fn resolved_cross(&self, r: &ResolvedSize) -> Option<f32> {
+        match self {
+            Axis::Horizontal => r.height,
+            Axis::Vertical => r.width,
         }
     }
 
@@ -108,27 +137,41 @@ pub struct LayoutEngine;
 
 impl LayoutEngine {
     pub fn layout(root: &mut LayoutNode, width: f32, height: f32) {
-        root.style.size.width = Some(width);
-        root.style.size.height = Some(height);
-        Self::layout_node(root, 0.0, 0.0);
+        Self::layout_node(
+            root,
+            ResolvedSize {
+                width: Some(width),
+                height: Some(height),
+            },
+            0.0,
+            0.0,
+        );
     }
 
-    fn layout_node(node: &mut LayoutNode, origin_x: f32, origin_y: f32) {
+    fn layout_node(node: &mut LayoutNode, resolved: ResolvedSize, origin_x: f32, origin_y: f32) {
         match node.style.display {
             Display::Flex { flex_direction } => match flex_direction {
-                FlexDirection::Row => Self::layout_flex(node, Axis::Horizontal, origin_x, origin_y),
+                FlexDirection::Row => {
+                    Self::layout_flex(node, Axis::Horizontal, resolved, origin_x, origin_y)
+                }
                 FlexDirection::Column => {
-                    Self::layout_flex(node, Axis::Vertical, origin_x, origin_y)
+                    Self::layout_flex(node, Axis::Vertical, resolved, origin_x, origin_y)
                 }
             },
             Display::Block => {
-                Self::layout_block(node, origin_x, origin_y);
+                Self::layout_block(node, resolved, origin_x, origin_y);
             }
             Display::None => {}
         }
     }
 
-    fn layout_flex(node: &mut LayoutNode, axis: Axis, origin_x: f32, origin_y: f32) {
+    fn layout_flex(
+        node: &mut LayoutNode,
+        axis: Axis,
+        resolved: ResolvedSize,
+        origin_x: f32,
+        origin_y: f32,
+    ) {
         let (padding_main_start, padding_main_end, padding_cross) = {
             let s = &node.style.spacing;
             (
@@ -140,8 +183,13 @@ impl LayoutEngine {
         let gap = axis.gap(&node.style).max(0.0);
 
         // --- own size ---
-        let own_main = axis.size(&node.style.size);
-        let own_cross = axis.cross_size(&node.style.size).0;
+        let own_main = axis
+            .size(&node.style.size)
+            .or(axis.resolved_main(&resolved));
+        let own_cross = axis
+            .cross_size(&node.style.size)
+            .0
+            .or(axis.resolved_cross(&resolved));
 
         let inner_main = own_main.map(|v| (v - padding_main_start - padding_main_end).max(0.0));
         let inner_cross = own_cross.map(|v| (v - padding_cross).max(0.0));
@@ -242,24 +290,16 @@ impl LayoutEngine {
                 (0.0, 0.0)
             };
 
-            match axis {
-                Axis::Horizontal => {
-                    if child.style.size.width.is_none() {
-                        child.style.size.width = *main_opt;
-                    }
-                    if child.style.size.height.is_none() {
-                        child.style.size.height = Some(cross_size);
-                    }
-                }
-                Axis::Vertical => {
-                    if child.style.size.width.is_none() {
-                        child.style.size.width = Some(cross_size);
-                    }
-                    if child.style.size.height.is_none() {
-                        child.style.size.height = *main_opt;
-                    }
-                }
-            }
+            let child_resolved_size = match axis {
+                Axis::Horizontal => ResolvedSize {
+                    width: *main_opt,
+                    height: Some(cross_size),
+                },
+                Axis::Vertical => ResolvedSize {
+                    width: Some(cross_size),
+                    height: *main_opt,
+                },
+            };
 
             let (cx, cy) = match axis {
                 Axis::Horizontal => (
@@ -272,7 +312,7 @@ impl LayoutEngine {
                 ),
             };
 
-            Self::layout_node(child, cx, cy);
+            Self::layout_node(child, child_resolved_size, cx, cy);
 
             let child_outer_cross = axis.cross(&child.rect)
                 + axis.margin_cross_start(&child.style.spacing)
@@ -299,16 +339,18 @@ impl LayoutEngine {
                     axis.margin_cross_end(&child.style.spacing),
                 );
 
-                match axis {
-                    Axis::Horizontal => {
-                        child.style.size.height = Some(cross_size);
-                    }
-                    Axis::Vertical => {
-                        child.style.size.width = Some(cross_size);
-                    }
-                }
+                let child_resolved_size = match axis {
+                    Axis::Horizontal => ResolvedSize {
+                        width: Some(child.rect.width),
+                        height: Some(cross_size),
+                    },
+                    Axis::Vertical => ResolvedSize {
+                        width: Some(cross_size),
+                        height: Some(child.rect.height),
+                    },
+                };
 
-                Self::layout_node(child, child.rect.x, child.rect.y);
+                Self::layout_node(child, child_resolved_size, child.rect.x, child.rect.y);
             }
         }
 
@@ -431,11 +473,7 @@ impl LayoutEngine {
             if child.children.is_empty() {
                 continue;
             }
-
-            child.style.size.width.get_or_insert(child.rect.width);
-            child.style.size.height.get_or_insert(child.rect.height);
-
-            LayoutEngine::layout_node(child, child.rect.x, child.rect.y);
+            LayoutEngine::layout_node(child, ResolvedSize::empty(), child.rect.x, child.rect.y);
         }
     }
 
@@ -483,11 +521,11 @@ impl LayoutEngine {
         }
     }
 
-    fn layout_block(node: &mut LayoutNode, origin_x: f32, origin_y: f32) {
+    fn layout_block(node: &mut LayoutNode, resolved: ResolvedSize, origin_x: f32, origin_y: f32) {
         let s = &node.style.spacing;
 
         // --- block width ---
-        let node_width = node.style.size.width;
+        let node_width = node.style.size.width.or(resolved.width);
 
         let inner_width = node_width.map(|w| (w - s.padding_left - s.padding_right).max(0.0));
 
@@ -496,12 +534,14 @@ impl LayoutEngine {
 
         // --- children ---
         for child in &mut node.children {
-            if child.style.size.width.is_none() {
-                child.style.size.width = inner_width;
-            }
+            let child_resolved_size = ResolvedSize {
+                width: inner_width,
+                height: None,
+            };
 
             Self::layout_node(
                 child,
+                child_resolved_size,
                 s.padding_left + child.style.spacing.margin_left,
                 cursor_y + child.style.spacing.margin_top,
             );
@@ -525,6 +565,7 @@ impl LayoutEngine {
             .style
             .size
             .height
+            .or(resolved.height)
             .unwrap_or(cursor_y + s.padding_bottom);
 
         // max, min
