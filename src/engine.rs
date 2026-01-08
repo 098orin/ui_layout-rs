@@ -359,7 +359,7 @@ impl LayoutEngine {
                             .map(|m| sizes[*i] > m)
                             .unwrap_or(true)
                     } else {
-                        return true;
+                        true
                     }
                 })
                 .map(|(_, c)| c.style.item_style.flex_grow.max(0.0))
@@ -399,10 +399,8 @@ impl LayoutEngine {
                     if max.map(|m| clamped >= m).unwrap_or(false) {
                         frozen[i] = true;
                     }
-                } else {
-                    if min.map(|m| clamped <= m).unwrap_or(false) {
-                        frozen[i] = true;
-                    }
+                } else if min.map(|m| clamped <= m).unwrap_or(false) {
+                    frozen[i] = true;
                 }
             }
 
