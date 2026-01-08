@@ -473,7 +473,13 @@ impl LayoutEngine {
             if child.children.is_empty() {
                 continue;
             }
-            LayoutEngine::layout_node(child, ResolvedSize::empty(), child.rect.x, child.rect.y);
+
+            let resolved_size = ResolvedSize {
+                width: Some(child.rect.width),
+                height: Some(child.rect.height),
+            };
+
+            LayoutEngine::layout_node(child, resolved_size, child.rect.x, child.rect.y);
         }
     }
 
