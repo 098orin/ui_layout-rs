@@ -458,10 +458,9 @@ impl LayoutEngine {
         let s = &node.style.spacing;
 
         // --- block width ---
-        // width: style > available > auto(None)
-        let resolved_width = node.style.size.width;
+        let node_width = node.style.size.width;
 
-        let inner_width = resolved_width.map(|w| (w - s.padding_left - s.padding_right).max(0.0));
+        let inner_width = node_width.map(|w| (w - s.padding_left - s.padding_right).max(0.0));
 
         let mut cursor_y = s.padding_top;
         let mut max_child_width: f32 = 0.0;
@@ -491,7 +490,7 @@ impl LayoutEngine {
 
         // resolve auto size
         let computed_width =
-            resolved_width.unwrap_or(max_child_width + s.padding_left + s.padding_right);
+            node_width.unwrap_or(max_child_width + s.padding_left + s.padding_right);
 
         let computed_height = node
             .style
