@@ -56,6 +56,12 @@ impl Axis {
     }
 
     // --- padding ---
+    fn padding_main(&self, s: &Spacing) -> f32 {
+        match self {
+            Self::Horizontal => s.padding_left + s.padding_right,
+            Self::Vertical => s.padding_top + s.padding_bottom,
+        }
+    }
     fn padding_cross(&self, s: &Spacing) -> f32 {
         match self {
             Self::Horizontal => s.padding_top + s.padding_bottom,
@@ -268,7 +274,8 @@ impl LayoutEngine {
 
         let parent_main = axis
             .size_main(&node.style.size)
-            .or(axis.resolved_main(&resolved));
+            .or(axis.resolved_main(&resolved))
+            .map(|m| (m - axis.padding_main(s)).max(0.0));
 
         /* ---------- intrinsic pass ---------- */
 
