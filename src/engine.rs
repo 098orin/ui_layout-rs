@@ -102,11 +102,22 @@ impl Axis {
             Axis::Vertical => s.height,
         }
     }
-
     fn size_cross(&self, s: &SizeStyle) -> Option<f32> {
         match self {
             Axis::Horizontal => s.height,
             Axis::Vertical => s.width,
+        }
+    }
+    fn max_cross(&self, s: &SizeStyle) -> Option<f32> {
+        match self {
+            Axis::Horizontal => s.max_height,
+            Axis::Vertical => s.max_width,
+        }
+    }
+    fn min_cross(&self, s: &SizeStyle) -> Option<f32> {
+        match self {
+            Axis::Horizontal => s.min_height,
+            Axis::Vertical => s.min_width,
         }
     }
 
@@ -365,22 +376,29 @@ impl LayoutEngine {
                 .align_self
                 .unwrap_or(node.style.align_items);
 
-            let stretch = matches!(align, AlignItems::Stretch)
-                && axis.size_cross(&child.style.size).is_none();
-
-            let stretched_cross = parent_cross.map(|v| {
-                (v - axis.margin_cross_start(&child.style.spacing)
-                    - axis.margin_cross_end(&child.style.spacing))
-                .max(0.0)
-            });
+            let stretched_cross = if matches!(align, AlignItems::Stretch)
+                && axis.size_cross(&child.style.size).is_none()
+            {
+                parent_cross.map(|v| {
+                    clamp(
+                        (v - axis.margin_cross_start(&child.style.spacing)
+                            - axis.margin_cross_end(&child.style.spacing))
+                        .max(0.0),
+                        axis.min_cross(&child.style.size),
+                        axis.max_cross(&child.style.size),
+                    )
+                })
+            } else {
+                None
+            };
 
             let resolved_child = match axis {
                 Axis::Horizontal => ResolvedSize {
                     width: Some(main_sizes[i]),
-                    height: if stretch { stretched_cross } else { None },
+                    height: stretched_cross,
                 },
                 Axis::Vertical => ResolvedSize {
-                    width: if stretch { stretched_cross } else { None },
+                    width: stretched_cross,
                     height: Some(main_sizes[i]),
                 },
             };
