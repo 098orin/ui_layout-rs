@@ -92,7 +92,7 @@ fn nested_flex_coordinate_bug() {
 
     // stretched
     assert_eq!(r.rect.width, 200.0 - 10.0 - 10.0);
-    // max height of the children+ padding + margin
+    // max height of the children + padding + margin
     assert_eq!(r.rect.height, 20.0 + 2.0 + 2.0 + 2.0 + 2.0);
 
     // padding top + margin top
