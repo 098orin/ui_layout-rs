@@ -359,17 +359,23 @@ impl LayoutEngine {
 
                 let grow = child.style.item_style.flex_grow;
                 let delta = remaining * (grow / total_grow);
-                let proposed = main_sizes[i] + delta;
 
                 let (min, max) = match axis {
                     Axis::Horizontal => (child.style.size.min_width, child.style.size.max_width),
                     Axis::Vertical => (child.style.size.min_height, child.style.size.max_height),
                 };
 
-                let clamped = clamp(proposed, min, max);
-                let actual = clamped - main_sizes[i];
+                let margin = axis.margin_main_start(&child.style.spacing)
+                    + axis.margin_main_end(&child.style.spacing);
 
-                main_sizes[i] = clamped;
+                let content = main_sizes[i] - margin;
+
+                let proposed_content = content + delta;
+                let clamped_content = clamp(proposed_content, min, max);
+
+                let actual = clamped_content - content;
+
+                main_sizes[i] = clamped_content + margin;
                 used += actual;
 
                 if (actual - delta).abs() > 0.0001 {
