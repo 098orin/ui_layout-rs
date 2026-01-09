@@ -287,7 +287,11 @@ impl LayoutEngine {
 
             total_base_main += base_main;
             total_flex_grow += child.style.item_style.flex_grow;
-            max_cross = max_cross.max(axis.cross(&child.rect));
+            max_cross = max_cross.max(
+                axis.cross(&child.rect)
+                    + axis.margin_cross_start(&child.style.spacing)
+                    + axis.margin_cross_end(&child.style.spacing),
+            );
         }
 
         let gaps = gap * node.children.len().saturating_sub(1) as f32;
