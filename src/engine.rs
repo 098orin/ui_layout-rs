@@ -102,6 +102,18 @@ impl Axis {
             Axis::Vertical => s.height,
         }
     }
+    fn max_main(&self, s: &SizeStyle) -> Option<f32> {
+        match self {
+            Axis::Horizontal => s.max_width,
+            Axis::Vertical => s.max_height,
+        }
+    }
+    fn min_main(&self, s: &SizeStyle) -> Option<f32> {
+        match self {
+            Axis::Horizontal => s.min_width,
+            Axis::Vertical => s.min_height,
+        }
+    }
     fn size_cross(&self, s: &SizeStyle) -> Option<f32> {
         match self {
             Axis::Horizontal => s.height,
@@ -247,8 +259,16 @@ impl LayoutEngine {
 
         let s = &node.style.spacing;
 
-        let final_main = own_main.unwrap_or(content_main + s.padding_left + s.padding_right);
-        let final_cross = own_cross.unwrap_or(max_cross + s.padding_top + s.padding_bottom);
+        let final_main = clamp(
+            own_main.unwrap_or(content_main + s.padding_left + s.padding_right),
+            axis.min_main(&node.style.size),
+            axis.max_main(&node.style.size),
+        );
+        let final_cross = clamp(
+            own_cross.unwrap_or(max_cross + s.padding_top + s.padding_bottom),
+            axis.min_cross(&node.style.size),
+            axis.max_cross(&node.style.size),
+        );
 
         match axis {
             Axis::Horizontal => {
@@ -380,13 +400,9 @@ impl LayoutEngine {
                 && axis.size_cross(&child.style.size).is_none()
             {
                 parent_cross.map(|v| {
-                    clamp(
-                        (v - axis.margin_cross_start(&child.style.spacing)
-                            - axis.margin_cross_end(&child.style.spacing))
-                        .max(0.0),
-                        axis.min_cross(&child.style.size),
-                        axis.max_cross(&child.style.size),
-                    )
+                    (v - axis.margin_cross_start(&child.style.spacing)
+                        - axis.margin_cross_end(&child.style.spacing))
+                    .max(0.0)
                 })
             } else {
                 None
