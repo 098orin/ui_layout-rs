@@ -7,6 +7,25 @@ and this project loosely follows Semantic Versioning.
 
 ---
 
+## [0.5.0] - 2026-01-09
+
+### Changed
+
+* Reworked auto size resolution logic across the layout engine.
+  - Auto sizing is now evaluated using a clearer intrinsic size pass, improving correctness and predictability.
+  - Nested flex layouts with auto-sized containers now produce stable and consistent results.
+
+* Internal layout algorithm has been largely rewritten for clarity and correctness.
+  - Separation between intrinsic size calculation and flex redistribution has been improved.
+  - Layout recalculation order is now more robust when parent sizes change during flex resolution.
+
+### Notes
+
+* This release does **not** introduce API or interface changes.
+* Layout results may differ from previous versions due to improved auto size evaluation.
+
+---
+
 ## [0.4.6] - 2026-01-05
 
 ### Fixed
