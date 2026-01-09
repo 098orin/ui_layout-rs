@@ -393,11 +393,14 @@ impl LayoutEngine {
         let s = &node.style.spacing;
         let gap = axis.gap(&node.style).max(0.0);
 
+        // === main-axis content size ===
         let content_main: f32 = node
             .children
             .iter()
             .map(|c| {
-                axis.main(&c.rect) + c.style.spacing.margin_left + c.style.spacing.margin_right
+                axis.main(&c.rect)
+                    + axis.margin_main_start(&c.style.spacing)
+                    + axis.margin_main_end(&c.style.spacing)
             })
             .sum::<f32>()
             + gap * node.children.len().saturating_sub(1) as f32;
@@ -415,44 +418,48 @@ impl LayoutEngine {
 
         let mut cursor = start_offset;
 
+        // === cross-axis container size (content box) ===
         let container_cross = axis.cross(&node.rect) - axis.padding_cross(&node.style.spacing);
 
         let child_len = node.children.len();
+
         for (i, child) in node.children.iter_mut().enumerate() {
-            // main-axis: margin start
+            // --- main-axis margin start ---
             cursor += axis.margin_main_start(&child.style.spacing);
 
-            let cross_start = axis.margin_cross_start(&child.style.spacing);
+            // --- cross-axis: margin-inclusive size ---
+            let child_cross_outer = axis.cross(&child.rect)
+                + axis.margin_cross_start(&child.style.spacing)
+                + axis.margin_cross_end(&child.style.spacing);
 
-            // cross-axis align
-            let cross_offset = resolve_align_position(
-                child
-                    .style
-                    .item_style
-                    .align_self
-                    .unwrap_or(node.style.align_items),
-                axis.cross(&child.rect),
-                container_cross,
-            );
+            let align = child
+                .style
+                .item_style
+                .align_self
+                .unwrap_or(node.style.align_items);
+
+            let cross_offset = resolve_align_position(align, child_cross_outer, container_cross);
+
+            let cross_pos = cross_offset + axis.margin_cross_start(&child.style.spacing);
 
             match axis {
                 Axis::Horizontal => {
                     Self::layout_position(
                         child,
                         s.padding_left + cursor,
-                        s.padding_top + cross_offset + cross_start,
+                        s.padding_top + cross_pos,
                     );
                 }
                 Axis::Vertical => {
                     Self::layout_position(
                         child,
-                        s.padding_left + cross_offset + cross_start,
+                        s.padding_left + cross_pos,
                         s.padding_top + cursor,
                     );
                 }
             }
 
-            // main-axis: size + margin end
+            // --- main-axis: size + margin end ---
             cursor += axis.main(&child.rect) + axis.margin_main_end(&child.style.spacing);
 
             if i + 1 < child_len {
