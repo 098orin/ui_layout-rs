@@ -77,6 +77,13 @@ impl Axis {
         }
     }
 
+    fn margin_cross_start(&self, s: &Spacing) -> f32 {
+        match self {
+            Axis::Horizontal => s.margin_top,
+            Axis::Vertical => s.margin_left,
+        }
+    }
+
     // --- size style ---
     fn size_main(&self, s: &SizeStyle) -> Option<f32> {
         match self {
@@ -401,6 +408,8 @@ impl LayoutEngine {
             // main-axis: margin start
             cursor += axis.margin_main_start(&child.style.spacing);
 
+            let cross_start = axis.margin_cross_start(&child.style.spacing);
+
             // cross-axis align
             let cross_offset = resolve_align_position(
                 child
@@ -417,13 +426,13 @@ impl LayoutEngine {
                     Self::layout_position(
                         child,
                         s.padding_left + cursor,
-                        s.padding_top + cross_offset,
+                        s.padding_top + cross_offset + cross_start,
                     );
                 }
                 Axis::Vertical => {
                     Self::layout_position(
                         child,
-                        s.padding_left + cross_offset,
+                        s.padding_left + cross_offset + cross_start,
                         s.padding_top + cursor,
                     );
                 }
