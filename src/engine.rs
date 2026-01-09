@@ -338,7 +338,7 @@ impl LayoutEngine {
         match node.style.display {
             Display::None => {}
             Display::Block => {
-                Self::layout_block(node);
+                Self::layout_block_position(node);
             }
             Display::Flex { flex_direction } => {
                 let axis = match flex_direction {
@@ -350,7 +350,7 @@ impl LayoutEngine {
         }
     }
 
-    fn layout_block(node: &mut LayoutNode) {
+    fn layout_block_position(node: &mut LayoutNode) {
         let cursor_x = node.style.spacing.padding_left;
         let mut cursor_y = node.style.spacing.padding_top;
         for child in &mut node.children {
@@ -409,15 +409,15 @@ impl LayoutEngine {
                 Axis::Horizontal => {
                     Self::layout_position(
                         child,
-                        node.rect.x + s.padding_left + cursor,
-                        node.rect.y + s.padding_top + cross_offset,
+                        s.padding_left + cursor,
+                        s.padding_top + cross_offset,
                     );
                 }
                 Axis::Vertical => {
                     Self::layout_position(
                         child,
-                        node.rect.x + s.padding_left + cross_offset,
-                        node.rect.y + s.padding_top + cursor,
+                        s.padding_left + cross_offset,
+                        s.padding_top + cursor,
                     );
                 }
             }
