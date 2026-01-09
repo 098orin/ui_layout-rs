@@ -257,36 +257,30 @@ impl LayoutEngine {
         self_only: bool,
     ) -> (f32, f32) {
         let s = &node.style.spacing;
+        let count = node.children.len();
 
-        // Parent cross size (content box)
         let parent_cross = axis
             .size_cross(&node.style.size)
             .or(axis.resolved_cross(&resolved))
-            .map(|v| v - axis.padding_cross(s))
-            .map(|v| v.max(0.0));
+            .map(|v| (v - axis.padding_cross(s)).max(0.0));
 
         let gap = axis.gap(&node.style).max(0.0);
 
-        // Parent main size (content box)
         let parent_main = axis
             .size_main(&node.style.size)
             .or(axis.resolved_main(&resolved));
 
-        // First pass: measure intrinsic sizes
-        let mut total_base_main = 0.0;
-        let mut total_flex_grow = 0.0;
+        /* ---------- intrinsic pass ---------- */
+
+        let mut main_sizes = vec![0.0; count];
+        let mut frozen = vec![false; count];
         let mut max_cross: f32 = 0.0;
 
-        for child in &mut node.children {
-            // Base size: layout with no constraints
+        for (i, child) in node.children.iter_mut().enumerate() {
             Self::layout_size(child, ResolvedSize::empty(), self_only);
 
-            let base_main = axis.main(&child.rect)
-                + child.style.spacing.margin_left
-                + child.style.spacing.margin_right;
+            main_sizes[i] = axis.main(&child.rect);
 
-            total_base_main += base_main;
-            total_flex_grow += child.style.item_style.flex_grow;
             max_cross = max_cross.max(
                 axis.cross(&child.rect)
                     + axis.margin_cross_start(&child.style.spacing)
@@ -294,26 +288,69 @@ impl LayoutEngine {
             );
         }
 
-        let gaps = gap * node.children.len().saturating_sub(1) as f32;
-        let content_base_main = total_base_main + gaps;
+        let total_base_main: f32 = main_sizes.iter().sum();
+        let gaps = gap * count.saturating_sub(1) as f32;
 
-        // Remaining space for flex-grow
-        let remaining_main = parent_main
-            .map(|m| (m - content_base_main).max(0.0))
+        let mut remaining = parent_main
+            .map(|m| (m - total_base_main - gaps).max(0.0))
             .unwrap_or(0.0);
 
-        // Second pass: apply flex-grow and relayout children
+        /* ---------- redistribute loop ---------- */
+
+        loop {
+            let mut total_grow = 0.0;
+            for (i, child) in node.children.iter().enumerate() {
+                if !frozen[i] {
+                    total_grow += child.style.item_style.flex_grow;
+                }
+            }
+
+            if total_grow == 0.0 || remaining <= 0.0 {
+                break;
+            }
+
+            let mut used = 0.0;
+            let mut any_frozen = false;
+
+            for (i, child) in node.children.iter().enumerate() {
+                if frozen[i] {
+                    continue;
+                }
+
+                let grow = child.style.item_style.flex_grow;
+                let delta = remaining * (grow / total_grow);
+                let proposed = main_sizes[i] + delta;
+
+                let (min, max) = match axis {
+                    Axis::Horizontal => (child.style.size.min_width, child.style.size.max_width),
+                    Axis::Vertical => (child.style.size.min_height, child.style.size.max_height),
+                };
+
+                let clamped = clamp(proposed, min, max);
+
+                let actual = clamped - main_sizes[i];
+
+                main_sizes[i] = clamped;
+                used += actual;
+
+                if actual < delta {
+                    frozen[i] = true;
+                    any_frozen = true;
+                }
+            }
+
+            remaining -= used;
+
+            if !any_frozen {
+                break;
+            }
+        }
+
+        /* ---------- final layout ---------- */
+
         let mut used_main = 0.0;
 
-        for child in &mut node.children {
-            let grow = child.style.item_style.flex_grow;
-
-            let grow_main = if total_flex_grow > 0.0 {
-                remaining_main * (grow / total_flex_grow)
-            } else {
-                0.0
-            };
-
+        for (i, child) in node.children.iter_mut().enumerate() {
             let align = child
                 .style
                 .item_style
@@ -331,21 +368,19 @@ impl LayoutEngine {
 
             let resolved_child = match axis {
                 Axis::Horizontal => ResolvedSize {
-                    width: Some(axis.main(&child.rect) + grow_main),
+                    width: Some(main_sizes[i]),
                     height: if stretch { stretched_cross } else { None },
                 },
                 Axis::Vertical => ResolvedSize {
                     width: if stretch { stretched_cross } else { None },
-                    height: Some(axis.main(&child.rect) + grow_main),
+                    height: Some(main_sizes[i]),
                 },
             };
 
-            // Relayout child with grown main size
             Self::layout_size(child, resolved_child, self_only);
 
-            used_main += axis.main(&child.rect)
-                + child.style.spacing.margin_left
-                + child.style.spacing.margin_right;
+            used_main +=
+                main_sizes[i] + child.style.spacing.margin_left + child.style.spacing.margin_right;
         }
 
         let content_main = used_main + gaps;
