@@ -76,11 +76,16 @@ impl Axis {
             Axis::Vertical => s.margin_bottom,
         }
     }
-
     fn margin_cross_start(&self, s: &Spacing) -> f32 {
         match self {
             Axis::Horizontal => s.margin_top,
             Axis::Vertical => s.margin_left,
+        }
+    }
+    fn margin_cross_end(&self, s: &Spacing) -> f32 {
+        match self {
+            Axis::Horizontal => s.margin_bottom,
+            Axis::Vertical => s.margin_right,
         }
     }
 
@@ -158,7 +163,10 @@ impl LayoutEngine {
         if layout_children {
             for child in &mut node.children {
                 let child_resolved = ResolvedSize {
-                    width: inner_width,
+                    width: inner_width.map(|w| {
+                        (w - child.style.spacing.margin_left - child.style.spacing.margin_right)
+                            .max(0.0)
+                    }),
                     height: None,
                 };
 
@@ -308,16 +316,22 @@ impl LayoutEngine {
                 .align_self
                 .unwrap_or(node.style.align_items);
 
-            let stretch_cross = matches!(align, AlignItems::Stretch)
+            let stretch = matches!(align, AlignItems::Stretch)
                 && axis.size_cross(&child.style.size).is_none();
+
+            let stretched_cross = parent_cross.map(|v| {
+                (v - axis.margin_cross_start(&child.style.spacing)
+                    - axis.margin_cross_end(&child.style.spacing))
+                .max(0.0)
+            });
 
             let resolved_child = match axis {
                 Axis::Horizontal => ResolvedSize {
                     width: Some(axis.main(&child.rect) + grow_main),
-                    height: if stretch_cross { parent_cross } else { None },
+                    height: if stretch { stretched_cross } else { None },
                 },
                 Axis::Vertical => ResolvedSize {
-                    width: if stretch_cross { parent_cross } else { None },
+                    width: if stretch { stretched_cross } else { None },
                     height: Some(axis.main(&child.rect) + grow_main),
                 },
             };
