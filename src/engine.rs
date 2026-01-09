@@ -279,7 +279,9 @@ impl LayoutEngine {
         for (i, child) in node.children.iter_mut().enumerate() {
             Self::layout_size(child, ResolvedSize::empty(), self_only);
 
-            main_sizes[i] = axis.main(&child.rect);
+            main_sizes[i] = axis.main(&child.rect)
+                + axis.margin_main_start(&child.style.spacing)
+                + axis.margin_main_end(&child.style.spacing);
 
             max_cross = max_cross.max(
                 axis.cross(&child.rect)
@@ -305,7 +307,7 @@ impl LayoutEngine {
                 }
             }
 
-            if total_grow == 0.0 || remaining <= 0.0 {
+            if total_grow == 0.0 {
                 break;
             }
 
@@ -327,13 +329,12 @@ impl LayoutEngine {
                 };
 
                 let clamped = clamp(proposed, min, max);
-
                 let actual = clamped - main_sizes[i];
 
                 main_sizes[i] = clamped;
                 used += actual;
 
-                if actual < delta {
+                if (actual - delta).abs() > 0.0001 {
                     frozen[i] = true;
                     any_frozen = true;
                 }
@@ -379,8 +380,7 @@ impl LayoutEngine {
 
             Self::layout_size(child, resolved_child, self_only);
 
-            used_main +=
-                main_sizes[i] + child.style.spacing.margin_left + child.style.spacing.margin_right;
+            used_main += main_sizes[i];
         }
 
         let content_main = used_main + gaps;
