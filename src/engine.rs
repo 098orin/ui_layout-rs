@@ -315,11 +315,21 @@ impl LayoutEngine {
         let mut max_cross: f32 = 0.0;
 
         for (i, child) in node.children.iter_mut().enumerate() {
-            Self::layout_size(child, ResolvedSize::empty(), self_only);
+            Self::layout_size(child, ResolvedSize::empty(), true);
 
-            main_sizes[i] = axis.main(&child.rect)
-                + axis.margin_main_start(&child.style.spacing)
+            let basis = child.style.item_style.flex_basis;
+
+            let base_content_main = match basis {
+                Some(v) => v,
+                None => axis
+                    .size_main(&child.style.size)
+                    .unwrap_or_else(|| axis.main(&child.rect)),
+            };
+
+            let margin = axis.margin_main_start(&child.style.spacing)
                 + axis.margin_main_end(&child.style.spacing);
+
+            main_sizes[i] = base_content_main + margin;
 
             max_cross = max_cross.max(
                 axis.cross(&child.rect)
