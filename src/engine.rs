@@ -351,12 +351,19 @@ impl LayoutEngine {
     }
 
     fn layout_block_position(node: &mut LayoutNode) {
-        let cursor_x = node.style.spacing.padding_left;
-        let mut cursor_y = node.style.spacing.padding_top;
+        let s = &node.style.spacing;
+
+        let cursor_x = s.padding_left;
+        let mut cursor_y = s.padding_top;
+
         for child in &mut node.children {
-            Self::layout_position(child, cursor_x, cursor_y);
-            cursor_y += child.rect.height
-                + child.style.spacing.margin_top
+            let x = cursor_x + child.style.spacing.margin_left;
+            let y = cursor_y + child.style.spacing.margin_top;
+
+            Self::layout_position(child, x, y);
+
+            cursor_y += child.style.spacing.margin_top
+                + child.rect.height
                 + child.style.spacing.margin_bottom;
         }
     }
