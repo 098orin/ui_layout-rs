@@ -47,8 +47,8 @@ fn align_items_stretch() {
         vec![LayoutNode::new(Style {
             display: Display::Block,
             size: SizeStyle {
-                width: None,
-                height: Some(20.0),
+                width: Length::Auto,
+                height: Length::Px(20.0),
                 ..Default::default()
             },
             ..Default::default()
@@ -80,8 +80,8 @@ fn layout_with_align(align: AlignItems) -> LayoutNode {
         vec![LayoutNode::new(Style {
             display: Display::Block,
             size: SizeStyle {
-                width: Some(40.0),
-                height: Some(20.0),
+                width: Length::Px(40.0),
+                height: Length::Px(20.0),
                 ..Default::default()
             },
             ..Default::default()

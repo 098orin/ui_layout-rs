@@ -18,8 +18,8 @@ fn align_self_center_overrides_parent() {
         vec![LayoutNode::new(Style {
             display: Display::Block,
             size: SizeStyle {
-                width: Some(40.0),
-                height: Some(20.0),
+                width: Length::Px(40.0),
+                height: Length::Px(20.0),
                 ..Default::default()
             },
             item_style: ItemStyle {
@@ -57,8 +57,8 @@ fn align_self_end_overrides_parent() {
         vec![LayoutNode::new(Style {
             display: Display::Block,
             size: SizeStyle {
-                width: Some(40.0),
-                height: Some(20.0),
+                width: Length::Px(40.0),
+                height: Length::Px(20.0),
                 ..Default::default()
             },
             item_style: ItemStyle {
@@ -96,8 +96,8 @@ fn align_self_stretch_overrides_parent() {
         vec![LayoutNode::new(Style {
             display: Display::Block,
             size: SizeStyle {
-                width: None,
-                height: Some(20.0),
+                width: Length::Auto,
+                height: Length::Px(20.0),
                 ..Default::default()
             },
             item_style: ItemStyle {
@@ -134,8 +134,8 @@ fn align_self_auto_uses_parent_align_items() {
         vec![LayoutNode::new(Style {
             display: Display::Block,
             size: SizeStyle {
-                width: Some(40.0),
-                height: Some(20.0),
+                width: Length::Px(40.0),
+                height: Length::Px(20.0),
                 ..Default::default()
             },
             item_style: ItemStyle {

@@ -5,7 +5,7 @@ fn flex_grow_redistribute_max() {
     let grow1 = LayoutNode::new(Style {
         display: Display::Block,
         size: SizeStyle {
-            max_width: Some(250.0),
+            max_width: Length::Px(250.0),
             ..Default::default()
         },
         item_style: ItemStyle {
@@ -49,7 +49,7 @@ fn flex_grow_redistribute_min() {
     let min_item = LayoutNode::new(Style {
         display: Display::Block,
         size: SizeStyle {
-            min_width: Some(300.0),
+            min_width: Length::Px(300.0),
             ..Default::default()
         },
         item_style: ItemStyle {
@@ -92,7 +92,7 @@ fn flex_basis_and_max() {
     let a = LayoutNode::new(Style {
         display: Display::Block,
         size: SizeStyle {
-            max_width: Some(200.0),
+            max_width: Length::Px(200.0),
             ..Default::default()
         },
         item_style: ItemStyle {

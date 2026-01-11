@@ -5,7 +5,7 @@ fn justify_content_center_column() {
     let child1 = LayoutNode::new(Style {
         display: Display::Block,
         size: SizeStyle {
-            height: Some(50.0),
+            height: Length::Px(50.0),
             ..Default::default()
         },
         ..Default::default()
@@ -14,7 +14,7 @@ fn justify_content_center_column() {
     let child2 = LayoutNode::new(Style {
         display: Display::Block,
         size: SizeStyle {
-            height: Some(50.0),
+            height: Length::Px(50.0),
             ..Default::default()
         },
         ..Default::default()
@@ -48,7 +48,7 @@ fn justify_content_space_between_column() {
     let child1 = LayoutNode::new(Style {
         display: Display::Block,
         size: SizeStyle {
-            height: Some(50.0),
+            height: Length::Px(50.0),
             ..Default::default()
         },
         ..Default::default()
@@ -57,7 +57,7 @@ fn justify_content_space_between_column() {
     let child2 = LayoutNode::new(Style {
         display: Display::Block,
         size: SizeStyle {
-            height: Some(50.0),
+            height: Length::Px(50.0),
             ..Default::default()
         },
         ..Default::default()
@@ -66,7 +66,7 @@ fn justify_content_space_between_column() {
     let child3 = LayoutNode::new(Style {
         display: Display::Block,
         size: SizeStyle {
-            height: Some(50.0),
+            height: Length::Px(50.0),
             ..Default::default()
         },
         ..Default::default()
@@ -104,7 +104,7 @@ fn justify_content_space_evenly_column() {
             LayoutNode::new(Style {
                 display: Display::Block,
                 size: SizeStyle {
-                    height: Some(50.0),
+                    height: Length::Px(50.0),
                     ..Default::default()
                 },
                 ..Default::default()

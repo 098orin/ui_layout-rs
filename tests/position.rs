@@ -41,8 +41,8 @@ fn nested_flex_coordinate_bug() {
     row.children = vec![
         LayoutNode::new(Style {
             size: SizeStyle {
-                width: Some(20.0),
-                height: Some(10.0),
+                width: Length::Px(20.0),
+                height: Length::Px(10.0),
                 ..Default::default()
             },
             spacing: Spacing {
@@ -54,8 +54,8 @@ fn nested_flex_coordinate_bug() {
         }),
         LayoutNode::new(Style {
             size: SizeStyle {
-                width: Some(30.0),
-                height: Some(20.0),
+                width: Length::Px(30.0),
+                height: Length::Px(20.0),
                 ..Default::default()
             },
             spacing: Spacing {
@@ -67,8 +67,8 @@ fn nested_flex_coordinate_bug() {
         }),
         LayoutNode::new(Style {
             size: SizeStyle {
-                width: Some(40.0),
-                height: Some(15.0),
+                width: Length::Px(40.0),
+                height: Length::Px(15.0),
                 ..Default::default()
             },
             spacing: Spacing {
@@ -123,7 +123,7 @@ fn flex_column_coordinates() {
         vec![
             LayoutNode::new(Style {
                 size: SizeStyle {
-                    height: Some(50.0),
+                    height: Length::Px(50.0),
                     ..Default::default()
                 },
                 spacing: Spacing {
@@ -135,7 +135,7 @@ fn flex_column_coordinates() {
             }),
             LayoutNode::new(Style {
                 size: SizeStyle {
-                    height: Some(30.0),
+                    height: Length::Px(30.0),
                     ..Default::default()
                 },
                 spacing: Spacing {
@@ -178,16 +178,16 @@ fn flex_row_coordinates_align() {
         vec![
             LayoutNode::new(Style {
                 size: SizeStyle {
-                    height: Some(20.0),
-                    width: Some(30.0),
+                    height: Length::Px(20.0),
+                    width: Length::Px(30.0),
                     ..Default::default()
                 },
                 ..Default::default()
             }),
             LayoutNode::new(Style {
                 size: SizeStyle {
-                    height: Some(40.0),
-                    width: Some(50.0),
+                    height: Length::Px(40.0),
+                    width: Length::Px(50.0),
                     ..Default::default()
                 },
                 ..Default::default()

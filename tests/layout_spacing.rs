@@ -22,7 +22,7 @@ fn layout_with_spacing() {
             LayoutNode::new(Style {
                 display: Display::Block,
                 size: SizeStyle {
-                    height: Some(50.0),
+                    height: Length::Px(50.0),
                     ..Default::default()
                 },
                 spacing: Spacing {
@@ -38,7 +38,7 @@ fn layout_with_spacing() {
             LayoutNode::new(Style {
                 display: Display::Block,
                 size: SizeStyle {
-                    height: Some(30.0),
+                    height: Length::Px(30.0),
                     ..Default::default()
                 },
                 spacing: Spacing {

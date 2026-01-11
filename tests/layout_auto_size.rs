@@ -4,8 +4,8 @@ use ui_layout::*;
 fn flex_column_auto() {
     let child1 = LayoutNode::new(Style {
         size: SizeStyle {
-            width: None,
-            height: Some(20.0),
+            width: Length::Auto,
+            height: Length::Px(20.0),
             ..Default::default()
         },
         ..Default::default()
@@ -13,8 +13,8 @@ fn flex_column_auto() {
 
     let child2 = LayoutNode::new(Style {
         size: SizeStyle {
-            width: None,
-            height: Some(40.0),
+            width: Length::Auto,
+            height: Length::Px(40.0),
             ..Default::default()
         },
         ..Default::default()
@@ -52,8 +52,8 @@ fn flex_column_auto() {
 fn nested_flex_auto_size() {
     let inner_child1 = LayoutNode::new(Style {
         size: SizeStyle {
-            width: Some(40.0),
-            height: Some(10.0),
+            width: Length::Px(40.0),
+            height: Length::Px(10.0),
             ..Default::default()
         },
         ..Default::default()
@@ -61,8 +61,8 @@ fn nested_flex_auto_size() {
 
     let inner_child2 = LayoutNode::new(Style {
         size: SizeStyle {
-            width: Some(60.0),
-            height: Some(20.0),
+            width: Length::Px(60.0),
+            height: Length::Px(20.0),
             ..Default::default()
         },
         ..Default::default()
@@ -103,8 +103,8 @@ fn nested_flex_auto_size() {
 fn block_auto_size() {
     let child1 = LayoutNode::new(Style {
         size: SizeStyle {
-            width: Some(50.0),
-            height: Some(10.0),
+            width: Length::Px(50.0),
+            height: Length::Px(10.0),
             ..Default::default()
         },
         spacing: Spacing {
@@ -116,8 +116,8 @@ fn block_auto_size() {
 
     let child2 = LayoutNode::new(Style {
         size: SizeStyle {
-            width: Some(30.0),
-            height: Some(20.0),
+            width: Length::Px(30.0),
+            height: Length::Px(20.0),
             ..Default::default()
         },
         ..Default::default()
@@ -144,8 +144,8 @@ fn nested_block_size() {
     let child1_1 = LayoutNode::new(Style {
         display: Display::Block,
         size: SizeStyle {
-            width: Some(50.0),
-            height: Some(20.0),
+            width: Length::Px(50.0),
+            height: Length::Px(20.0),
             ..Default::default()
         },
         ..Default::default()
@@ -154,8 +154,8 @@ fn nested_block_size() {
     let child1_2 = LayoutNode::new(Style {
         display: Display::Block,
         size: SizeStyle {
-            width: Some(70.0),
-            height: Some(10.0),
+            width: Length::Px(70.0),
+            height: Length::Px(10.0),
             ..Default::default()
         },
         ..Default::default()
@@ -172,8 +172,8 @@ fn nested_block_size() {
     let child2 = LayoutNode::new(Style {
         display: Display::Block,
         size: SizeStyle {
-            width: Some(40.0),
-            height: Some(15.0),
+            width: Length::Px(40.0),
+            height: Length::Px(15.0),
             ..Default::default()
         },
         ..Default::default()
@@ -209,8 +209,8 @@ fn nested_too_big_flex() {
     let child = LayoutNode::new(Style {
         display: Display::Block,
         size: SizeStyle {
-            width: Some(60.0),
-            height: Some(16.0),
+            width: Length::Px(60.0),
+            height: Length::Px(16.0),
             ..Default::default()
         },
         ..Default::default()
@@ -231,7 +231,7 @@ fn nested_too_big_flex() {
             flex_direction: FlexDirection::Row,
         },
         size: SizeStyle {
-            height: Some(700.0),
+            height: Length::Px(700.0),
             ..Default::default()
         },
         ..Default::default()

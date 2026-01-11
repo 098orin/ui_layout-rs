@@ -10,7 +10,7 @@ fn flex_row_basic() {
             ..Default::default()
         },
         size: SizeStyle {
-            width: Some(200.0),
+            width: Length::Px(200.0),
             ..Default::default()
         },
         ..Default::default()
@@ -57,7 +57,7 @@ fn layout_mvp() {
     let toolbar = LayoutNode::new(Style {
         display: Display::Block,
         size: SizeStyle {
-            height: Some(40.0),
+            height: Length::Px(40.0),
             ..Default::default()
         },
         ..Style::default()
@@ -66,7 +66,7 @@ fn layout_mvp() {
     let sidebar = LayoutNode::new(Style {
         display: Display::Block,
         size: SizeStyle {
-            width: Some(200.0),
+            width: Length::Px(200.0),
             ..Default::default()
         },
         ..Style::default()
@@ -100,7 +100,7 @@ fn layout_mvp() {
     let status = LayoutNode::new(Style {
         display: Display::Block,
         size: SizeStyle {
-            height: Some(24.0),
+            height: Length::Px(24.0),
             ..Default::default()
         },
         ..Style::default()
