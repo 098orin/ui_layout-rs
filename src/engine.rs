@@ -697,3 +697,138 @@ fn resolve_align_position(align: AlignItems, size: f32, container: f32) -> f32 {
         AlignItems::End => free,
     }
 }
+
+// ==========================================
+//                  test
+// ==========================================
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ctx() -> LayoutContext {
+        LayoutContext {
+            parent_width: 200.0,
+            parent_height: 100.0,
+            viewport_width: 1000.0,
+            viewport_height: 500.0,
+        }
+    }
+
+    // ------------------------
+    // basic units
+    // ------------------------
+
+    #[test]
+    fn resolve_px() {
+        let c = ctx();
+        let l = Length::Px(42.0);
+        assert_eq!(resolve_length(&l, &c, Axis::Horizontal), Some(42.0));
+    }
+
+    #[test]
+    fn resolve_percent_width() {
+        let c = ctx();
+        let l = Length::Percent(50.0);
+        assert_eq!(resolve_length(&l, &c, Axis::Horizontal), Some(100.0));
+    }
+
+    #[test]
+    fn resolve_percent_height() {
+        let c = ctx();
+        let l = Length::Percent(25.0);
+        assert_eq!(resolve_length(&l, &c, Axis::Vertical), Some(25.0));
+    }
+
+    #[test]
+    fn resolve_vw_vh() {
+        let c = ctx();
+        assert_eq!(
+            resolve_length(&Length::Vw(10.0), &c, Axis::Horizontal),
+            Some(100.0)
+        );
+        assert_eq!(
+            resolve_length(&Length::Vh(10.0), &c, Axis::Vertical),
+            Some(50.0)
+        );
+    }
+
+    #[test]
+    fn resolve_auto() {
+        let c = ctx();
+        assert_eq!(resolve_length(&Length::Auto, &c, Axis::Horizontal), None);
+    }
+
+    // ------------------------
+    // calc (add / sub)
+    // ------------------------
+
+    #[test]
+    fn resolve_add() {
+        let c = ctx();
+        let l = Length::Add(
+            Box::new(Length::Px(10.0)),
+            Box::new(Length::Percent(50.0)), // 100
+        );
+        assert_eq!(resolve_length(&l, &c, Axis::Horizontal), Some(110.0));
+    }
+
+    #[test]
+    fn resolve_sub() {
+        let c = ctx();
+        let l = Length::Sub(
+            Box::new(Length::Vw(10.0)), // 100
+            Box::new(Length::Px(40.0)),
+        );
+        assert_eq!(resolve_length(&l, &c, Axis::Horizontal), Some(60.0));
+    }
+
+    #[test]
+    fn auto_propagates_in_calc() {
+        let c = ctx();
+        let l = Length::Add(Box::new(Length::Auto), Box::new(Length::Px(10.0)));
+        assert_eq!(resolve_length(&l, &c, Axis::Horizontal), None);
+    }
+
+    // ------------------------
+    // semantic correctness
+    // ------------------------
+
+    #[test]
+    fn auto_is_not_zero_percent() {
+        let c = ctx();
+
+        assert_eq!(resolve_length(&Length::Auto, &c, Axis::Horizontal), None);
+        assert_eq!(
+            resolve_length(&Length::Percent(0.0), &c, Axis::Horizontal),
+            Some(0.0)
+        );
+    }
+
+    // ------------------------
+    // SizeStyle resolve helpers
+    // ------------------------
+
+    #[test]
+    fn size_style_resolve_width() {
+        let c = ctx();
+
+        let s = SizeStyle {
+            width: Length::Percent(50.0),
+            ..Default::default()
+        };
+
+        assert_eq!(s.resolve_width(&c), Some(100.0));
+    }
+
+    #[test]
+    fn size_style_auto() {
+        let c = ctx();
+
+        let s = SizeStyle {
+            width: Length::Auto,
+            ..Default::default()
+        };
+
+        assert_eq!(s.resolve_width(&c), None);
+    }
+}
