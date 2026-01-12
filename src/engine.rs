@@ -409,18 +409,6 @@ impl LayoutEngine {
         for (i, child) in node.children.iter_mut().enumerate() {
             Self::layout_size(child, true, ctx);
 
-            let basis = child.style.item_style.flex_basis.resolve_with(cbm, vm);
-
-            let base_content_main = match basis {
-                Some(v) => v,
-                None => axis
-                    .size_main(&child.style.size)
-                    .resolve_with(cbm, vm)
-                    .unwrap_or(axis.main(&child.rect)),
-            };
-
-            main_sizes[i] = base_content_main;
-
             let (pad_start, pad_end) = axis.padding_main(&child.style.spacing);
             main_padding[i] = (
                 pad_start.resolve_with(cbm, vm).unwrap_or(0.0),
@@ -433,6 +421,18 @@ impl LayoutEngine {
                 mar_start.resolve_with(cbm, vm).unwrap_or(0.0),
                 mar_end.resolve_with(cbm, vm).unwrap_or(0.0),
             );
+
+            let basis = child.style.item_style.flex_basis.resolve_with(cbm, vm);
+
+            let base_content_main = match basis {
+                Some(v) => v,
+                None => axis
+                    .size_main(&child.style.size)
+                    .resolve_with(cbm, vm)
+                    .unwrap_or(axis.main(&child.rect) - main_padding[i].0 - main_padding[i].1),
+            };
+
+            main_sizes[i] = base_content_main;
 
             let cross_size = axis
                 .size_cross(&child.style.size)
