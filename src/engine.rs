@@ -582,20 +582,25 @@ impl LayoutEngine {
         let vw = ctx.viewport_width;
         let vh = ctx.viewport_height;
 
+        let pl = s.padding_left.resolve_with(Some(cbw), vw).unwrap_or(0.0);
+        let pr = s.padding_right.resolve_with(Some(cbw), vw).unwrap_or(0.0);
+        let pt = s.padding_top.resolve_with(Some(cbw), vw).unwrap_or(0.0);
+        let pb = s.padding_bottom.resolve_with(Some(cbw), vw).unwrap_or(0.0);
+
         let cursor_x = s.padding_left.resolve_with(Some(cbw), vw).unwrap_or(0.0);
         let mut cursor_y = s.padding_top.resolve_with(Some(cbh), vh).unwrap_or(0.0);
 
+        let child_cbw = node.rect.width - pl - pr;
+        let child_cbh = node.rect.height - pt - pb;
+
         let child_ctx = LayoutContext {
-            containing_block_width: Some(node.rect.width),
-            containing_block_height: Some(node.rect.height),
+            containing_block_width: Some(child_cbw),
+            containing_block_height: Some(child_cbh),
             viewport_width: vw,
             viewport_height: vh,
             forced_width: None,
             forced_height: None,
         };
-
-        let child_cbw = node.rect.width;
-        let child_cbh = node.rect.height;
 
         for child in &mut node.children {
             let child_s = &node.style.spacing;
