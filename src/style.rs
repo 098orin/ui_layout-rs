@@ -62,11 +62,21 @@ impl Length {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct ItemStyle {
     pub flex_grow: f32,
     pub flex_basis: Length,
     pub align_self: Option<AlignItems>,
+}
+
+impl Default for ItemStyle {
+    fn default() -> Self {
+        ItemStyle {
+            flex_grow: 0.0,
+            flex_basis: Length::Auto,
+            align_self: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
