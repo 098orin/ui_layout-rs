@@ -33,10 +33,39 @@ pub enum Length {
     Sub(Box<Length>, Box<Length>),
 }
 
+impl Length {
+    // Resolve Length
+    //
+    // If the containing block’s is `auto`, then the percentage is treated as `auto` for the purpose of layout.
+    pub fn resolve_with(&self, containing_block: Option<f32>, viewport: f32) -> Option<f32> {
+        match self {
+            Length::Auto => None,
+            Length::Px(v) => Some(*v),
+            Length::Percent(p) => {
+                if let Some(cb) = containing_block {
+                    Some(cb * *p / 100.0)
+                } else {
+                    None
+                }
+            }
+            Length::Vw(v) => Some(viewport * *v / 100.0),
+            Length::Vh(v) => Some(viewport * *v / 100.0),
+            Length::Add(a, b) => Some(
+                a.resolve_with(containing_block, viewport)?
+                    + b.resolve_with(containing_block, viewport)?,
+            ),
+            Length::Sub(a, b) => Some(
+                a.resolve_with(containing_block, viewport)?
+                    - b.resolve_with(containing_block, viewport)?,
+            ),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct ItemStyle {
     pub flex_grow: f32,
-    pub flex_basis: Option<f32>,
+    pub flex_basis: Length,
     pub align_self: Option<AlignItems>,
 }
 
@@ -50,16 +79,17 @@ pub struct SizeStyle {
     pub max_height: Length,
 }
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct Spacing {
-    pub margin_top: f32,
-    pub margin_bottom: f32,
-    pub margin_left: f32,
-    pub margin_right: f32,
-    pub padding_top: f32,
-    pub padding_bottom: f32,
-    pub padding_left: f32,
-    pub padding_right: f32,
+    pub margin_top: Length,
+    pub margin_bottom: Length,
+    pub margin_left: Length,
+    pub margin_right: Length,
+
+    pub padding_top: Length,
+    pub padding_bottom: Length,
+    pub padding_left: Length,
+    pub padding_right: Length,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -91,8 +121,8 @@ pub struct Style {
 
     pub justify_content: JustifyContent,
     pub align_items: AlignItems,
-    pub column_gap: f32,
-    pub row_gap: f32,
+    pub column_gap: Length,
+    pub row_gap: Length,
 }
 
 // =======================
