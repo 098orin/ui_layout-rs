@@ -695,6 +695,12 @@ impl LayoutEngine {
             .unwrap_or(0.0);
 
         for child in node.children.iter_mut() {
+            let margin_s = axis
+                .margin_main_start(&child.style.spacing)
+                .resolve_with(cbm, vm)
+                .unwrap_or(0.0);
+            cursor_main += margin_s;
+
             let cross_offset = cursor_cross_padding
                 + resolve_align_position(
                     child
@@ -712,16 +718,12 @@ impl LayoutEngine {
             };
             Self::layout_position(child, x, y, &child_ctx);
 
-            let margin_s = axis
-                .margin_main_start(&child.style.spacing)
-                .resolve_with(cbm, vm)
-                .unwrap_or(0.0);
             let margin_e = axis
                 .margin_main_end(&child.style.spacing)
                 .resolve_with(cbm, vm)
                 .unwrap_or(0.0);
 
-            cursor_main += axis.main(&child.rect) + margin_s + margin_e + gap + gap_between;
+            cursor_main += axis.main(&child.rect) + margin_e + gap + gap_between;
         }
     }
 }
