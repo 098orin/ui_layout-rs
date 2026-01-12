@@ -547,7 +547,8 @@ impl LayoutEngine {
             used_main += main_sizes[i];
         }
 
-        let content_main = used_main + total_main_margin + total_main_padding + gaps;
+        let content_main =
+            used_main + total_main_padding + total_main_margin + total_main_padding + gaps;
 
         (content_main, max_cross)
     }
