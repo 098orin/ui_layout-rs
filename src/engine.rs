@@ -466,7 +466,6 @@ impl LayoutEngine {
         /* ---------- redistribute loop ---------- */
 
         loop {
-            dbg!(remaining);
             let mut total_grow = 0.0;
             for (i, child) in node.children.iter().enumerate() {
                 if !frozen[i] {
@@ -498,8 +497,6 @@ impl LayoutEngine {
 
                 main_sizes[i] = clamped_content;
                 used += actual;
-
-                dbg!(actual, delta);
 
                 if delta.abs() < 0.0001 {
                     frozen[i] = true;
