@@ -691,17 +691,21 @@ impl LayoutEngine {
         let (start_offset, gap_between) =
             resolve_justify_content(node.style.justify_content, remaining, node.children.len());
 
-        let mut cursor_main = start_offset;
+        let mut cursor_main =
+            start_offset + axis.padding_main(&s).0.resolve_with(cbm, vm).unwrap_or(0.0);
         let cursor_cross_padding = axis
             .padding_cross(&s)
             .0
             .resolve_with(cbc, vc)
             .unwrap_or(0.0);
 
+        let child_cbm = axis.main(&node.rect);
+        let child_cbc = axis.cross(&node.rect);
+
         for child in node.children.iter_mut() {
             let margin_s = axis
                 .margin_main_start(&child.style.spacing)
-                .resolve_with(cbm, vm)
+                .resolve_with(Some(child_cbm), vm)
                 .unwrap_or(0.0);
             cursor_main += margin_s;
 
@@ -713,7 +717,7 @@ impl LayoutEngine {
                         .align_self
                         .unwrap_or(node.style.align_items),
                     axis.cross(&child.rect),
-                    cbc.unwrap_or(0.0),
+                    child_cbc,
                 );
 
             let (x, y) = match axis {
@@ -724,7 +728,7 @@ impl LayoutEngine {
 
             let margin_e = axis
                 .margin_main_end(&child.style.spacing)
-                .resolve_with(cbm, vm)
+                .resolve_with(Some(child_cbm), vm)
                 .unwrap_or(0.0);
 
             cursor_main += axis.main(&child.rect) + margin_e + gap + gap_between;
