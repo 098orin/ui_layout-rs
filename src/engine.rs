@@ -592,8 +592,8 @@ impl LayoutEngine {
 
         let pl = s.padding_left.resolve_with(Some(cbw), vw).unwrap_or(0.0);
         let pr = s.padding_right.resolve_with(Some(cbw), vw).unwrap_or(0.0);
-        let pt = s.padding_top.resolve_with(Some(cbw), vw).unwrap_or(0.0);
-        let pb = s.padding_bottom.resolve_with(Some(cbw), vw).unwrap_or(0.0);
+        let pt = s.padding_top.resolve_with(Some(cbh), vh).unwrap_or(0.0);
+        let pb = s.padding_bottom.resolve_with(Some(cbh), vh).unwrap_or(0.0);
 
         let cursor_x = s.padding_left.resolve_with(Some(cbw), vw).unwrap_or(0.0);
         let mut cursor_y = s.padding_top.resolve_with(Some(cbh), vh).unwrap_or(0.0);
@@ -664,9 +664,19 @@ impl LayoutEngine {
             .unwrap_or(0.0)
             .max(0.0);
 
+        let cbw = ctx.containing_block_width.unwrap();
+        let cbh = ctx.containing_block_height.unwrap();
+        let vw = ctx.viewport_width;
+        let vh = ctx.viewport_height;
+
+        let pl = s.padding_left.resolve_with(Some(cbw), vw).unwrap_or(0.0);
+        let pr = s.padding_right.resolve_with(Some(cbw), vw).unwrap_or(0.0);
+        let pt = s.padding_top.resolve_with(Some(cbh), vh).unwrap_or(0.0);
+        let pb = s.padding_bottom.resolve_with(Some(cbh), vh).unwrap_or(0.0);
+
         let child_ctx = LayoutContext {
-            containing_block_width: Some(node.rect.width),
-            containing_block_height: Some(node.rect.height),
+            containing_block_width: Some(node.rect.width - pl - pr),
+            containing_block_height: Some(node.rect.height - pt - pb),
             viewport_width: ctx.viewport_width,
             viewport_height: ctx.viewport_height,
             forced_width: None,
