@@ -351,24 +351,12 @@ impl LayoutEngine {
         let min_cross = axis.min_cross(&node.style.size).resolve_with(cbc, vc);
         let max_cross = axis.max_cross(&node.style.size).resolve_with(cbc, vc);
 
-        let final_main = clamp(
-            own_main.unwrap_or(
-                content_main
-                    + pms.resolve_with(cbm, vm).unwrap_or(0.0)
-                    + pme.resolve_with(cbm, vm).unwrap_or(0.0),
-            ),
-            min_main,
-            max_main,
-        );
-        let final_cross = clamp(
-            own_cross.unwrap_or(
-                max_child_cross
-                    + pcs.resolve_with(cbc, vc).unwrap_or(0.0)
-                    + pce.resolve_with(cbc, vc).unwrap_or(0.0),
-            ),
-            min_cross,
-            max_cross,
-        );
+        let final_main = clamp(own_main.unwrap_or(content_main), min_main, max_main)
+            + pms.resolve_with(cbm, vm).unwrap_or(0.0)
+            + pme.resolve_with(cbm, vm).unwrap_or(0.0);
+        let final_cross = clamp(own_cross.unwrap_or(max_child_cross), min_cross, max_cross)
+            + pcs.resolve_with(cbc, vc).unwrap_or(0.0)
+            + pce.resolve_with(cbc, vc).unwrap_or(0.0);
 
         match axis {
             Axis::Horizontal => {
