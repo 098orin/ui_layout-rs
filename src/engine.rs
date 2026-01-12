@@ -224,6 +224,8 @@ impl LayoutEngine {
 
         let pl = s.padding_left.resolve_with(cbw, vw).unwrap_or(0.0);
         let pr = s.padding_right.resolve_with(cbw, vw).unwrap_or(0.0);
+        let pt = s.padding_top.resolve_with(cbw, vw).unwrap_or(0.0);
+        let pb = s.padding_bottom.resolve_with(cbw, vw).unwrap_or(0.0);
         let ml_opt = s.margin_left.resolve_with(cbw, vw);
         let mr_opt = s.margin_right.resolve_with(cbw, vw);
 
@@ -232,7 +234,7 @@ impl LayoutEngine {
             .size
             .width
             .resolve_with(cbw, vw)
-            .or(ctx.forced_width);
+            .or(ctx.forced_width.map(|v| v - pl - pr));
         let content_width = match specified_width {
             Some(w) => Some(w),
             None => {
@@ -248,7 +250,7 @@ impl LayoutEngine {
             .size
             .height
             .resolve_with(cbw, vh)
-            .or(ctx.forced_height);
+            .or(ctx.forced_height.map(|v| v - pt - pb));
 
         // ========================
         // layout children
