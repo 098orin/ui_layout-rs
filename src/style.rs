@@ -15,17 +15,22 @@ pub enum FlexDirection {
     Column,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub enum Length {
     Px(f32),
     Percent(f32),
     Vw(f32),
     Vh(f32),
-    #[default]
     Auto,
     // calc
     Add(Box<Length>, Box<Length>),
     Sub(Box<Length>, Box<Length>),
+}
+
+impl Default for Length {
+    fn default() -> Self {
+        Length::Px(0.0)
+    }
 }
 
 impl Length {
@@ -64,7 +69,7 @@ pub struct ItemStyle {
     pub align_self: Option<AlignItems>,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct SizeStyle {
     pub width: Length,
     pub height: Length,
@@ -72,6 +77,19 @@ pub struct SizeStyle {
     pub max_width: Length,
     pub min_height: Length,
     pub max_height: Length,
+}
+
+impl Default for SizeStyle {
+    fn default() -> Self {
+        SizeStyle {
+            width: Length::Auto,
+            height: Length::Auto,
+            min_width: Length::Auto,
+            max_width: Length::Auto,
+            min_height: Length::Auto,
+            max_height: Length::Auto,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default)]
