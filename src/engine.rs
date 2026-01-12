@@ -721,7 +721,7 @@ impl LayoutEngine {
                 .resolve_with(cbm, vm)
                 .unwrap_or(0.0);
 
-            cursor_main += axis.main(&child.rect) + margin_s + margin_e + gap_between;
+            cursor_main += axis.main(&child.rect) + margin_s + margin_e + gap + gap_between;
         }
     }
 }
