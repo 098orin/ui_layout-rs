@@ -48,24 +48,26 @@ fn test_flex_layout_row() {
     // Flex children
     let child1 = LayoutNode::new(Style {
         size: SizeStyle {
-            width: Length::Px(50.0),
+            width: Length::Auto,
             height: Length::Auto,
             ..Default::default()
         },
         item_style: ItemStyle {
             flex_grow: 1.0,
+            flex_basis: Length::Px(50.0),
             ..Default::default()
         },
         ..Default::default()
     });
     let child2 = LayoutNode::new(Style {
         size: SizeStyle {
-            width: Length::Px(50.0),
+            width: Length::Auto,
             height: Length::Auto,
             ..Default::default()
         },
         item_style: ItemStyle {
             flex_grow: 2.0,
+            flex_basis: Length::Px(50.0),
             ..Default::default()
         },
         ..Default::default()
