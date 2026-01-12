@@ -604,9 +604,13 @@ impl LayoutEngine {
             forced_height: None,
         };
 
+        let child_cbw = node.rect.width;
+        let child_cbh = node.rect.height;
+
         for child in &mut node.children {
-            let ml_opt = s.margin_left.resolve_with(Some(cbw), vw);
-            let mr_opt = s.margin_right.resolve_with(Some(cbw), vw);
+            let child_s = &node.style.spacing;
+            let ml_opt = child_s.margin_left.resolve_with(Some(child_cbw), vw);
+            let mr_opt = child_s.margin_right.resolve_with(Some(child_cbw), vw);
 
             let (ml, _mr) = match (ml_opt, mr_opt) {
                 (Some(ml), Some(mr)) => (ml, mr),
@@ -624,7 +628,7 @@ impl LayoutEngine {
                     .style
                     .spacing
                     .margin_top
-                    .resolve_with(Some(cbh), vh)
+                    .resolve_with(Some(child_cbh), vh)
                     .unwrap_or(0.0);
 
             Self::layout_position(child, x, y, &child_ctx);
@@ -633,14 +637,14 @@ impl LayoutEngine {
                 .style
                 .spacing
                 .margin_top
-                .resolve_with(Some(cbh), vh)
+                .resolve_with(Some(child_cbh), vh)
                 .unwrap_or(0.0)
                 + child.rect.height
                 + child
                     .style
                     .spacing
                     .margin_bottom
-                    .resolve_with(Some(cbh), vh)
+                    .resolve_with(Some(child_cbh), vh)
                     .unwrap_or(0.0);
         }
     }
