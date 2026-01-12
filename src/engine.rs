@@ -3,6 +3,7 @@ use crate::{
     Spacing, Style,
 };
 
+/// forced_size INCLUDE padding_size
 struct LayoutContext {
     containing_block_width: Option<f32>,
     containing_block_height: Option<f32>,
@@ -529,8 +530,14 @@ impl LayoutEngine {
             };
 
             let (forced_width, forced_height) = match axis {
-                Axis::Horizontal => (Some(main_sizes[i]), stretched_cross),
-                Axis::Vertical => (stretched_cross, Some(main_sizes[i])),
+                Axis::Horizontal => (
+                    Some(main_sizes[i] + main_padding[i].0 + main_padding[i].1),
+                    stretched_cross,
+                ),
+                Axis::Vertical => (
+                    stretched_cross,
+                    Some(main_sizes[i] + main_padding[i].0 + main_padding[i].1),
+                ),
             };
 
             let child_ctx = LayoutContext {
