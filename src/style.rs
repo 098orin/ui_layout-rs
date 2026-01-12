@@ -1,16 +1,11 @@
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub enum Display {
-    Flex { flex_direction: FlexDirection },
+    Flex {
+        flex_direction: FlexDirection,
+    },
+    #[default]
     Block,
     None,
-}
-
-impl Default for Display {
-    fn default() -> Self {
-        Display::Flex {
-            flex_direction: FlexDirection::Column,
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy, Default)]
