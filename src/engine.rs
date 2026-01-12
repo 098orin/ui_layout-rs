@@ -437,8 +437,9 @@ impl LayoutEngine {
             let cross_size = axis
                 .size_cross(&child.style.size)
                 .resolve_with(cbc, vc)
+                .map(|v| v + main_padding[i].0 + main_padding[i].1)
                 .unwrap_or(axis.cross(&child.rect));
-            max_cross = max_cross.max(cross_size);
+            max_cross = max_cross.max(cross_size + main_margin[i].0 + main_margin[i].1);
         }
 
         let total_base_main: f32 = main_sizes.iter().sum();
