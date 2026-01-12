@@ -311,15 +311,22 @@ impl LayoutEngine {
         let cbm = ctx.containing_block_main(axis);
         let cbc = ctx.containing_block_cross(axis);
 
+        let (pms, pme) = axis.padding_main(&node.style.spacing);
+        let (pcs, pce) = axis.padding_cross(&node.style.spacing);
+        let pms = pms.resolve_with(cbm, vm).unwrap_or(0.0);
+        let pme = pme.resolve_with(cbm, vm).unwrap_or(0.0);
+        let pcs = pcs.resolve_with(cbc, vc).unwrap_or(0.0);
+        let pce = pce.resolve_with(cbc, vc).unwrap_or(0.0);
+
         let own_main = axis
             .size_main(&node.style.size)
             .resolve_with(cbm, vm)
-            .or(ctx.forced_main(axis));
+            .or(ctx.forced_main(axis).map(|v| v - pms - pme));
 
         let own_cross = axis
             .size_cross(&node.style.size)
             .resolve_with(cbc, vc)
-            .or(ctx.forced_cross(axis));
+            .or(ctx.forced_cross(axis).map(|v| v - pcs - pce));
 
         // auto || self_only
         let layout_children = (own_main.is_none() || own_cross.is_none()) || !self_only;
@@ -343,22 +350,14 @@ impl LayoutEngine {
             (0.0, 0.0)
         };
 
-        let s = &node.style.spacing;
-
-        let (pms, pme) = axis.padding_main(&s);
-        let (pcs, pce) = axis.padding_cross(&s);
-
         let min_main = axis.min_main(&node.style.size).resolve_with(cbm, vm);
         let max_main = axis.max_main(&node.style.size).resolve_with(cbm, vm);
         let min_cross = axis.min_cross(&node.style.size).resolve_with(cbc, vc);
         let max_cross = axis.max_cross(&node.style.size).resolve_with(cbc, vc);
 
-        let final_main = clamp(own_main.unwrap_or(content_main), min_main, max_main)
-            + pms.resolve_with(cbm, vm).unwrap_or(0.0)
-            + pme.resolve_with(cbm, vm).unwrap_or(0.0);
-        let final_cross = clamp(own_cross.unwrap_or(max_child_cross), min_cross, max_cross)
-            + pcs.resolve_with(cbc, vc).unwrap_or(0.0)
-            + pce.resolve_with(cbc, vc).unwrap_or(0.0);
+        let final_main = clamp(own_main.unwrap_or(content_main), min_main, max_main) + pms + pme;
+        let final_cross =
+            clamp(own_cross.unwrap_or(max_child_cross), min_cross, max_cross) + pcs + pce;
 
         match axis {
             Axis::Horizontal => {
