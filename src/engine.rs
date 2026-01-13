@@ -495,7 +495,7 @@ impl LayoutEngine {
                 main_sizes[i] = clamped_content;
                 used += actual;
 
-                if proposed_content == clamped_content {
+                if proposed_content != clamped_content {
                     frozen[i] = true;
                 }
             }
