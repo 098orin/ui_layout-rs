@@ -446,7 +446,7 @@ impl LayoutEngine {
                 None => {
                     let size_opt = axis.size_main(&child.style.size).resolve_with(cbm, vm);
                     match size_opt {
-                        None => 0.0,
+                        None => axis.main(&child.rect),
                         Some(v) => {
                             frozen[i] = true;
                             v
