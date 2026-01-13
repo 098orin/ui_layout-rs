@@ -302,12 +302,8 @@ impl LayoutEngine {
         // ========================
         // apply
         // ========================
-        let computed_width = content_width
-            .map(|v| v - pl - pr)
-            .unwrap_or(max_child_width);
-        let computed_height = content_height
-            .map(|v| v - pt - pb)
-            .unwrap_or(total_child_height);
+        let computed_width = content_width.unwrap_or(max_child_width);
+        let computed_height = content_height.unwrap_or(total_child_height);
 
         let final_width = clamp(
             computed_width,
