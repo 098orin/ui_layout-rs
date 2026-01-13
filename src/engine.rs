@@ -502,7 +502,7 @@ impl LayoutEngine {
 
             remaining -= used;
 
-            if !frozen.contains(&false) || remaining.abs() < 0.0001 || used.abs() < 0.0001 {
+            if remaining.abs() < 0.0001 || used.abs() < 0.0001 {
                 break;
             }
         }
