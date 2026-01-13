@@ -712,8 +712,12 @@ impl LayoutEngine {
             .resolve_with(cbc, vc)
             .unwrap_or(0.0);
 
-        let child_cbm = axis.main(&node.rect);
-        let child_cbc = axis.cross(&node.rect);
+        let (pm, pc) = match axis {
+            Axis::Horizontal => (pl + pr, pt + pb),
+            Axis::Vertical => (pt + pb, pl + pr),
+        };
+        let child_cbm = axis.main(&node.rect) - pm;
+        let child_cbc = axis.cross(&node.rect) - pc;
 
         for child in node.children.iter_mut() {
             let margin_s = axis
@@ -722,6 +726,12 @@ impl LayoutEngine {
                 .unwrap_or(0.0);
             cursor_main += margin_s;
 
+            let child_pc = {
+                let (pcs, pce) = axis.padding_cross(&child.style.spacing);
+                let resolve = |v: &Length| v.resolve_with(Some(child_cbc), vc).unwrap_or(0.0);
+                resolve(pcs) + resolve(pce)
+            };
+
             let cross_offset = cursor_cross_padding
                 + resolve_align_position(
                     child
@@ -729,7 +739,7 @@ impl LayoutEngine {
                         .item_style
                         .align_self
                         .unwrap_or(node.style.align_items),
-                    axis.cross(&child.rect),
+                    axis.cross(&child.rect) - child_pc,
                     child_cbc,
                 );
 
