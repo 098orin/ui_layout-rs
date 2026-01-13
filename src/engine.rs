@@ -446,7 +446,15 @@ impl LayoutEngine {
                 None => {
                     let size_opt = axis.size_main(&child.style.size).resolve_with(cbm, vm);
                     match size_opt {
-                        None => axis.main(&child.rect) - main_padding[i].0 - main_padding[i].1,
+                        None => {
+                            if matches!(child.style.display, Display::Block)
+                                && matches!(axis, Axis::Horizontal)
+                            {
+                                0.0
+                            } else {
+                                axis.main(&child.rect) - main_padding[i].0 - main_padding[i].1
+                            }
+                        }
                         Some(v) => {
                             frozen[i] = true;
                             v
