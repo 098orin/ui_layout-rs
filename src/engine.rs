@@ -286,10 +286,8 @@ impl LayoutEngine {
         // ========================
         // apply
         // ========================
-        let computed_width = content_width.unwrap_or(max_child_width) + pl + pr;
-        let computed_height = content_height.unwrap_or(total_child_height)
-            + s.padding_top.resolve_with(cbw, vw).unwrap_or(0.0)
-            + s.padding_bottom.resolve_with(cbw, vw).unwrap_or(0.0);
+        let computed_width = content_width.unwrap_or(max_child_width);
+        let computed_height = content_height.unwrap_or(total_child_height);
 
         let final_width = clamp(
             computed_width,
@@ -302,8 +300,10 @@ impl LayoutEngine {
             node.style.size.max_height.resolve_with(cbw, vw),
         );
 
-        node.rect.height = final_height;
-        node.rect.width = final_width;
+        node.rect.height = final_height + pl + pr;
+        node.rect.width = final_width
+            + s.padding_top.resolve_with(cbw, vw).unwrap_or(0.0)
+            + s.padding_bottom.resolve_with(cbw, vw).unwrap_or(0.0);
     }
 
     fn layout_flex_size(node: &mut LayoutNode, axis: Axis, self_only: bool, ctx: &LayoutContext) {
