@@ -260,7 +260,8 @@ impl LayoutEngine {
         let mut total_child_height = 0.0;
         let mut max_child_width: f32 = 0.0;
 
-        let should_layout_children = matches!(node.style.size.height, Length::Auto) || !self_only;
+        let should_layout_children =
+            content_width.is_none() || content_height.is_none() || !self_only;
 
         if should_layout_children {
             for child in &mut node.children {
