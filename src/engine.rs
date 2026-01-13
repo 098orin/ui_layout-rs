@@ -220,6 +220,7 @@ impl LayoutEngine {
     fn layout_block_size(node: &mut LayoutNode, self_only: bool, ctx: &LayoutContext) {
         let s = &node.style.spacing;
         let cbw = ctx.containing_block_width;
+        let cbh = ctx.containing_block_height;
         let vw = ctx.viewport_width;
         let vh = ctx.viewport_height;
 
@@ -312,8 +313,8 @@ impl LayoutEngine {
         );
         let final_height = clamp(
             computed_height,
-            node.style.size.min_height.resolve_with(cbw, vw),
-            node.style.size.max_height.resolve_with(cbw, vw),
+            node.style.size.min_height.resolve_with(cbh, vh),
+            node.style.size.max_height.resolve_with(cbh, vh),
         );
 
         node.rect.width = final_width + pl + pr;
