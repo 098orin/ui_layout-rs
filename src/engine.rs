@@ -226,8 +226,8 @@ impl LayoutEngine {
 
         let pl = s.padding_left.resolve_with(cbw, vw).unwrap_or(0.0);
         let pr = s.padding_right.resolve_with(cbw, vw).unwrap_or(0.0);
-        let pt = s.padding_top.resolve_with(cbw, vw).unwrap_or(0.0);
-        let pb = s.padding_bottom.resolve_with(cbw, vw).unwrap_or(0.0);
+        let pt = s.padding_top.resolve_with(cbh, vh).unwrap_or(0.0);
+        let pb = s.padding_bottom.resolve_with(cbh, vh).unwrap_or(0.0);
         let ml_opt = s.margin_left.resolve_with(cbw, vw);
         let mr_opt = s.margin_right.resolve_with(cbw, vw);
 
