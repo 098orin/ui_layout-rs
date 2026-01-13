@@ -251,7 +251,7 @@ impl LayoutEngine {
             .style
             .size
             .height
-            .resolve_with(cbw, vh)
+            .resolve_with(cbh, vh)
             .or(ctx.forced_height.map(|v| v - pt - pb));
 
         // ========================
