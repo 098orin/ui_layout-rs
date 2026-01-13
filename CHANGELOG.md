@@ -7,6 +7,25 @@ and this project loosely follows Semantic Versioning.
 
 ---
 
+## [0.6.0] - 2026-01-13
+
+### Added
+- New `Length` type to represent layout sizes in multiple units (Px, Percent, Vw, Vh, Auto)
+- Support for viewport-relative units (`vw`, `vh`)
+- Support for percentage-based lengths
+- Basic `calc()`-style expressions via `Length::Add` and `Length::Sub`
+
+### Changed
+- Layout APIs that previously accepted `f32` (px-only) now use `Length`
+- Layout resolution now depends on the available space (for Percent, Vw, Vh, and Auto)
+- Spacing (margin, padding, gap) now follows CSS specification semantics
+- Internal size and spacing calculations refactored to support unit-aware resolution
+
+### Breaking Changes
+- All size-related properties (width, height, min/max sizes, margin, padding, gap, etc.) now use `Length` instead of `f32`
+
+---
+
 ## [0.5.0] - 2026-01-09
 
 ### Changed
