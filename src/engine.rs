@@ -258,36 +258,56 @@ impl LayoutEngine {
         // ========================
         let mut total_child_height = 0.0;
         let mut max_child_width: f32 = 0.0;
-        if matches!(node.style.size.height, Length::Auto) || !self_only {
+
+        let should_layout_children = matches!(node.style.size.height, Length::Auto) || !self_only;
+
+        if should_layout_children {
             for child in &mut node.children {
+                // ---- resolve margins ----
+                let spacing = &child.style.spacing;
+
+                let ml = spacing.margin_left.resolve_with(content_width, vw);
+                let mr = spacing.margin_right.resolve_with(content_width, vw);
+                let mt = spacing.margin_top.resolve_with(content_height, vh);
+                let mb = spacing.margin_bottom.resolve_with(content_height, vh);
+
+                // ---- build layout context for child ----
+                let forced_width = content_width.and_then(|w| match (ml, mr) {
+                    (Some(ml), Some(mr)) => Some((w - ml - mr).max(0.0)),
+                    _ => None,
+                });
+
                 let child_ctx = LayoutContext {
                     containing_block_width: content_width,
                     containing_block_height: content_height,
                     viewport_width: vw,
                     viewport_height: vh,
-                    forced_width: content_width.and_then(|v| {
-                        if let Some(ml) = child.style.spacing.margin_left.resolve_with(Some(v), vw)
-                            && let Some(mr) =
-                                child.style.spacing.margin_right.resolve_with(Some(v), vw)
-                        {
-                            Some((v - ml - mr).max(0.0))
-                        } else {
-                            None
-                        }
-                    }),
+                    forced_width,
                     forced_height: None,
                 };
+
+                // ---- layout child ----
                 Self::layout_size(child, self_only, &child_ctx);
-                total_child_height += child.rect.height;
-                max_child_width = child.rect.width.max(max_child_width);
+
+                // ---- accumulate sizes ----
+                let child_mar_box_height =
+                    child.rect.height + mt.unwrap_or(0.0) + mb.unwrap_or(0.0);
+                total_child_height += child_mar_box_height;
+
+                let child_mar_box_width = child.rect.width + ml.unwrap_or(0.0) + mr.unwrap_or(0.0);
+                max_child_width = max_child_width.max(child_mar_box_width);
             }
         }
 
         // ========================
         // apply
         // ========================
-        let computed_width = content_width.unwrap_or(max_child_width);
-        let computed_height = content_height.unwrap_or(total_child_height);
+        let computed_width = content_width
+            .map(|v| v - pl - pr)
+            .unwrap_or(max_child_width);
+        let computed_height = content_height
+            .map(|v| v - pt - pb)
+            .unwrap_or(total_child_height);
 
         let final_width = clamp(
             computed_width,
@@ -300,10 +320,8 @@ impl LayoutEngine {
             node.style.size.max_height.resolve_with(cbw, vw),
         );
 
-        node.rect.height = final_height + pl + pr;
-        node.rect.width = final_width
-            + s.padding_top.resolve_with(cbw, vw).unwrap_or(0.0)
-            + s.padding_bottom.resolve_with(cbw, vw).unwrap_or(0.0);
+        node.rect.width = final_width + pl + pr;
+        node.rect.height = final_height + pt + pb;
     }
 
     fn layout_flex_size(node: &mut LayoutNode, axis: Axis, self_only: bool, ctx: &LayoutContext) {
