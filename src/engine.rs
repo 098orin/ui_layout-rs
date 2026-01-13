@@ -427,10 +427,16 @@ impl LayoutEngine {
 
             let base_content_main = match basis {
                 Some(v) => v,
-                None => axis
-                    .size_main(&child.style.size)
-                    .resolve_with(cbm, vm)
-                    .unwrap_or(axis.main(&child.rect) - main_padding[i].0 - main_padding[i].1),
+                None => {
+                    let size_opt = axis.size_main(&child.style.size).resolve_with(cbm, vm);
+                    match size_opt {
+                        None => {
+                            frozen[i] = true;
+                            axis.main(&child.rect) - main_padding[i].0 - main_padding[i].1
+                        }
+                        Some(v) => v,
+                    }
+                }
             };
 
             main_sizes[i] = base_content_main;
