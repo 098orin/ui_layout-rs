@@ -495,7 +495,7 @@ impl LayoutEngine {
                 main_sizes[i] = clamped_content;
                 used += actual;
 
-                if delta.abs() < 0.0001 {
+                if (proposed_content - clamped_content).abs() > 0.0001 {
                     frozen[i] = true;
                 }
             }
