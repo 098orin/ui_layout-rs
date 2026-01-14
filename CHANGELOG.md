@@ -7,6 +7,21 @@ and this project loosely follows Semantic Versioning.
 
 ---
 
+## [0.6.1] - 2026-01-14
+
+### Fixed
+- Fixed incorrect flex container main size calculation caused by double-counted
+  child padding.
+- Fixed cross-axis size calculation mistakenly using main-axis padding in flex
+  layouts.
+- Fixed cross size aggregation incorrectly applying main-axis margins instead of
+  cross-axis margins.
+- Fixed block layout positioning using parent spacing instead of child margins.
+- Fixed incorrect handling of `margin: auto` in block layout that relied on
+  viewport size instead of the containing block.
+
+---
+
 ## [0.6.0] - 2026-01-13
 
 ### Added
