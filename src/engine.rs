@@ -465,12 +465,26 @@ impl LayoutEngine {
 
             main_sizes[i] = base_content_main;
 
+            let (pcs, pce) = axis.padding_cross(&child.style.spacing);
+            let cross_padding =
+                pcs.resolve_with(cbc, vc).unwrap_or(0.0) + pce.resolve_with(cbc, vc).unwrap_or(0.0);
+
             let cross_size = axis
                 .size_cross(&child.style.size)
                 .resolve_with(cbc, vc)
-                .map(|v| v + main_padding[i].0 + main_padding[i].1)
+                .map(|v| v + cross_padding)
                 .unwrap_or(axis.cross(&child.rect));
-            max_cross = max_cross.max(cross_size + main_margin[i].0 + main_margin[i].1);
+
+            let cross_margin = axis
+                .margin_cross_start(&child.style.spacing)
+                .resolve_with(cbc, vc)
+                .unwrap_or(0.0)
+                + axis
+                    .margin_cross_end(&child.style.spacing)
+                    .resolve_with(cbc, vc)
+                    .unwrap_or(0.0);
+
+            max_cross = max_cross.max(cross_size + cross_margin);
         }
 
         let total_base_main: f32 = main_sizes.iter().sum();
@@ -584,8 +598,7 @@ impl LayoutEngine {
             used_main += main_sizes[i];
         }
 
-        let content_main =
-            used_main + total_main_padding + total_main_margin + total_main_padding + gaps;
+        let content_main = used_main + total_main_margin + total_main_padding + gaps;
 
         (content_main, max_cross)
     }
@@ -641,14 +654,14 @@ impl LayoutEngine {
         };
 
         for child in &mut node.children {
-            let child_s = &node.style.spacing;
+            let child_s = &child.style.spacing;
             let ml_opt = child_s.margin_left.resolve_with(Some(child_cbw), vw);
             let mr_opt = child_s.margin_right.resolve_with(Some(child_cbw), vw);
 
             let (ml, _mr) = match (ml_opt, mr_opt) {
                 (Some(ml), Some(mr)) => (ml, mr),
                 (Some(ml), None) => (ml, node.rect.width - ml),
-                (None, Some(mr)) => (vw - mr, mr),
+                (None, Some(mr)) => (ctx.containing_block_width.unwrap() - mr, mr),
                 (None, None) => {
                     let m = node.rect.width - child.rect.width;
                     (m, m)
