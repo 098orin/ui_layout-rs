@@ -639,7 +639,7 @@ impl LayoutEngine {
         let pb = s.padding_bottom.resolve_with(Some(cbh), vh).unwrap_or(0.0);
 
         let cursor_x = pl;
-        let mut cursor_y = pr;
+        let mut cursor_y = pt;
 
         let child_cbw = node.rect.width - pl - pr;
         let child_cbh = node.rect.height - pt - pb;
