@@ -766,7 +766,7 @@ impl LayoutEngine {
         let child_cbc = axis.cross(&node.rect) - pc;
 
         for child in node.children.iter_mut() {
-            let (has_auto_margin_on_main_axis, margin_s, margin_e) = {
+            let (_has_auto_margin_on_main, margin_s, margin_e) = {
                 let ms_opt = axis
                     .margin_main_start(&child.style.spacing)
                     .resolve_with(Some(child_cbm), vm);
@@ -795,20 +795,16 @@ impl LayoutEngine {
                 resolve(pcs) + resolve(pce)
             };
 
-            let cross_offset = if has_auto_margin_on_main_axis {
-                0.0
-            } else {
-                cursor_cross_padding
-                    + resolve_align_position(
-                        child
-                            .style
-                            .item_style
-                            .align_self
-                            .unwrap_or(node.style.align_items),
-                        axis.cross(&child.rect) - child_pc,
-                        child_cbc,
-                    )
-            };
+            let cross_offset = cursor_cross_padding
+                + resolve_align_position(
+                    child
+                        .style
+                        .item_style
+                        .align_self
+                        .unwrap_or(node.style.align_items),
+                    axis.cross(&child.rect) - child_pc,
+                    child_cbc,
+                );
 
             let (x, y) = match axis {
                 Axis::Horizontal => (cursor_main, cross_offset),
