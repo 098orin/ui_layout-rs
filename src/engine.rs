@@ -658,14 +658,17 @@ impl LayoutEngine {
             let ml_opt = child_s.margin_left.resolve_with(Some(child_cbw), vw);
             let mr_opt = child_s.margin_right.resolve_with(Some(child_cbw), vw);
 
-            let (ml, _mr) = match (ml_opt, mr_opt) {
-                (Some(ml), Some(mr)) => (ml, mr),
-                (Some(ml), None) => (ml, node.rect.width - ml),
-                (None, Some(mr)) => (ctx.containing_block_width.unwrap() - mr, mr),
-                (None, None) => {
-                    let m = node.rect.width - child.rect.width;
-                    (m, m)
-                }
+            let (ml, _mr) = {
+                let (ml, mr) = match (ml_opt, mr_opt) {
+                    (Some(ml), Some(mr)) => (ml, mr),
+                    (Some(ml), None) => (ml, node.rect.width - ml),
+                    (None, Some(mr)) => (cbw - node.rect.width - mr, mr),
+                    (None, None) => {
+                        let m = (cbw - child.rect.width) / 2.0;
+                        (m, m)
+                    }
+                };
+                (ml.max(0.0), mr.max(0.0))
             };
 
             let x = cursor_x + ml;
