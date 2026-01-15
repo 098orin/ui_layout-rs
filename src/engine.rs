@@ -700,10 +700,12 @@ impl LayoutEngine {
 
     fn layout_flex_position(node: &mut LayoutNode, axis: Axis, ctx: &LayoutContext) {
         let s = &node.style.spacing;
+
         let vm = ctx.viewport_main(axis);
         let vc = ctx.viewport_cross(axis);
         let cbm = ctx.containing_block_main(axis);
         let cbc = ctx.containing_block_cross(axis);
+
         let gap = axis
             .gap(&node.style)
             .resolve_with(cbc, vc)
@@ -720,15 +722,29 @@ impl LayoutEngine {
         let pt = s.padding_top.resolve_with(Some(cbh), vh).unwrap_or(0.0);
         let pb = s.padding_bottom.resolve_with(Some(cbh), vh).unwrap_or(0.0);
 
+        let (pm, pc) = match axis {
+            Axis::Horizontal => (pl + pr, pt + pb),
+            Axis::Vertical => (pt + pb, pl + pr),
+        };
+
+        let child_cbm = axis.main(&node.rect) - pm;
+        let child_cbc = axis.cross(&node.rect) - pc;
+
         let child_ctx = LayoutContext {
             containing_block_width: Some(node.rect.width - pl - pr),
             containing_block_height: Some(node.rect.height - pt - pb),
-            viewport_width: ctx.viewport_width,
-            viewport_height: ctx.viewport_height,
+            viewport_width: vw,
+            viewport_height: vh,
             forced_width: None,
             forced_height: None,
         };
 
+        let has_any_auto_margin_main = node.children.iter().any(|child| {
+            matches!(axis.margin_main_start(&child.style.spacing), Length::Auto)
+                || matches!(axis.margin_main_end(&child.style.spacing), Length::Auto)
+        });
+
+        // === total main size ===
         let total_main: f32 = node
             .children
             .iter()
@@ -736,37 +752,36 @@ impl LayoutEngine {
                 axis.main(&child.rect)
                     + axis
                         .margin_main_start(&child.style.spacing)
-                        .resolve_with(cbm, vm)
+                        .resolve_with(Some(child_cbm), vm)
                         .unwrap_or(0.0)
                     + axis
                         .margin_main_end(&child.style.spacing)
-                        .resolve_with(cbm, vm)
+                        .resolve_with(Some(child_cbm), vm)
                         .unwrap_or(0.0)
             })
             .sum::<f32>()
             + gap * (node.children.len().saturating_sub(1) as f32);
 
         let remaining = cbm.map(|m| (m - total_main).max(0.0)).unwrap_or(0.0);
-        let (start_offset, gap_between) =
-            resolve_justify_content(node.style.justify_content, remaining, node.children.len());
+
+        // === justify-content ===
+        let (start_offset, gap_between) = if has_any_auto_margin_main {
+            (0.0, 0.0)
+        } else {
+            resolve_justify_content(node.style.justify_content, remaining, node.children.len())
+        };
 
         let mut cursor_main =
             start_offset + axis.padding_main(&s).0.resolve_with(cbm, vm).unwrap_or(0.0);
-        let cursor_cross_padding = axis
+
+        let cross_padding_start = axis
             .padding_cross(&s)
             .0
             .resolve_with(cbc, vc)
             .unwrap_or(0.0);
 
-        let (pm, pc) = match axis {
-            Axis::Horizontal => (pl + pr, pt + pb),
-            Axis::Vertical => (pt + pb, pl + pr),
-        };
-        let child_cbm = axis.main(&node.rect) - pm;
-        let child_cbc = axis.cross(&node.rect) - pc;
-
         for child in node.children.iter_mut() {
-            let (_has_auto_margin_on_main, margin_s, margin_e) = {
+            let (margin_s, margin_e) = {
                 let ms_opt = axis
                     .margin_main_start(&child.style.spacing)
                     .resolve_with(Some(child_cbm), vm);
@@ -774,42 +789,59 @@ impl LayoutEngine {
                     .margin_main_end(&child.style.spacing)
                     .resolve_with(Some(child_cbm), vm);
 
-                let (has_auto_margin_on_main_axis, ms, me) = match (ms_opt, me_opt) {
-                    (Some(ms), Some(me)) => (false, ms, me),
-                    (Some(ms), None) => (true, ms, child_cbm - axis.main(&child.rect) - ms),
-                    (None, Some(me)) => (true, child_cbm - axis.main(&child.rect) - me, me),
+                let (ms, me) = match (ms_opt, me_opt) {
+                    (Some(ms), Some(me)) => (ms, me),
+                    (Some(ms), None) => (ms, child_cbm - axis.main(&child.rect) - ms),
+                    (None, Some(me)) => (child_cbm - axis.main(&child.rect) - me, me),
                     (None, None) => {
                         let m = (child_cbm - axis.main(&child.rect)) / 2.0;
-                        (true, m, m)
+                        (m, m)
                     }
                 };
 
-                (has_auto_margin_on_main_axis, ms.max(0.0), me.max(0.0))
+                (ms.max(0.0), me.max(0.0))
             };
 
             cursor_main += margin_s;
 
-            let child_pc = {
-                let (pcs, pce) = axis.padding_cross(&child.style.spacing);
-                let resolve = |v: &Length| v.resolve_with(Some(child_cbc), vc).unwrap_or(0.0);
-                resolve(pcs) + resolve(pce)
-            };
+            // === cross auto margin ===
+            let cs_opt = axis
+                .margin_cross_start(&child.style.spacing)
+                .resolve_with(Some(child_cbc), vc);
+            let ce_opt = axis
+                .margin_cross_end(&child.style.spacing)
+                .resolve_with(Some(child_cbc), vc);
 
-            let cross_offset = cursor_cross_padding
-                + resolve_align_position(
-                    child
-                        .style
-                        .item_style
-                        .align_self
-                        .unwrap_or(node.style.align_items),
-                    axis.cross(&child.rect) - child_pc,
-                    child_cbc,
-                );
+            let cross_offset = if cs_opt.is_none() || ce_opt.is_none() {
+                let (cs, _) = match (cs_opt, ce_opt) {
+                    (Some(cs), Some(ce)) => (cs, ce),
+                    (Some(cs), None) => (cs, child_cbc - axis.cross(&child.rect) - cs),
+                    (None, Some(ce)) => (child_cbc - axis.cross(&child.rect) - ce, ce),
+                    (None, None) => {
+                        let m = (child_cbc - axis.cross(&child.rect)) / 2.0;
+                        (m, m)
+                    }
+                };
+                cross_padding_start + cs.max(0.0)
+            } else {
+                // align-items / align-self
+                cross_padding_start
+                    + resolve_align_position(
+                        child
+                            .style
+                            .item_style
+                            .align_self
+                            .unwrap_or(node.style.align_items),
+                        axis.cross(&child.rect),
+                        child_cbc,
+                    )
+            };
 
             let (x, y) = match axis {
                 Axis::Horizontal => (cursor_main, cross_offset),
                 Axis::Vertical => (cross_offset, cursor_main),
             };
+
             Self::layout_position(child, x, y, &child_ctx);
 
             cursor_main += axis.main(&child.rect) + margin_e + gap + gap_between;
