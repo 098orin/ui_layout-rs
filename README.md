@@ -54,7 +54,7 @@ see the unit tests in the [`tests/`](tests/) directory. They provide practical u
 
 See [CHANGELOG.md](CHANGELOG.md) for a detailed list of changes.
 
-* Version: **0.6.1**
+* Version: **0.6.2**
 * API is evolving but now includes full Flexbox-like alignment and gaps
 
 Future versions may add:

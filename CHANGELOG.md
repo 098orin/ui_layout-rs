@@ -7,6 +7,26 @@ and this project loosely follows Semantic Versioning.
 
 ---
 
+## [0.6.2] – 2026-01-15
+
+### Fixed
+- Fixed incorrect behavior where `margin: auto` on the main axis did not fully consume remaining free space.
+- Fixed cases where `justify-content` was still applied even when at least one flex item had an auto margin on the main axis.
+- Fixed incorrect handling of cross-axis auto margins where `align-items` / `align-self` were not properly overridden.
+- Fixed inconsistent positioning when only auto margins were present without other spacing or alignment rules.
+
+### Improved
+- Auto margins now correctly take precedence over alignment and justification, in accordance with the CSS Flexbox specification.
+- Unified auto margin resolution logic across main and cross axes to ensure consistent behavior.
+- Improved correctness of auto margin centering when both start and end margins are set to `auto`.
+
+### Notes
+- These changes affect only `margin: auto` behavior.
+- No other spacing, gap, padding, or alignment logic was modified in this release.
+
+
+---
+
 ## [0.6.1] - 2026-01-14
 
 ### Fixed
