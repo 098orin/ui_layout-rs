@@ -661,7 +661,7 @@ impl LayoutEngine {
             let (ml, _mr) = {
                 let (ml, mr) = match (ml_opt, mr_opt) {
                     (Some(ml), Some(mr)) => (ml, mr),
-                    (Some(ml), None) => (ml, node.rect.width - ml),
+                    (Some(ml), None) => (ml, cbw - node.rect.width - ml),
                     (None, Some(mr)) => (cbw - node.rect.width - mr, mr),
                     (None, None) => {
                         let m = (cbw - child.rect.width) / 2.0;
