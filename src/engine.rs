@@ -638,8 +638,8 @@ impl LayoutEngine {
         let pt = s.padding_top.resolve_with(Some(cbh), vh).unwrap_or(0.0);
         let pb = s.padding_bottom.resolve_with(Some(cbh), vh).unwrap_or(0.0);
 
-        let cursor_x = s.padding_left.resolve_with(Some(cbw), vw).unwrap_or(0.0);
-        let mut cursor_y = s.padding_top.resolve_with(Some(cbh), vh).unwrap_or(0.0);
+        let cursor_x = pl;
+        let mut cursor_y = pr;
 
         let child_cbw = node.rect.width - pl - pr;
         let child_cbh = node.rect.height - pt - pb;
@@ -661,10 +661,10 @@ impl LayoutEngine {
             let (ml, _mr) = {
                 let (ml, mr) = match (ml_opt, mr_opt) {
                     (Some(ml), Some(mr)) => (ml, mr),
-                    (Some(ml), None) => (ml, cbw - node.rect.width - ml),
-                    (None, Some(mr)) => (cbw - node.rect.width - mr, mr),
+                    (Some(ml), None) => (ml, child_cbw - child.rect.width - ml),
+                    (None, Some(mr)) => (child_cbw - child.rect.width - mr, mr),
                     (None, None) => {
-                        let m = (cbw - child.rect.width) / 2.0;
+                        let m = (child_cbw - child.rect.width) / 2.0;
                         (m, m)
                     }
                 };
