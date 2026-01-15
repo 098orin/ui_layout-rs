@@ -766,10 +766,27 @@ impl LayoutEngine {
         let child_cbc = axis.cross(&node.rect) - pc;
 
         for child in node.children.iter_mut() {
-            let margin_s = axis
-                .margin_main_start(&child.style.spacing)
-                .resolve_with(Some(child_cbm), vm)
-                .unwrap_or(0.0);
+            let (has_auto_margin_on_main_axis, margin_s, margin_e) = {
+                let ms_opt = axis
+                    .margin_main_start(&child.style.spacing)
+                    .resolve_with(Some(child_cbm), vm);
+                let me_opt = axis
+                    .margin_main_end(&child.style.spacing)
+                    .resolve_with(Some(child_cbm), vm);
+
+                let (has_auto_margin_on_main_axis, ms, me) = match (ms_opt, me_opt) {
+                    (Some(ms), Some(me)) => (false, ms, me),
+                    (Some(ms), None) => (true, ms, child_cbm - axis.main(&child.rect) - ms),
+                    (None, Some(me)) => (true, child_cbm - axis.main(&child.rect) - me, me),
+                    (None, None) => {
+                        let m = (child_cbm - axis.main(&child.rect)) / 2.0;
+                        (true, m, m)
+                    }
+                };
+
+                (has_auto_margin_on_main_axis, ms.max(0.0), me.max(0.0))
+            };
+
             cursor_main += margin_s;
 
             let child_pc = {
@@ -778,27 +795,26 @@ impl LayoutEngine {
                 resolve(pcs) + resolve(pce)
             };
 
-            let cross_offset = cursor_cross_padding
-                + resolve_align_position(
-                    child
-                        .style
-                        .item_style
-                        .align_self
-                        .unwrap_or(node.style.align_items),
-                    axis.cross(&child.rect) - child_pc,
-                    child_cbc,
-                );
+            let cross_offset = if has_auto_margin_on_main_axis {
+                0.0
+            } else {
+                cursor_cross_padding
+                    + resolve_align_position(
+                        child
+                            .style
+                            .item_style
+                            .align_self
+                            .unwrap_or(node.style.align_items),
+                        axis.cross(&child.rect) - child_pc,
+                        child_cbc,
+                    )
+            };
 
             let (x, y) = match axis {
                 Axis::Horizontal => (cursor_main, cross_offset),
                 Axis::Vertical => (cross_offset, cursor_main),
             };
             Self::layout_position(child, x, y, &child_ctx);
-
-            let margin_e = axis
-                .margin_main_end(&child.style.spacing)
-                .resolve_with(Some(child_cbm), vm)
-                .unwrap_or(0.0);
 
             cursor_main += axis.main(&child.rect) + margin_e + gap + gap_between;
         }
