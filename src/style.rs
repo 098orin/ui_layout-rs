@@ -1,4 +1,4 @@
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum Display {
     Flex {
         flex_direction: FlexDirection,
@@ -8,14 +8,14 @@ pub enum Display {
     None,
 }
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum FlexDirection {
     Row,
     #[default]
     Column,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Length {
     Px(f32),
     Percent(f32),
@@ -62,7 +62,7 @@ impl Length {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ItemStyle {
     pub flex_grow: f32,
     pub flex_basis: Length,
@@ -79,7 +79,7 @@ impl Default for ItemStyle {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct SizeStyle {
     pub width: Length,
     pub height: Length,
@@ -102,7 +102,7 @@ impl Default for SizeStyle {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct Spacing {
     pub margin_top: Length,
     pub margin_bottom: Length,
@@ -115,7 +115,7 @@ pub struct Spacing {
     pub padding_right: Length,
 }
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum JustifyContent {
     #[default]
     Start,
@@ -126,7 +126,7 @@ pub enum JustifyContent {
     SpaceEvenly,
 }
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum AlignItems {
     Start,
     Center,
@@ -135,7 +135,7 @@ pub enum AlignItems {
     Stretch,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct Style {
     pub display: Display,
     pub item_style: ItemStyle,
