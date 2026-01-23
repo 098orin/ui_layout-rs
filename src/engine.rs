@@ -269,7 +269,9 @@ impl LayoutEngine {
         // layout children
         // ========================
 
-        let (children_width, children_height) = if !self_only {
+        let layout_children = !self_only || content_width.is_none() || content_height.is_none();
+
+        let (children_width, children_height) = if layout_children {
             let mut total_child_height = 0.0;
             let mut max_child_width: f32 = 0.0;
             for child in &mut node.children {
@@ -414,7 +416,9 @@ impl LayoutEngine {
             },
         };
 
-        let (children_main, children_cross) = if !self_only {
+        let layout_children = !self_only || content_main.is_none() || content_cross.is_none();
+
+        let (children_main, children_cross) = if layout_children {
             let (content_width, content_height) = match axis {
                 Axis::Horizontal => (content_main, content_cross),
                 Axis::Vertical => (content_cross, content_main),
