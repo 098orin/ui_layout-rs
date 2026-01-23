@@ -102,12 +102,24 @@ impl Default for SizeStyle {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum BoxSizing {
+    #[default]
+    ContentBox,
+    BorderBox,
+}
+
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Spacing {
     pub margin_top: Length,
     pub margin_bottom: Length,
     pub margin_left: Length,
     pub margin_right: Length,
+
+    pub border_top: Length,
+    pub border_bottom: Length,
+    pub border_left: Length,
+    pub border_right: Length,
 
     pub padding_top: Length,
     pub padding_bottom: Length,
@@ -140,6 +152,7 @@ pub struct Style {
     pub display: Display,
     pub item_style: ItemStyle,
     pub size: SizeStyle,
+    pub box_sizing: BoxSizing,
     pub spacing: Spacing,
 
     pub justify_content: JustifyContent,

@@ -1,9 +1,9 @@
-use crate::{Rect, Style};
+use crate::{BoxModel, Style};
 
 #[derive(Debug)]
 pub struct LayoutNode {
     pub style: Style,
-    pub rect: Rect,
+    pub box_model: BoxModel,
     pub children: Vec<LayoutNode>,
 }
 
@@ -11,7 +11,7 @@ impl LayoutNode {
     pub fn new(style: Style) -> Self {
         Self {
             style,
-            rect: Rect::default(),
+            box_model: BoxModel::default(),
             children: Vec::new(),
         }
     }
@@ -19,7 +19,7 @@ impl LayoutNode {
     pub fn with_children(style: Style, children: Vec<LayoutNode>) -> Self {
         Self {
             style,
-            rect: Rect::default(),
+            box_model: BoxModel::default(),
             children,
         }
     }
