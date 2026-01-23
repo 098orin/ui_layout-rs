@@ -727,28 +727,28 @@ impl LayoutEngine {
         node.box_model.border_box.x = border_x;
         node.box_model.border_box.y = border_y;
         node.box_model.padding_box.x = border_x
-            - node
+            + node
                 .style
                 .spacing
                 .border_left
                 .resolve_with(ctx.containing_block_width, ctx.viewport_width)
                 .unwrap_or(0.0);
         node.box_model.padding_box.y = border_y
-            - node
+            + node
                 .style
                 .spacing
                 .border_top
                 .resolve_with(ctx.containing_block_height, ctx.viewport_height)
                 .unwrap_or(0.0);
         node.box_model.content_box.x = node.box_model.padding_box.x
-            - node
+            + node
                 .style
                 .spacing
                 .padding_left
                 .resolve_with(ctx.containing_block_width, ctx.viewport_width)
                 .unwrap_or(0.0);
         node.box_model.content_box.y = node.box_model.padding_box.y
-            - node
+            + node
                 .style
                 .spacing
                 .padding_top
