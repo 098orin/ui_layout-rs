@@ -506,7 +506,7 @@ impl LayoutEngine {
 
         let gap = axis
             .gap(&node.style)
-            .resolve_with(cbc, vc)
+            .resolve_with(cbm, vm)
             .unwrap_or(0.0)
             .max(0.0);
 
