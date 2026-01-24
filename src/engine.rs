@@ -759,6 +759,8 @@ impl LayoutEngine {
                 .padding_top
                 .resolve_with(ctx.containing_block_height, ctx.viewport_height)
                 .unwrap_or(0.0);
+        node.box_model.children_box.x = node.box_model.content_box.x;
+        node.box_model.children_box.y = node.box_model.content_box.y;
 
         match node.style.display {
             Display::None => {}
