@@ -557,9 +557,9 @@ impl LayoutEngine {
                                 axis.main(&child.box_model.content_box)
                             }
                         }
-                        Some(v) => {
+                        Some(_) => {
                             frozen[i] = true;
-                            v
+                            axis.main(&child.box_model.content_box)
                         }
                     }
                 }
