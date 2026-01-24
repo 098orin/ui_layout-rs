@@ -240,8 +240,8 @@ impl LayoutEngine {
         let pb = s.padding_bottom.resolve_with(cbh, vh).unwrap_or(0.0);
         let bl = s.border_left.resolve_with(cbw, vw).unwrap_or(0.0);
         let br = s.border_right.resolve_with(cbw, vw).unwrap_or(0.0);
-        let bt = s.border_top.resolve_with(cbw, vw).unwrap_or(0.0);
-        let bb = s.border_bottom.resolve_with(cbw, vw).unwrap_or(0.0);
+        let bt = s.border_top.resolve_with(cbh, vh).unwrap_or(0.0);
+        let bb = s.border_bottom.resolve_with(cbh, vh).unwrap_or(0.0);
 
         let specified_width = node.style.size.width.resolve_with(cbw, vw);
 
