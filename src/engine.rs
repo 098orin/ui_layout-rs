@@ -705,7 +705,7 @@ impl LayoutEngine {
                 .resolve_with(cbc, vc)
                 .unwrap_or(0.0);
 
-            total_border_size_main += axis.cross(&child.box_model.border_box);
+            total_border_size_main += axis.main(&child.box_model.border_box);
             children_max_cross =
                 children_max_cross.max(axis.cross(&child.box_model.border_box) + mcs + mce);
         }
