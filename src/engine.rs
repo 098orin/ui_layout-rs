@@ -656,7 +656,7 @@ impl LayoutEngine {
                 .align_self
                 .unwrap_or(node.style.align_items);
 
-            let is_auto_cross = matches!(axis.size_cross(&child.style.size), Length::Auto);
+            let is_auto_cross = axis.size_cross(&child.style.size) == &Length::Auto;
 
             let stretched_cross = if matches!(align, AlignItems::Stretch) && is_auto_cross {
                 cbc.map(|v| {
