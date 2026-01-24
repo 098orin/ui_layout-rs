@@ -775,17 +775,11 @@ impl LayoutEngine {
     }
 
     fn layout_block_position(node: &mut LayoutNode, ctx: &LayoutContext) {
-        let s = &node.style.spacing;
-        let cbw = ctx.containing_block_width.unwrap();
-        let cbh = ctx.containing_block_height.unwrap();
         let vw = ctx.viewport_width;
         let vh = ctx.viewport_height;
 
-        let pl = s.padding_left.resolve_with(Some(cbw), vw).unwrap_or(0.0);
-        let pt = s.padding_top.resolve_with(Some(cbh), vh).unwrap_or(0.0);
-
-        let cursor_x = pl;
-        let mut cursor_y = pt;
+        let cursor_x = 0.0;
+        let mut cursor_y = 0.0;
 
         let child_cbw = node.box_model.content_box.width;
         let child_cbh = node.box_model.content_box.height;
@@ -890,14 +884,7 @@ impl LayoutEngine {
             resolve_justify_content(node.style.justify_content, remaining, node.children.len())
         };
 
-        let mut cursor_main =
-            start_offset + axis.padding_main(&s).0.resolve_with(cbm, vm).unwrap_or(0.0);
-
-        let cross_padding_start = axis
-            .padding_cross(&s)
-            .0
-            .resolve_with(cbc, vc)
-            .unwrap_or(0.0);
+        let mut cursor_main = start_offset;
 
         for child in node.children.iter_mut() {
             let (margin_s, margin_e) = {
@@ -953,19 +940,18 @@ impl LayoutEngine {
                         (m, m)
                     }
                 };
-                cross_padding_start + cs.max(0.0)
+                cs.max(0.0)
             } else {
                 // align-items / align-self
-                cross_padding_start
-                    + resolve_align_position(
-                        child
-                            .style
-                            .item_style
-                            .align_self
-                            .unwrap_or(node.style.align_items),
-                        axis.cross(&child.box_model.padding_box),
-                        cbc_for_child,
-                    )
+                resolve_align_position(
+                    child
+                        .style
+                        .item_style
+                        .align_self
+                        .unwrap_or(node.style.align_items),
+                    axis.cross(&child.box_model.padding_box),
+                    cbc_for_child,
+                )
             };
 
             let (x, y) = match axis {
