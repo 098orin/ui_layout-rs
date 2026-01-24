@@ -700,9 +700,18 @@ impl LayoutEngine {
 
             Self::layout_size(child, self_only, &child_ctx);
 
+            let mcs = axis
+                .margin_cross_start(&child.style.spacing)
+                .resolve_with(cbc, vc)
+                .unwrap_or(0.0);
+            let mce = axis
+                .margin_cross_end(&child.style.spacing)
+                .resolve_with(cbc, vc)
+                .unwrap_or(0.0);
+
             total_border_size_main += axis.cross(&child.box_model.border_box);
-            children_max_cross = children_max_cross
-                .max(axis.cross(&child.box_model.border_box) + main_margin[i].0 + main_margin[i].1);
+            children_max_cross =
+                children_max_cross.max(axis.cross(&child.box_model.border_box) + mcs + mce);
         }
 
         let children_main = total_border_size_main + gaps;
