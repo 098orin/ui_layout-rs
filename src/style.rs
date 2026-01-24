@@ -41,13 +41,7 @@ impl Length {
         match self {
             Length::Auto => None,
             Length::Px(v) => Some(*v),
-            Length::Percent(p) => {
-                if let Some(cb) = containing_block {
-                    Some(cb * *p / 100.0)
-                } else {
-                    None
-                }
-            }
+            Length::Percent(p) => containing_block.map(|cb| cb * *p / 100.0),
             Length::Vw(v) => Some(viewport * *v / 100.0),
             Length::Vh(v) => Some(viewport * *v / 100.0),
             Length::Add(a, b) => Some(

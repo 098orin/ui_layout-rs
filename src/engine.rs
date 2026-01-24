@@ -248,10 +248,9 @@ impl LayoutEngine {
         let content_width = match (specified_width, node.style.box_sizing) {
             (Some(w), BoxSizing::BorderBox) => Some((w - pl - pr - bl - br).max(0.0)),
             (Some(w), BoxSizing::ContentBox) => Some(w),
-            (None, _) => match ctx.forced_border_width {
-                Some(w) => Some((w - pl - pr - bl - br).max(0.0)),
-                None => None,
-            },
+            (None, _) => ctx
+                .forced_border_width
+                .map(|w| (w - pl - pr - bl - br).max(0.0)),
         };
 
         let specified_height = node.style.size.height.resolve_with(cbh, vh);
@@ -259,10 +258,9 @@ impl LayoutEngine {
         let content_height = match (specified_height, node.style.box_sizing) {
             (Some(h), BoxSizing::BorderBox) => Some((h - pt - pb - bt - bb).max(0.0)),
             (Some(h), BoxSizing::ContentBox) => Some(h),
-            (None, _) => match ctx.forced_border_height {
-                Some(h) => Some((h - pt - pb - bt - bb).max(0.0)),
-                None => None,
-            },
+            (None, _) => ctx
+                .forced_border_height
+                .map(|h| (h - pt - pb - bt - bb).max(0.0)),
         };
 
         // ========================
@@ -399,10 +397,9 @@ impl LayoutEngine {
         let content_main = match (specified_main, node.style.box_sizing) {
             (Some(m), BoxSizing::BorderBox) => Some((m - pms - pme - bms - bme).max(0.0)),
             (Some(m), BoxSizing::ContentBox) => Some(m),
-            (None, _) => match ctx.forced_border_main(axis) {
-                Some(m) => Some((m - pms - pme - bms - bme).max(0.0)),
-                None => None,
-            },
+            (None, _) => ctx
+                .forced_border_main(axis)
+                .map(|m| (m - pms - pme - bms - bme).max(0.0)),
         };
 
         let specified_cross = axis.size_cross(&node.style.size).resolve_with(cbc, vc);
@@ -410,10 +407,9 @@ impl LayoutEngine {
         let content_cross = match (specified_cross, node.style.box_sizing) {
             (Some(c), BoxSizing::BorderBox) => Some((c - pcs - pce - bcs - bce).max(0.0)),
             (Some(c), BoxSizing::ContentBox) => Some(c),
-            (None, _) => match ctx.forced_border_cross(axis) {
-                Some(c) => Some((c - pcs - pce - bcs - bce).max(0.0)),
-                None => None,
-            },
+            (None, _) => ctx
+                .forced_border_cross(axis)
+                .map(|c| (c - pcs - pce - bcs - bce).max(0.0)),
         };
 
         let layout_children = !self_only || content_main.is_none() || content_cross.is_none();
