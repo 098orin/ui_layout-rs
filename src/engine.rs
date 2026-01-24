@@ -665,8 +665,6 @@ impl LayoutEngine {
 
         /* ---------- final layout ---------- */
 
-        let mut used_main = 0.0;
-
         for (i, child) in node.children.iter_mut().enumerate() {
             let align = child
                 .style
@@ -713,11 +711,14 @@ impl LayoutEngine {
             };
 
             Self::layout_size(child, self_only, &child_ctx);
-
-            used_main += main_sizes[i];
         }
 
-        let children_main = used_main + total_main_margin + total_main_padding + gaps;
+        let children_main = node
+            .children
+            .iter()
+            .map(|c| axis.main(&c.box_model.border_box))
+            .sum::<f32>()
+            + gaps;
 
         (children_main, children_max_cross)
     }
