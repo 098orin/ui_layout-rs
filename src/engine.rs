@@ -839,8 +839,6 @@ impl LayoutEngine {
     }
 
     fn layout_flex_position(node: &mut LayoutNode, axis: Axis, ctx: &LayoutContext) {
-        let s = &node.style.spacing;
-
         let vm = ctx.viewport_main(axis);
         let vc = ctx.viewport_cross(axis);
         let cbm = ctx.containing_block_main(axis);
