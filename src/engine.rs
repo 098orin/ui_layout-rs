@@ -197,8 +197,8 @@ pub struct LayoutEngine;
 impl LayoutEngine {
     pub fn layout(root: &mut LayoutNode, width: f32, height: f32) {
         let ctx = LayoutContext {
-            containing_block_height: Some(height),
             containing_block_width: Some(width),
+            containing_block_height: Some(height),
             viewport_width: width,
             viewport_height: height,
             forced_border_width: Some(width),
