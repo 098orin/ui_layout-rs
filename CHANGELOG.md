@@ -7,6 +7,21 @@ and this project loosely follows Semantic Versioning.
 
 ---
 
+## v0.7.0
+
+### Breaking Changes
+* Remake `node.rect` to `node.box_model`.
+
+### Added
+* Introduced `BoxModel` to represent layout boxes.
+  - Supports `border`, `padding`, `content`, and `children` areas.
+* Added support for `border` and `box-sizing` properties.
+
+### Fixed
+* Various bug fixes and internal improvements.
+
+---
+
 ## [0.6.3] - 2026-01-21
 
 ### Added
