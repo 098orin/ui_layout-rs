@@ -522,7 +522,6 @@ impl LayoutEngine {
         let mut main_padding: Vec<(f32, f32)> = vec![(0.0, 0.0); node.children.len()];
         let mut main_border: Vec<(f32, f32)> = vec![(0.0, 0.0); node.children.len()];
         let mut main_margin: Vec<(f32, f32)> = vec![(0.0, 0.0); node.children.len()];
-        let mut children_max_cross: f32 = 0.0;
 
         for (i, child) in node.children.iter_mut().enumerate() {
             Self::layout_size(child, true, ctx);
@@ -571,19 +570,6 @@ impl LayoutEngine {
             };
 
             main_sizes[i] = base_content_main;
-
-            let child_cross_border = axis.cross(&child.box_model.border_box);
-
-            let cross_margin = axis
-                .margin_cross_start(&child.style.spacing)
-                .resolve_with(cbc, vc)
-                .unwrap_or(0.0)
-                + axis
-                    .margin_cross_end(&child.style.spacing)
-                    .resolve_with(cbc, vc)
-                    .unwrap_or(0.0);
-
-            children_max_cross = children_max_cross.max(child_cross_border + cross_margin);
         }
 
         let total_base_main: f32 = main_sizes.iter().sum();
@@ -664,6 +650,8 @@ impl LayoutEngine {
         }
 
         /* ---------- final layout ---------- */
+        let mut total_border_size_main: f32 = 0.0;
+        let mut children_max_cross: f32 = 0.0;
 
         for (i, child) in node.children.iter_mut().enumerate() {
             let align = child
@@ -711,14 +699,13 @@ impl LayoutEngine {
             };
 
             Self::layout_size(child, self_only, &child_ctx);
+
+            total_border_size_main += axis.cross(&child.box_model.border_box);
+            children_max_cross = children_max_cross
+                .max(axis.cross(&child.box_model.border_box) + main_margin[i].0 + main_margin[i].1);
         }
 
-        let children_main = node
-            .children
-            .iter()
-            .map(|c| axis.main(&c.box_model.border_box))
-            .sum::<f32>()
-            + gaps;
+        let children_main = total_border_size_main + gaps;
 
         (children_main, children_max_cross)
     }
