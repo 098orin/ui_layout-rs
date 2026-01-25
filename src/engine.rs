@@ -519,6 +519,8 @@ impl LayoutEngine {
         let mut main_padding: Vec<(f32, f32)> = vec![(0.0, 0.0); node.children.len()];
         let mut main_border: Vec<(f32, f32)> = vec![(0.0, 0.0); node.children.len()];
         let mut main_margin: Vec<(f32, f32)> = vec![(0.0, 0.0); node.children.len()];
+        let mut main_min_max: Vec<(Option<f32>, Option<f32>)> =
+            vec![(None, None); node.children.len()];
 
         for (i, child) in node.children.iter_mut().enumerate() {
             Self::layout_size(child, true, ctx);
@@ -541,6 +543,10 @@ impl LayoutEngine {
                 mar_start.resolve_with(cbm, vm).unwrap_or(0.0),
                 mar_end.resolve_with(cbm, vm).unwrap_or(0.0),
             );
+
+            let min_main = axis.min_main(&child.style.size).resolve_with(cbm, vm);
+            let max_main = axis.max_main(&child.style.size).resolve_with(cbm, vm);
+            main_min_max[i] = (min_main, max_main);
 
             let basis = child.style.item_style.flex_basis.resolve_with(cbm, vm);
 
@@ -606,8 +612,8 @@ impl LayoutEngine {
                 let grow = child.style.item_style.flex_grow;
                 let delta = remaining * (grow / total_grow);
 
-                let min_main = axis.min_main(&child.style.size).resolve_with(cbm, vm);
-                let max_main = axis.max_main(&child.style.size).resolve_with(cbm, vm);
+                let min_main = main_min_max[i].0;
+                let max_main = main_min_max[i].1;
 
                 let proposed_content = main_sizes[i] + delta;
                 let clamped_content = match child.style.box_sizing {
