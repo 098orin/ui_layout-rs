@@ -7,6 +7,38 @@ and this project loosely follows Semantic Versioning.
 
 ---
 
+## v0.8.0
+
+### Breaking Changes
+
+* `LayoutNode` is now marked as `#[non_exhaustive]`.
+  - External crates can no longer construct `LayoutNode` using struct literals.
+  - This allows new internal fields to be added without introducing further breaking releases.
+
+* Direct field-based construction of `LayoutNode` is no longer supported.
+  - Users must construct layout nodes via the provided constructors or helper APIs.
+
+### Improved
+
+* Significantly improved layout performance for deeply nested Flex / Block trees.
+  - Reduced redundant layout size calculations in complex flex-chain scenarios.
+  - Worst-case layout time for real-world-like structures has been reduced from seconds to milliseconds.
+
+### Internal
+
+* Added internal layout caching to `LayoutNode`.
+  - Cached `BoxModel` results are reused when layout inputs are unchanged.
+  - Drastically reduces repeated `layout_size` calls in recursive layouts.
+* Refactored layout hot paths to better support incremental and cached evaluation.
+* No changes to layout results or visual output; behavior remains identical.
+
+### Notes
+
+* This release focuses on performance and long-term API stability.
+* Although layout behavior is unchanged, the public construction pattern for `LayoutNode` has been intentionally restricted.
+
+---
+
 ## v0.7.0
 
 ### Breaking Changes
