@@ -192,111 +192,6 @@ impl Axis {
     }
 }
 
-// =========================
-//     Cache structures
-// =========================
-
-#[derive(Default)]
-pub struct LayoutCacheNode {
-    pub size_cache: Option<LayoutSizeCache>,
-    pub children: Vec<LayoutCacheNode>,
-}
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub struct CacheKey {
-    pub flags: u16,
-    pub vw: u16,
-    pub vh: u16,
-    pub cbw: u16,
-    pub cbh: u16,
-    pub fbw: u16,
-    pub fbh: u16,
-}
-
-impl CacheKey {
-    fn from_ctx(ctx: &LayoutContext, self_only: bool) -> Self {
-        use key_flags::*;
-
-        let mut flags = 0;
-
-        if self_only {
-            flags |= SELF_ONLY;
-        }
-
-        if ctx.containing_block_width.is_some() {
-            flags |= HAS_CBW;
-        }
-        if ctx.containing_block_height.is_some() {
-            flags |= HAS_CBH;
-        }
-        if ctx.forced_border_width.is_some() {
-            flags |= HAS_FBW;
-        }
-        if ctx.forced_border_height.is_some() {
-            flags |= HAS_FBH;
-        }
-
-        CacheKey {
-            flags,
-            vw: Self::quantize(Some(ctx.viewport_width)),
-            vh: Self::quantize(Some(ctx.viewport_height)),
-            cbw: Self::quantize(ctx.containing_block_width),
-            cbh: Self::quantize(ctx.containing_block_height),
-            fbw: Self::quantize(ctx.forced_border_width),
-            fbh: Self::quantize(ctx.forced_border_height),
-        }
-    }
-
-    #[inline]
-    fn quantize(v: Option<f32>) -> u16 {
-        const QUANT: f32 = 1.0;
-
-        match v {
-            None => 0,
-            Some(x) => {
-                if x <= 0.0 {
-                    1
-                } else {
-                    let q = (x / QUANT).round() * QUANT;
-                    q.clamp(1.0, u16::MAX as f32) as u16
-                }
-            }
-        }
-    }
-}
-
-mod key_flags {
-    pub const SELF_ONLY: u16 = 1 << 0;
-    pub const HAS_CBW: u16 = 1 << 1;
-    pub const HAS_CBH: u16 = 1 << 2;
-    pub const HAS_FBW: u16 = 1 << 3;
-    pub const HAS_FBH: u16 = 1 << 4;
-}
-
-pub struct LayoutSizeCache {
-    pub key: CacheKey,
-    pub box_model: BoxModel,
-}
-
-impl LayoutCacheNode {
-    pub fn from_layout(node: &LayoutNode) -> Self {
-        let children = node
-            .children
-            .iter()
-            .map(LayoutCacheNode::from_layout)
-            .collect();
-
-        LayoutCacheNode {
-            size_cache: None,
-            children,
-        }
-    }
-}
-
-// ===============================
-//         Layout engine
-// ===============================
-
 pub struct LayoutEngine;
 
 impl LayoutEngine {
@@ -310,9 +205,7 @@ impl LayoutEngine {
             forced_border_height: Some(height),
         };
 
-        let mut cache_root = LayoutCacheNode::from_layout(&root);
-
-        Self::layout_size(root, &mut cache_root, false, &ctx);
+        Self::layout_size(root, false, &ctx);
         Self::layout_position(root, (0.0, 0.0), &ctx);
     }
 
@@ -320,40 +213,21 @@ impl LayoutEngine {
     // Size pass
     // =========================
 
-    fn layout_size(
-        node: &mut LayoutNode,
-        cache: &mut LayoutCacheNode,
-        self_only: bool,
-        ctx: &LayoutContext,
-    ) {
-        let key = CacheKey::from_ctx(ctx, self_only);
-
-        if let Some(cached) = &cache.size_cache {
-            if cached.key == key {
-                node.box_model = cached.box_model.clone();
-                return;
-            }
-        }
-
+    fn layout_size(node: &mut LayoutNode, self_only: bool, ctx: &LayoutContext) {
         match node.style.display {
             Display::None => { /* ignore */ }
-            Display::Block => Self::layout_block_size(node, cache, self_only, ctx),
+            Display::Block => Self::layout_block_size(node, self_only, ctx),
             Display::Flex { flex_direction } => {
                 let axis = match flex_direction {
                     FlexDirection::Row => Axis::Horizontal,
                     FlexDirection::Column => Axis::Vertical,
                 };
-                Self::layout_flex_size(node, cache, axis, self_only, ctx);
+                Self::layout_flex_size(node, axis, self_only, ctx);
             }
         }
     }
 
-    fn layout_block_size(
-        node: &mut LayoutNode,
-        cache: &mut LayoutCacheNode,
-        self_only: bool,
-        ctx: &LayoutContext,
-    ) {
+    fn layout_block_size(node: &mut LayoutNode, self_only: bool, ctx: &LayoutContext) {
         let s = &node.style.spacing;
         let cbw = ctx.containing_block_width;
         let cbh = ctx.containing_block_height;
@@ -398,7 +272,7 @@ impl LayoutEngine {
         let (children_width, children_height) = if layout_children {
             let mut total_child_height = 0.0;
             let mut max_child_width: f32 = 0.0;
-            for (child, child_cache) in node.children.iter_mut().zip(cache.children.iter_mut()) {
+            for child in &mut node.children {
                 // ---- resolve margins ----
                 let spacing = &child.style.spacing;
 
@@ -423,7 +297,7 @@ impl LayoutEngine {
                 };
 
                 // ---- layout child ----
-                Self::layout_size(child, child_cache, self_only, &child_ctx);
+                Self::layout_size(child, self_only, &child_ctx);
 
                 // ---- accumulate sizes ----
                 let child_mar_box_height =
@@ -499,13 +373,7 @@ impl LayoutEngine {
         );
     }
 
-    fn layout_flex_size(
-        node: &mut LayoutNode,
-        cache: &mut LayoutCacheNode,
-        axis: Axis,
-        self_only: bool,
-        ctx: &LayoutContext,
-    ) {
+    fn layout_flex_size(node: &mut LayoutNode, axis: Axis, self_only: bool, ctx: &LayoutContext) {
         let vm = ctx.viewport_main(axis);
         let vc = ctx.viewport_cross(axis);
         let cbm = ctx.containing_block_main(axis);
@@ -559,7 +427,7 @@ impl LayoutEngine {
                 forced_border_width: None,
                 forced_border_height: None,
             };
-            Self::layout_flex_children_size(node, cache, axis, self_only, &children_ctx)
+            Self::layout_flex_children_size(node, axis, self_only, &children_ctx)
         } else {
             (0.0, 0.0)
         };
@@ -625,7 +493,6 @@ impl LayoutEngine {
     /// All of `ctx.forced_border_*` should be None.
     fn layout_flex_children_size(
         node: &mut LayoutNode,
-        cache: &mut LayoutCacheNode,
         axis: Axis,
         self_only: bool,
         ctx: &LayoutContext,
@@ -653,9 +520,7 @@ impl LayoutEngine {
         let mut main_margin: Vec<(f32, f32)> = vec![(0.0, 0.0); node.children.len()];
 
         for (i, child) in node.children.iter_mut().enumerate() {
-            let cache_child = &mut cache.children[i];
-
-            Self::layout_size(child, cache_child, true, ctx);
+            Self::layout_size(child, true, ctx);
 
             let (pad_start, pad_end) = axis.padding_main(&child.style.spacing);
             main_padding[i] = (
@@ -785,8 +650,6 @@ impl LayoutEngine {
         let mut children_max_cross: f32 = 0.0;
 
         for (i, child) in node.children.iter_mut().enumerate() {
-            let child_cache = &mut cache.children[i];
-
             let align = child
                 .style
                 .item_style
@@ -831,7 +694,7 @@ impl LayoutEngine {
                 forced_border_height,
             };
 
-            Self::layout_size(child, child_cache, self_only, &child_ctx);
+            Self::layout_size(child, self_only, &child_ctx);
 
             let mcs = axis
                 .margin_cross_start(&child.style.spacing)
