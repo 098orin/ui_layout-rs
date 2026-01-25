@@ -1,9 +1,15 @@
 use std::time::Instant;
 use ui_layout::*;
 
-fn make_heavy_child() -> LayoutNode {
+fn make_node(is_flex: bool) -> LayoutNode {
     LayoutNode::new(Style {
-        display: Display::Block,
+        display: if is_flex {
+            Display::Flex {
+                flex_direction: FlexDirection::Row,
+            }
+        } else {
+            Display::Block
+        },
         size: SizeStyle {
             width: Length::Auto,
             height: Length::Auto,
@@ -32,25 +38,27 @@ fn make_heavy_child() -> LayoutNode {
 }
 
 fn make_tree(depth: usize, max_depth: usize, remaining: &mut usize) -> LayoutNode {
-    let mut node = make_heavy_child();
+    let is_flex = depth % 2 == 0; // Flex -> Block -> Flex -> ...
+    let mut node = make_node(is_flex);
 
     if depth >= max_depth || *remaining == 0 {
         return node;
     }
 
-    // 深くなるほど子を減らす（爆発防止）
-    let max_children = if depth < 4 {
+    let max_children = if depth < 3 {
+        4
+    } else if depth < 6 {
         3
-    } else if depth < 8 {
+    } else if depth < 9 {
         2
     } else {
         1
     };
 
-    let children_count = max_children.min(*remaining);
+    let child_count = max_children.min(*remaining);
 
-    let mut children = Vec::with_capacity(children_count);
-    for _ in 0..children_count {
+    let mut children = Vec::with_capacity(child_count);
+    for _ in 0..child_count {
         if *remaining == 0 {
             break;
         }
@@ -63,15 +71,15 @@ fn make_tree(depth: usize, max_depth: usize, remaining: &mut usize) -> LayoutNod
 }
 
 fn main() {
-    const TOTAL_NODES: usize = 4_000;
-    const DEPTH: usize = 1_0;
+    const TOTAL_NODES: usize = 6_000;
+    const DEPTH: usize = 16;
 
-    println!("layout cache benchmark");
+    println!("layout performance benchmark");
     println!("TOTAL_NODES = {}", TOTAL_NODES);
     println!("DEPTH       = {}", DEPTH);
     println!("-------------------------");
 
-    let mut remaining = TOTAL_NODES - 1; // root 分を引く
+    let mut remaining = TOTAL_NODES - 1;
     let mut root = make_tree(0, DEPTH, &mut remaining);
 
     println!("remaining nodes unused = {}", remaining);
@@ -88,6 +96,6 @@ fn main() {
         start.elapsed()
     };
 
-    println!("1st: {:?}", t1);
-    println!("2nd: {:?}", t2);
+    println!("1st layout: {:?}", t1);
+    println!("2nd layout: {:?}", t2);
 }
