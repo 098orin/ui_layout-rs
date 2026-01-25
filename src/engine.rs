@@ -234,8 +234,10 @@ impl LayoutEngine {
             }
         }
 
-        let key = cache::make_layout_key(&ctx);
-        node.box_model_cache = (key, node.box_model.clone());
+        if self_only {
+            let key = cache::make_layout_key(&ctx);
+            node.box_model_cache = (key, node.box_model.clone());
+        }
     }
 
     fn layout_block_size(node: &mut LayoutNode, self_only: bool, ctx: &LayoutContext) {
