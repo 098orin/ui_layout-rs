@@ -644,7 +644,7 @@ impl LayoutEngine {
 
             remaining -= used;
 
-            if remaining.abs() < 0.0001 || used.abs() < 0.0001 {
+            if used.abs() < 0.0001 {
                 break;
             }
         }
