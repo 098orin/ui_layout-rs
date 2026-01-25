@@ -1,15 +1,15 @@
 use crate::{
     AlignItems, BoxModel, BoxSizing, Display, FlexDirection, JustifyContent, LayoutNode, Length,
-    Rect, SizeStyle, Spacing, Style,
+    Rect, SizeStyle, Spacing, Style, cache,
 };
 
-struct LayoutContext {
-    containing_block_width: Option<f32>,
-    containing_block_height: Option<f32>,
-    viewport_width: f32,
-    viewport_height: f32,
-    forced_border_width: Option<f32>,
-    forced_border_height: Option<f32>,
+pub(crate) struct LayoutContext {
+    pub(crate) containing_block_width: Option<f32>,
+    pub(crate) containing_block_height: Option<f32>,
+    pub(crate) viewport_width: f32,
+    pub(crate) viewport_height: f32,
+    pub(crate) forced_border_width: Option<f32>,
+    pub(crate) forced_border_height: Option<f32>,
 }
 
 impl LayoutContext {
@@ -214,6 +214,14 @@ impl LayoutEngine {
     // =========================
 
     fn layout_size(node: &mut LayoutNode, self_only: bool, ctx: &LayoutContext) {
+        if self_only {
+            let (key, box_model) = &node.box_model_cache;
+            if *key == cache::make_layout_key(&ctx) {
+                node.box_model = box_model.clone();
+                return;
+            }
+        }
+
         match node.style.display {
             Display::None => { /* ignore */ }
             Display::Block => Self::layout_block_size(node, self_only, ctx),
@@ -225,6 +233,9 @@ impl LayoutEngine {
                 Self::layout_flex_size(node, axis, self_only, ctx);
             }
         }
+
+        let key = cache::make_layout_key(&ctx);
+        node.box_model_cache = (key, node.box_model.clone());
     }
 
     fn layout_block_size(node: &mut LayoutNode, self_only: bool, ctx: &LayoutContext) {
