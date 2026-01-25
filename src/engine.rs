@@ -513,6 +513,7 @@ impl LayoutEngine {
         /* ---------- intrinsic pass ---------- */
 
         let mut frozen = vec![false; count];
+        let mut total_grow = 0.0;
 
         let mut main_sizes: Vec<f32> = vec![0.0; node.children.len()];
         let mut main_padding: Vec<(f32, f32)> = vec![(0.0, 0.0); node.children.len()];
@@ -565,6 +566,9 @@ impl LayoutEngine {
                 }
             };
 
+            if !frozen[i] {
+                total_grow += child.style.item_style.flex_grow;
+            }
             main_sizes[i] = base_content_main;
         }
 
@@ -588,13 +592,6 @@ impl LayoutEngine {
         /* ---------- redistribute loop ---------- */
 
         loop {
-            let mut total_grow = 0.0;
-            for (i, child) in node.children.iter().enumerate() {
-                if !frozen[i] {
-                    total_grow += child.style.item_style.flex_grow;
-                }
-            }
-
             if total_grow == 0.0 {
                 break;
             }
@@ -635,6 +632,7 @@ impl LayoutEngine {
 
                 if proposed_content != clamped_content {
                     frozen[i] = true;
+                    total_grow -= grow;
                 }
             }
 
