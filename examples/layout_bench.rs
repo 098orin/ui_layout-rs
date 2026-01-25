@@ -71,7 +71,7 @@ fn make_tree(depth: usize, max_depth: usize, remaining: &mut usize) -> LayoutNod
 }
 
 fn main() {
-    const TOTAL_NODES: usize = 6_000;
+    const TOTAL_NODES: usize = 7_000;
     const DEPTH: usize = 16;
 
     println!("layout performance benchmark");
