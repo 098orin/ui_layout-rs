@@ -536,8 +536,6 @@ impl LayoutEngine {
             vec![(None, None); node.children.len()];
 
         for (i, child) in node.children.iter_mut().enumerate() {
-            Self::layout_size(child, true, ctx);
-
             let (pad_start, pad_end) = axis.padding_main(&child.style.spacing);
             main_padding[i] = (
                 pad_start.resolve_with(cbm, vm).unwrap_or(0.0),
@@ -568,10 +566,13 @@ impl LayoutEngine {
                 None => {
                     let size_opt = axis.size_main(&child.style.size).resolve_with(cbm, vm);
                     match size_opt {
-                        None => axis.main(&child.box_model.content_box),
-                        Some(_) => {
-                            frozen[i] = true;
+                        None => {
+                            Self::layout_size(child, true, ctx);
                             axis.main(&child.box_model.content_box)
+                        }
+                        Some(v) => {
+                            frozen[i] = true;
+                            v
                         }
                     }
                 }
@@ -579,6 +580,9 @@ impl LayoutEngine {
 
             if !frozen[i] {
                 total_grow += child.style.item_style.flex_grow;
+                if child.style.item_style.flex_grow == 0.0 {
+                    frozen[i] = true;
+                }
             }
             main_sizes[i] = base_content_main;
         }
