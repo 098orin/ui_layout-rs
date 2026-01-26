@@ -7,6 +7,17 @@ and this project loosely follows Semantic Versioning.
 
 ---
 
+## [0.8.2] - 2026-01-26
+
+### Fixed
+* `Display::Flex` layout handling:
+  - Fixed incorrect handling of `flex_grow` when all children had zero `flex_grow` values, ensuring they are laid out according to their fixed sizes instead of being collapsed to zero.
+
+### Added
+* Add PartialEq to `Rect` for easier testing and comparison.
+
+---
+
 ## [0.8.1] - 2026-01-26
 
 ### Fixed
