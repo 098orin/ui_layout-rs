@@ -568,15 +568,7 @@ impl LayoutEngine {
                 None => {
                     let size_opt = axis.size_main(&child.style.size).resolve_with(cbm, vm);
                     match size_opt {
-                        None => {
-                            if child.style.display == Display::Block
-                                && matches!(axis, Axis::Horizontal)
-                            {
-                                0.0
-                            } else {
-                                axis.main(&child.box_model.content_box)
-                            }
-                        }
+                        None => axis.main(&child.box_model.content_box),
                         Some(_) => {
                             frozen[i] = true;
                             axis.main(&child.box_model.content_box)
