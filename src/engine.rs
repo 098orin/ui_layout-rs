@@ -223,7 +223,7 @@ impl LayoutEngine {
         }
 
         match node.style.display {
-            Display::None => { /* ignore */ }
+            Display::None => node.box_model = BoxModel::default(),
             Display::Block => Self::layout_block_size(node, self_only, ctx),
             Display::Flex { flex_direction } => {
                 let axis = match flex_direction {

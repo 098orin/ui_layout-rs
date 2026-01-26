@@ -7,6 +7,14 @@ and this project loosely follows Semantic Versioning.
 
 ---
 
+## [0.8.1] - 2026-01-26
+
+### Fixed
+* `Display::None` layout handling:
+  - Nodes with `Display::None` are now set as zero-size immediately without further layout processing.
+
+---
+
 ## v0.8.0
 
 ### Breaking Changes
