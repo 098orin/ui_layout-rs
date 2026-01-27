@@ -7,6 +7,13 @@ and this project loosely follows Semantic Versioning.
 
 ---
 
+## [0.8.3] - 2026-01-26
+### Added
+- Implemented margin collapsing for Block layouts:
+  - Vertical margins between block-level siblings now collapse according to CSS rules.
+
+---
+
 ## [0.8.2] - 2026-01-26
 
 ### Fixed
