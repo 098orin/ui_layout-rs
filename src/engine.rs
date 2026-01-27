@@ -285,6 +285,7 @@ impl LayoutEngine {
         let (children_width, children_height) = if layout_children {
             let mut total_child_height = 0.0;
             let mut max_child_width: f32 = 0.0;
+            let mut pending_margin_bottom = 0.0;
             for child in &mut node.children {
                 // ---- resolve margins ----
                 let spacing = &child.style.spacing;
@@ -313,14 +314,17 @@ impl LayoutEngine {
                 Self::layout_size(child, self_only, &child_ctx);
 
                 // ---- accumulate sizes ----
-                let child_mar_box_height =
-                    child.box_model.border_box.height + mt.unwrap_or(0.0) + mb.unwrap_or(0.0);
+                let child_mar_box_height = child.box_model.border_box.height
+                    + mt.unwrap_or(0.0).max(pending_margin_bottom);
                 total_child_height += child_mar_box_height;
 
                 let child_mar_box_width =
                     child.box_model.border_box.width + ml.unwrap_or(0.0) + mr.unwrap_or(0.0);
                 max_child_width = max_child_width.max(child_mar_box_width);
+
+                pending_margin_bottom = mb.unwrap_or(0.0);
             }
+            total_child_height += pending_margin_bottom;
 
             (max_child_width, total_child_height)
         } else {
@@ -801,6 +805,8 @@ impl LayoutEngine {
             forced_border_height: None,
         };
 
+        let mut pending_margin_bottom = 0.0;
+
         for child in &mut node.children {
             let child_s = &child.style.spacing;
             let ml_opt = child_s.margin_left.resolve_with(Some(child_cbw), vw);
@@ -826,7 +832,8 @@ impl LayoutEngine {
                     .spacing
                     .margin_top
                     .resolve_with(Some(child_cbh), vh)
-                    .unwrap_or(0.0);
+                    .unwrap_or(0.0)
+                    .max(pending_margin_bottom);
 
             Self::layout_position(child, (x, y), &child_ctx);
 
@@ -836,13 +843,15 @@ impl LayoutEngine {
                 .margin_top
                 .resolve_with(Some(child_cbh), vh)
                 .unwrap_or(0.0)
-                + child.box_model.border_box.height
-                + child
-                    .style
-                    .spacing
-                    .margin_bottom
-                    .resolve_with(Some(child_cbh), vh)
-                    .unwrap_or(0.0);
+                .max(pending_margin_bottom)
+                + child.box_model.border_box.height;
+
+            pending_margin_bottom = child
+                .style
+                .spacing
+                .margin_bottom
+                .resolve_with(Some(child_cbh), vh)
+                .unwrap_or(0.0);
         }
     }
 
