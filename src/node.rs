@@ -1,4 +1,4 @@
-use crate::{BoxModel, Fragment, FragmentPlacement, Style};
+use crate::{BoxModel, FragmentPlacement, ItemFragment, Style};
 
 /// A node in the layout tree.
 ///
@@ -40,7 +40,7 @@ use crate::{BoxModel, Fragment, FragmentPlacement, Style};
 #[derive(Debug)]
 pub struct LayoutNode {
     pub style: Style,
-    pub self_fragments: Vec<Fragment>,
+    pub self_fragments: Vec<ItemFragment>,
 
     pub children: Vec<LayoutNode>,
 
@@ -79,7 +79,7 @@ impl LayoutNode {
     /// This method defines the inline content owned by the node.
     /// Any previously computed fragment placements become invalid and must
     /// be recomputed during the next layout pass.
-    pub fn set_fragments(&mut self, fragments: Vec<Fragment>) {
+    pub fn set_fragments(&mut self, fragments: Vec<ItemFragment>) {
         self.self_fragments = fragments;
         self.placements.reserve(self.self_fragments.len());
     }
