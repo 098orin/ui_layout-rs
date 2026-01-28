@@ -5,11 +5,13 @@
 
 mod cache;
 mod engine;
+mod fragment;
 mod geometry;
 mod node;
 mod style;
 
 pub use engine::*;
+pub use fragment::*;
 pub use geometry::*;
 pub use node::*;
 pub use style::*;

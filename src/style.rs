@@ -5,6 +5,7 @@ pub enum Display {
     },
     #[default]
     Block,
+    Inline,
     None,
 }
 
