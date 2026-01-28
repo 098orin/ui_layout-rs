@@ -17,13 +17,13 @@ pub enum ItemFragment {
 /// positional data.
 #[derive(Debug, Clone, Copy)]
 pub struct Fragment {
-    width: f32,
-    height: f32,
+    pub width: f32,
+    pub height: f32,
 }
 
 /// Layout result for inline fragments.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FragmentPlacement {
-    offset: (f32, f32),
-    line_index: usize,
+    pub offset: (f32, f32),
+    pub line_index: usize,
 }
