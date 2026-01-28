@@ -224,6 +224,7 @@ impl LayoutEngine {
 
         match node.style.display {
             Display::None => node.box_model = BoxModel::default(),
+            Display::Inline => Self::layout_inline_size(node, self_only, ctx),
             Display::Block => Self::layout_block_size(node, self_only, ctx),
             Display::Flex { flex_direction } => {
                 let axis = match flex_direction {
@@ -238,6 +239,12 @@ impl LayoutEngine {
             let key = cache::make_layout_key(&ctx);
             node.box_model_cache = (key, node.box_model.clone());
         }
+    }
+
+    fn layout_inline_size(_node: &mut LayoutNode, _self_only: bool, _ctx: &LayoutContext) {
+        // For simplicity, we treat inline as block in this layout engine.
+        // A full implementation would require text measurement and inline formatting context.
+        unimplemented!("Inline layout is not implemented in this layout engine.");
     }
 
     fn layout_block_size(node: &mut LayoutNode, self_only: bool, ctx: &LayoutContext) {
@@ -773,6 +780,7 @@ impl LayoutEngine {
 
         match node.style.display {
             Display::None => {}
+            Display::Inline => Self::layout_inline_position(node, ctx),
             Display::Block => {
                 Self::layout_block_position(node, ctx);
             }
@@ -784,6 +792,12 @@ impl LayoutEngine {
                 Self::layout_flex_position(node, axis, ctx);
             }
         }
+    }
+
+    fn layout_inline_position(_node: &mut LayoutNode, _ctx: &LayoutContext) {
+        // For simplicity, we treat inline as block in this layout engine.
+        // A full implementation would require text measurement and inline formatting context.
+        unimplemented!("Inline layout is not implemented in this layout engine.");
     }
 
     fn layout_block_position(node: &mut LayoutNode, ctx: &LayoutContext) {
