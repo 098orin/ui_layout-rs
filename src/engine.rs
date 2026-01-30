@@ -999,22 +999,20 @@ impl LayoutEngine {
 // Helpers
 // =========================
 
-/// Apply box model to the node
+/// Create a box model
 /// # Arguments
-/// - node: target layout node
 /// - content_width/height: content box size
 /// - child_width/height: total size of children
 /// - padding_edge: (pl, pt, pr, pb)
 /// - border_edge: (bl, bt, br, bb)
-fn apply_block_box_model(
-    node: &mut LayoutNode,
+fn create_box_model(
     content_width: f32,
     content_height: f32,
     children_width: f32,
     children_height: f32,
     padding_edge: (f32, f32, f32, f32),
     border_edge: (f32, f32, f32, f32),
-) {
+) -> BoxModel {
     let (pl, pt, pr, pb) = padding_edge;
     let (bl, bt, br, bb) = border_edge;
 
@@ -1046,12 +1044,12 @@ fn apply_block_box_model(
         height: children_height,
     };
 
-    node.box_model = BoxModel {
+    BoxModel {
         content_box,
         padding_box,
         border_box,
         children_box,
-    };
+    }
 }
 
 fn clamp(value: f32, min: Option<f32>, max: Option<f32>) -> f32 {
