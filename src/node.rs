@@ -1,4 +1,4 @@
-use crate::{BoxModel, FragmentPlacement, ItemFragment, Style};
+use crate::{FragmentPlacement, ItemFragment, LayoutBoxes, Style};
 
 /// A node in the layout tree.
 ///
@@ -34,7 +34,7 @@ use crate::{BoxModel, FragmentPlacement, ItemFragment, Style};
 /// Results of the layout process are stored directly within each `LayoutNode`,
 /// allowing for easy access and further processing after layout computation.
 /// This includes the computed `BoxModel` and fragment placements.
-/// - `box_model`: The computed box model for this node after layout.
+/// - `layout_boxes`: The computed box model for this node after layout.
 /// - `placements`: The computed placements for each fragment in `self_fragments`.
 #[non_exhaustive]
 #[derive(Debug)]
@@ -44,11 +44,11 @@ pub struct LayoutNode {
 
     pub children: Vec<LayoutNode>,
 
-    pub box_model: BoxModel,
+    pub layout_boxes: LayoutBoxes,
     pub placements: Vec<FragmentPlacement>,
 
     // --- cache ---
-    pub(crate) box_model_cache: (u32, BoxModel), // (key, box_model)
+    pub(crate) box_model_cache: (u32, LayoutBoxes), // (key, box_model)
 }
 
 impl LayoutNode {
@@ -57,9 +57,9 @@ impl LayoutNode {
             style,
             self_fragments: Vec::new(),
             placements: Vec::new(),
-            box_model: BoxModel::default(),
+            layout_boxes: LayoutBoxes::default(),
             children: Vec::new(),
-            box_model_cache: (0, BoxModel::default()),
+            box_model_cache: (0, LayoutBoxes::default()),
         }
     }
 
@@ -68,9 +68,9 @@ impl LayoutNode {
             style,
             self_fragments: Vec::new(),
             placements: Vec::new(),
-            box_model: BoxModel::default(),
+            layout_boxes: LayoutBoxes::default(),
             children,
-            box_model_cache: (0, BoxModel::default()),
+            box_model_cache: (0, LayoutBoxes::default()),
         }
     }
 

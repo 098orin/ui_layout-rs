@@ -14,3 +14,11 @@ pub struct BoxModel {
     /// scroll size
     pub children_box: Rect,
 }
+
+#[derive(Debug, Clone, Default)]
+pub enum LayoutBoxes {
+    #[default]
+    None,
+    Single(BoxModel),
+    Multiple(Vec<BoxModel>),
+}
