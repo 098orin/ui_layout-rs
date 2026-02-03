@@ -84,7 +84,7 @@ impl LayoutBoxes {
         }
     }
 
-    /// Get max height
+    /// Culc height sum
     pub fn height(&self) -> f32 {
         match self {
             LayoutBoxes::None => 0.0,
