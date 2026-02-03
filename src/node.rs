@@ -48,7 +48,7 @@ pub struct LayoutNode {
     pub placements: Vec<FragmentPlacement>,
 
     // --- cache ---
-    pub(crate) layout_boxes_cache: (u32, LayoutBoxes), // (key, layout_boxes)
+    pub(crate) layout_boxes_cache: (u32, (LayoutBoxes, ((f32, f32), f32))), // (key, layout_boxes, ((f32, f32), f32))
 }
 
 impl LayoutNode {
@@ -59,7 +59,7 @@ impl LayoutNode {
             placements: Vec::new(),
             layout_boxes: LayoutBoxes::default(),
             children: Vec::new(),
-            layout_boxes_cache: (0, LayoutBoxes::default()),
+            layout_boxes_cache: (0, (LayoutBoxes::default(), ((0.0, 0.0), 0.0))),
         }
     }
 
@@ -70,7 +70,7 @@ impl LayoutNode {
             placements: Vec::new(),
             layout_boxes: LayoutBoxes::default(),
             children,
-            layout_boxes_cache: (0, LayoutBoxes::default()),
+            layout_boxes_cache: (0, (LayoutBoxes::default(), ((0.0, 0.0), 0.0))),
         }
     }
 

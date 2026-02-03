@@ -1,3 +1,7 @@
+//! Fragment
+//!
+//! TODO: Add struct that holds a root position of FragmentPlacement.
+
 /// An item fragment for inline layout.
 ///
 /// An item fragment can be either a splittable fragment of inline content
