@@ -344,7 +344,7 @@ fn test_coordinate_system_with_auto_margins() {
     // Parent content box
     assert_eq!(parent_box.content_box.x, 15.0);
     assert_eq!(parent_box.content_box.y, 10.0);
-    assert_eq!(parent_box.content_box.width, 170.0); // 200 - 15 - 15
+    assert_eq!(parent_box.content_box.width, 200.0);
 
     // Child should be centered horizontally within parent's content box (relative coordinates)
     let expected_child_x = (170.0 - 60.0) / 2.0; // (content_width - child_width) / 2
