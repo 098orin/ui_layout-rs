@@ -379,14 +379,14 @@ impl LayoutEngine {
         ctx: &LayoutContext,
     ) -> ((f32, f32), f32) {
         let mut cursor_y = origin.1;
+        let mut max_child_width: f32 = 0.0;
 
         // Resolve node's own size first
         let specified_width = node
             .style
             .size
             .width
-            .resolve_with(ctx.containing_block_width, ctx.viewport_width)
-            .unwrap_or_else(|| ctx.containing_block_width.unwrap_or(ctx.viewport_width));
+            .resolve_with(ctx.containing_block_width, ctx.viewport_width);
 
         let mut content_height = node
             .style
@@ -394,9 +394,16 @@ impl LayoutEngine {
             .height
             .resolve_with(ctx.containing_block_height, ctx.viewport_height);
 
+        // Determine width: if auto, we'll use child-based sizing; otherwise use specified
+        // However, if parent_assigned_border_width is set (e.g., flex items), use that instead
+        let is_width_auto = specified_width.is_none() && ctx.parent_assigned_border_width.is_none();
+        let initial_width = specified_width
+            .or(ctx.parent_assigned_border_width)
+            .unwrap_or_else(|| ctx.containing_block_width.unwrap_or(ctx.viewport_width));
+
         // Resolve padding, border, and margins for constraint calculations
         let ctx_with_width = LayoutContext {
-            containing_block_width: Some(specified_width),
+            containing_block_width: Some(initial_width),
             containing_block_height: content_height,
             ..*ctx
         };
@@ -407,9 +414,9 @@ impl LayoutEngine {
 
         // Calculate actual content width and height based on box-sizing
         let mut content_width = match node.style.box_sizing {
-            BoxSizing::ContentBox => specified_width,
+            BoxSizing::ContentBox => initial_width,
             BoxSizing::BorderBox => {
-                (specified_width - padding.0 - padding.2 - border.0 - border.2).max(0.0)
+                (initial_width - padding.0 - padding.2 - border.0 - border.2).max(0.0)
             }
         };
 
@@ -454,8 +461,26 @@ impl LayoutEngine {
             // Update cursor_y to track layout progression based on child's measured size
             cursor_y = child_end_y;
 
+            // Track maximum child width for auto width calculation
+            // Only do this if we're actually using child-based sizing (not in flex context)
+            if is_width_auto && specified_width.is_none() {
+                if let LayoutBoxes::Single(ref child_box) = child.layout_boxes {
+                    let child_border_width = child_box.border_box.width;
+                    max_child_width = max_child_width.max(child_border_width);
+                }
+            }
+
             // Store the margin-bottom for margin collapsing with next sibling
             previous_margin_bottom = child_margin_bottom;
+        }
+
+        // Handle auto width: use maximum child width or 0 if no children
+        // Only apply this if we determined auto width from the style (not from parent_assigned)
+        if is_width_auto && specified_width.is_none() {
+            content_width = match node.style.box_sizing {
+                BoxSizing::ContentBox => max_child_width,
+                BoxSizing::BorderBox => max_child_width,
+            };
         }
 
         // Apply min/max constraints to content size
