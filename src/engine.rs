@@ -960,6 +960,35 @@ impl LayoutEngine {
             };
 
             self.layout_node(child, false, (0.0, 0.0), 0.0, &flex_ctx);
+
+            // Enforce the resolved final main size onto the child's box model so
+            // the border/padding/content boxes reflect the computed flex size.
+            if let LayoutBoxes::Single(ref mut box_model) = child.layout_boxes {
+                match axis {
+                    Axis::Horizontal => {
+                        let target = flex_item.final_main_size;
+                        let delta = target - box_model.border_box.width;
+                        box_model.border_box.width = target;
+                        box_model.padding_box.width =
+                            (box_model.padding_box.width + delta).max(0.0);
+                        box_model.content_box.width =
+                            (box_model.content_box.width + delta).max(0.0);
+                        box_model.children_box.width =
+                            (box_model.children_box.width + delta).max(0.0);
+                    }
+                    Axis::Vertical => {
+                        let target = flex_item.final_main_size;
+                        let delta = target - box_model.border_box.height;
+                        box_model.border_box.height = target;
+                        box_model.padding_box.height =
+                            (box_model.padding_box.height + delta).max(0.0);
+                        box_model.content_box.height =
+                            (box_model.content_box.height + delta).max(0.0);
+                        box_model.children_box.height =
+                            (box_model.children_box.height + delta).max(0.0);
+                    }
+                }
+            }
         }
 
         // Phase 4: Handle cross-axis alignment (stretch)
