@@ -3,9 +3,9 @@
 [![Crates.io](https://img.shields.io/crates/v/ui_layout.svg)](https://crates.io/crates/ui_layout)
 [![Docs.rs](https://docs.rs/ui_layout/badge.svg)](https://docs.rs/ui_layout)
 
-A minimal Flexbox-inspired layout engine for Rust GUI development.
+A unified layout engine for Rust GUI development that treats Flexbox as a specialized form of Inline Block Flow layout.
 
-This crate provides a small, predictable layout system designed for
+This crate provides predictable layout system designed for
 custom GUI frameworks, editors, and experimental UI engines.
 
 > [!NOTE]
@@ -13,16 +13,15 @@ custom GUI frameworks, editors, and experimental UI engines.
 
 ## Features
 
-- Flex layout (Row / Column)
-- `flex_grow` and `flex_basis`
-- Fixed, percentage, and viewport-relative sizing via `Length`
-- Min / max size constraints (Length-based)
-- Margin, padding, and gaps with CSS-like spacing semantics
-- Block layout
-- Recursive tree-based layout
-- Parent-relative positioning
+
+### Flexbox Support
+- Flex layout (Row / Column direction)
+- `flex_grow` with proportional space distribution
+- `flex_basis` for initial sizing
+- `justify_content` (Start, Center, End, SpaceBetween, SpaceAround, SpaceEvenly)
+- `align_items` with full `stretch` support (Start, Center, End, Stretch)
+- `align_self` for individual item alignment override
 - Row and column gaps (`row_gap` / `column_gap`)
-- Justify content (`justify_content`) and align items (`align_items`)
 
 ## Non-goals
 
@@ -43,7 +42,53 @@ custom GUI frameworks, editors, and experimental UI engines.
 ```rust
 use layout::*;
 
+```rust
+use ui_layout::*;
+
+// Create a flex container
+let mut root = LayoutNode::with_children(
+    Style {
+        display: Display::Flex {
+            flex_direction: FlexDirection::Row,
+        },
+        size: SizeStyle {
+            width: Length::Px(300.0),
+            height: Length::Px(200.0),
+            ..Default::default()
+        },
+        justify_content: JustifyContent::SpaceBetween,
+        align_items: AlignItems::Center,
+        column_gap: Length::Px(20.0),
+        ..Default::default()
+    },
+    vec![
+        LayoutNode::new(Style {
+            item_style: ItemStyle {
+                flex_grow: 1.0,
+                ..Default::default()
+            },
+            ..Default::default()
+        }),
+        LayoutNode::new(Style {
+            size: SizeStyle {
+                width: Length::Px(100.0),
+                ..Default::default()
+            },
+            ..Default::default()
+        }),
+    ],
+);
+
+// Layout with viewport size
 LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+// Access results
+match &root.layout_boxes {
+    LayoutBoxes::Single(box_model) => {
+        println!("Container: {}x{}", box_model.border_box.width, box_model.border_box.height);
+    },
+    _ => {}
+}
 ```
 
 For more examples and to understand the behavior of gaps, alignment, and sizing,
