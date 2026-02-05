@@ -40,15 +40,19 @@ fn block_vertical_margin_collapsing_between_siblings() {
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
-    let c1 = &root.children[0];
-    let c2 = &root.children[1];
+    let c1_box = match &root.children[0].layout_boxes {
+        LayoutBoxes::Single(box_model) => box_model,
+        _ => panic!("Expected single box model"),
+    };
 
-    // child1 は先頭なので y = 0
-    assert_eq!(c1.box_model.border_box.y, 0.0);
+    let c2_box = match &root.children[1].layout_boxes {
+        LayoutBoxes::Single(box_model) => box_model,
+        _ => panic!("Expected single box model"),
+    };
 
-    // margin-bottom(30) と margin-top(10) は回収されて max(30, 10) = 30
-    assert_eq!(
-        c2.box_model.border_box.y,
-        c1.box_model.border_box.height + 30.0
-    );
+    // child1 is at the top so y = 0
+    assert_eq!(c1_box.border_box.y, 0.0);
+
+    // margin-bottom(30) and margin-top(10) collapse to max(30, 10) = 30
+    assert_eq!(c2_box.border_box.y, c1_box.border_box.height + 30.0);
 }

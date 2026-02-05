@@ -24,14 +24,17 @@ fn block_basic_box_model() {
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
-    assert_eq!(root.box_model.content_box.width, 200.0);
-    assert_eq!(root.box_model.content_box.height, 100.0);
-
-    assert_eq!(root.box_model.padding_box.width, 220.0);
-    assert_eq!(root.box_model.padding_box.height, 110.0);
-
-    assert_eq!(root.box_model.border_box.width, 224.0);
-    assert_eq!(root.box_model.border_box.height, 112.0);
+    match &root.layout_boxes {
+        LayoutBoxes::Single(box_model) => {
+            assert_eq!(box_model.content_box.width, 200.0);
+            assert_eq!(box_model.content_box.height, 100.0);
+            assert_eq!(box_model.padding_box.width, 220.0);
+            assert_eq!(box_model.padding_box.height, 110.0);
+            assert_eq!(box_model.border_box.width, 224.0);
+            assert_eq!(box_model.border_box.height, 112.0);
+        }
+        _ => panic!("Expected single box model"),
+    }
 }
 
 #[test]
@@ -58,7 +61,12 @@ fn block_auto_height_from_children() {
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
-    assert_eq!(root.children[0].box_model.content_box.height, 40.0);
+    match &root.children[0].layout_boxes {
+        LayoutBoxes::Single(box_model) => {
+            assert_eq!(box_model.content_box.height, 40.0);
+        }
+        _ => panic!("Expected single box model"),
+    }
 }
 
 #[test]
@@ -96,11 +104,18 @@ fn flex_row_grow() {
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
-    let c1 = &root.children[0];
-    let c2 = &root.children[1];
+    let c1_box = match &root.children[0].layout_boxes {
+        LayoutBoxes::Single(box_model) => box_model,
+        _ => panic!("Expected single box model"),
+    };
 
-    assert_eq!(c1.box_model.content_box.width, 150.0);
-    assert_eq!(c2.box_model.content_box.width, 150.0);
+    let c2_box = match &root.children[1].layout_boxes {
+        LayoutBoxes::Single(box_model) => box_model,
+        _ => panic!("Expected single box model"),
+    };
+
+    assert_eq!(c1_box.content_box.width, 150.0);
+    assert_eq!(c2_box.content_box.width, 150.0);
 }
 
 #[test]
@@ -126,11 +141,23 @@ fn flex_gap_affects_children_box() {
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
-    assert_eq!(root.box_model.children_box.width, 20.0);
-    assert_eq!(
-        root.children[1].box_model.border_box.x,
-        root.children[0].box_model.border_box.width + 20.0
-    );
+    let root_box = match &root.layout_boxes {
+        LayoutBoxes::Single(box_model) => box_model,
+        _ => panic!("Expected single box model"),
+    };
+
+    let child0_box = match &root.children[0].layout_boxes {
+        LayoutBoxes::Single(box_model) => box_model,
+        _ => panic!("Expected single box model"),
+    };
+
+    let child1_box = match &root.children[1].layout_boxes {
+        LayoutBoxes::Single(box_model) => box_model,
+        _ => panic!("Expected single box model"),
+    };
+
+    assert_eq!(root_box.children_box.width, 20.0);
+    assert_eq!(child1_box.border_box.x, child0_box.border_box.width + 20.0);
 }
 
 #[test]
@@ -161,7 +188,14 @@ fn flex_align_items_stretch() {
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
-    assert_eq!(root.children[0].box_model.content_box.height, 80.0);
+    dbg!(root.layout_boxes.height());
+
+    match &root.children[0].layout_boxes {
+        LayoutBoxes::Single(box_model) => {
+            assert_eq!(box_model.content_box.height, 80.0);
+        }
+        _ => panic!("Expected single box model"),
+    }
 }
 
 #[test]
@@ -193,6 +227,11 @@ fn block_margin_auto_centering() {
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
-    let x = root.children[0].box_model.border_box.x;
+    let child_box = match &root.children[0].layout_boxes {
+        LayoutBoxes::Single(box_model) => box_model,
+        _ => panic!("Expected single box model"),
+    };
+
+    let x = child_box.border_box.x;
     assert_eq!(x, 100.0); // (300 - 100) / 2
 }
