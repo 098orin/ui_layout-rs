@@ -379,7 +379,6 @@ impl LayoutEngine {
         ctx: &LayoutContext,
     ) -> ((f32, f32), f32) {
         let mut cursor_y = origin.1;
-        let mut max_child_border_width: f32 = 0.0;
 
         // Resolve node's own size first
         let specified_width = node
@@ -394,15 +393,19 @@ impl LayoutEngine {
             .height
             .resolve_with(ctx.containing_block_height, ctx.viewport_height);
 
-        // Determine if width is auto and if we should use specified or parent-assigned width
         let is_width_from_spec = specified_width.is_some();
         let is_width_from_parent = ctx.parent_assigned_border_width.is_some();
         let is_width_auto = !is_width_from_spec && !is_width_from_parent;
 
-        // Calculate initial width for resolving padding/border with containing block context
-        let width_for_spacing = specified_width
-            .or(ctx.parent_assigned_border_width)
-            .unwrap_or_else(|| ctx.containing_block_width.unwrap_or(ctx.viewport_width));
+        let width_for_layout = if is_width_auto {
+            ctx.containing_block_width.unwrap_or(ctx.viewport_width)
+        } else {
+            specified_width
+                .or(ctx.parent_assigned_border_width)
+                .unwrap_or_else(|| ctx.containing_block_width.unwrap_or(ctx.viewport_width))
+        };
+
+        let width_for_spacing = width_for_layout;
 
         // Resolve padding, border, and margins for constraint calculations
         let ctx_with_width = LayoutContext {
@@ -415,16 +418,10 @@ impl LayoutEngine {
         let (margins, _) =
             resolve_margins_with_collapsing(&node.style.spacing, &ctx_with_width, 0.0);
 
-        // Calculate actual content width and height based on box-sizing
-        // For auto width, this will be recalculated after children are laid out
-        let mut content_width = if is_width_auto {
-            0.0 // Placeholder; will be updated after child layout
-        } else {
-            match node.style.box_sizing {
-                BoxSizing::ContentBox => width_for_spacing,
-                BoxSizing::BorderBox => {
-                    (width_for_spacing - padding.0 - padding.2 - border.0 - border.2).max(0.0)
-                }
+        let mut content_width = match node.style.box_sizing {
+            BoxSizing::ContentBox => width_for_layout,
+            BoxSizing::BorderBox => {
+                (width_for_layout - padding.0 - padding.2 - border.0 - border.2).max(0.0)
             }
         };
 
@@ -469,38 +466,8 @@ impl LayoutEngine {
             // Update cursor_y to track layout progression based on child's measured size
             cursor_y = child_end_y;
 
-            // Track maximum child border box width for auto width calculation
-            // Include child margins in the width calculation since the parent should
-            // accommodate the total space needed by the child
-            if is_width_auto {
-                if let LayoutBoxes::Single(ref child_box) = child.layout_boxes {
-                    let child_border_width = child_box.border_box.width;
-                    // Resolve child margins to include in the width calculation
-                    let child_margin_left = child
-                        .style
-                        .spacing
-                        .margin_left
-                        .resolve_with(Some(content_width), ctx.viewport_width)
-                        .unwrap_or(0.0);
-                    let child_margin_right = child
-                        .style
-                        .spacing
-                        .margin_right
-                        .resolve_with(Some(content_width), ctx.viewport_width)
-                        .unwrap_or(0.0);
-                    let child_total_width =
-                        child_border_width + child_margin_left + child_margin_right;
-                    max_child_border_width = max_child_border_width.max(child_total_width);
-                }
-            }
-
             // Store the margin-bottom for margin collapsing with next sibling
             previous_margin_bottom = child_margin_bottom;
-        }
-
-        // Handle auto width: use maximum child border box width
-        if is_width_auto {
-            content_width = max_child_border_width;
         }
 
         // Apply min/max constraints to content size
