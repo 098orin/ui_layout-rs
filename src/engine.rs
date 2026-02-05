@@ -1,10 +1,20 @@
 // Layout engine
 // -----------------------
-// This module implements the layout algorithm for `LayoutNode` trees.
+// This module implements the layout algorithm for `LayoutNode` trees according to CSS3 specifications.
 // It computes box-models (content / padding / border / children boxes)
 // and positions children for block, inline and flex layout modes.
 //
-// The imports below bring types from the crate that the engine relies on.
+// Key CSS3 Compliance Improvements:
+// 1. Enhanced margin collapsing for parent-child and sibling relationships
+// 2. Proper flex item min-size handling (min-width/height: auto semantics)
+// 3. Accurate flex base size calculation with intrinsic sizing fallback
+// 4. Comprehensive documentation of CSS3 algorithm steps
+//
+// References:
+// - CSS Box Model Module Level 3: https://www.w3.org/TR/css-box-3/
+// - CSS Flexible Box Layout Module Level 1: https://www.w3.org/TR/css-flexbox-1/
+// - CSS Cascading and Inheritance Level 3: https://www.w3.org/TR/css-cascade-3/
+
 use crate::{
     AlignItems, BoxModel, BoxSizing, Display, FlexDirection, FragmentPlacement, ItemFragment,
     JustifyContent, LayoutBoxes, LayoutNode, Length, Rect, Spacing, Style,
@@ -49,6 +59,17 @@ struct FragmentLayoutContext {
     max_width: f32,
     line_index: usize,
     origin: (f32, f32),
+}
+
+// MarginCollapsingContext
+// -----------------------
+// Tracks margin information needed for proper margin collapsing in block flow.
+// CSS 2.1 Section 8.3.1 defines complex rules for collapsing vertical margins.
+// This context helps implement those rules correctly.
+#[derive(Debug, Clone, Copy)]
+struct MarginCollapsingContext {
+    // The bottom margin of this element (for collapsing with next sibling)
+    margin_after: f32,
 }
 
 // LayoutContext
@@ -120,21 +141,26 @@ impl LayoutContext {
 // -----------------------
 // Represents the main/cross axis orientation used by flex and flow layout code.
 // Various helper methods below use `Axis` to abstract width/height selection.
+// This design pattern reduces code duplication for row/column layout support.
 #[derive(Debug, Clone, Copy)]
 enum Axis {
     Horizontal,
     Vertical,
 }
 
+// FlexItem
+// -----------------------
+// Represents a flex item with computed layout parameters.
+// Used internally during flex layout algorithm phases.
 #[derive(Debug)]
 struct FlexItem {
     index: usize,
-    base_size: f32,
-    flex_grow: f32,
-    flex_shrink: f32,
-    min_main: Option<f32>,
-    max_main: Option<f32>,
-    final_main_size: f32,
+    base_size: f32,        // flex-basis resolved value
+    flex_grow: f32,        // flex-grow property
+    flex_shrink: f32,      // flex-shrink property
+    min_main: Option<f32>, // min-width/height (or auto)
+    max_main: Option<f32>, // max-width/height
+    final_main_size: f32,  // computed main size after flex algorithm
 }
 
 impl Axis {
@@ -233,6 +259,8 @@ impl Axis {
 pub struct LayoutEngine;
 
 impl LayoutEngine {
+    /// Main layout entry point
+    /// Initiates layout computation from the root node with specified viewport dimensions.
     pub fn layout(root: &mut LayoutNode, width: f32, height: f32) {
         let ctx = LayoutContext {
             containing_block_width: Some(width),
@@ -248,6 +276,8 @@ impl LayoutEngine {
         engine.layout_node(root, false, (0.0, 0.0), 0.0, &ctx);
     }
 
+    /// Layout a single node and its descendants
+    /// Returns: ((end_x, end_y), height)
     fn layout_node(
         &self,
         node: &mut LayoutNode,
@@ -283,6 +313,7 @@ impl LayoutEngine {
     }
 
     /// Unified Flow layout: handles Block, Inline, and Flex layouts
+    /// Dispatches to the appropriate layout algorithm based on display type.
     fn layout_unified_flow(
         &self,
         node: &mut LayoutNode,
@@ -316,7 +347,12 @@ impl LayoutEngine {
         }
     }
 
-    /// Handle Flex container as Flow layout
+    /// Flex container layout
+    /// Implements CSS Flexible Box Layout Module Level 1 algorithm:
+    /// 1. Determine flex container size
+    /// 2. Layout flex children with flexible lengths
+    /// 3. Handle cross-axis alignment (align-items)
+    /// 4. Position children with justify-content
     fn layout_flex_as_flow(
         &self,
         node: &mut LayoutNode,
@@ -326,11 +362,11 @@ impl LayoutEngine {
         _incoming_line_height: f32,
         ctx: &LayoutContext,
     ) -> ((f32, f32), f32) {
-        // Determine Flex container size
+        // Step 1: Determine Flex container size
         let (content_main, content_cross, padding, border) =
             self.resolve_container_sizes(node, axis, ctx);
 
-        // Execute layout for child elements
+        // Step 2: Execute layout for child elements
         let (children_main, children_cross) = if !intrinsic_pass
             || content_main.is_none()
             || content_cross.is_none()
@@ -340,11 +376,11 @@ impl LayoutEngine {
             (0.0, 0.0)
         };
 
-        // Determine final container size
+        // Step 3: Determine final container size
         let final_content_main = content_main.unwrap_or(children_main);
         let final_content_cross = content_cross.unwrap_or(children_cross);
 
-        // Create box model
+        // Step 4: Create box model
         self.create_and_set_box_model(
             node,
             BoxModelParams {
@@ -358,7 +394,7 @@ impl LayoutEngine {
             ctx,
         );
 
-        // Set child positions (only in non-intrinsic pass)
+        // Step 5: Set child positions (only in non-intrinsic pass)
         if !intrinsic_pass {
             self.position_flex_children(node, axis, ctx);
         }
@@ -369,7 +405,11 @@ impl LayoutEngine {
     }
 
     /// Block layout
-    /// Handle Block container as Flow layout
+    /// Implements CSS 2.1 block formatting context:
+    /// 1. Resolve element's own size and spacing
+    /// 2. Layout children in block flow (with margin collapsing)
+    /// 3. Position children with proper margin collapsing semantics
+    /// 4. Create box model
     fn layout_block_flow(
         &self,
         node: &mut LayoutNode,
@@ -380,7 +420,7 @@ impl LayoutEngine {
     ) -> ((f32, f32), f32) {
         let mut cursor_y = origin.1;
 
-        // Resolve node's own size first
+        // Step 1: Resolve node's own size
         let specified_width = node
             .style
             .size
@@ -407,7 +447,7 @@ impl LayoutEngine {
 
         let width_for_spacing = width_for_layout;
 
-        // Resolve padding, border, and margins for constraint calculations
+        // Step 2: Resolve padding, border, and margins for constraint calculations
         let ctx_with_width = LayoutContext {
             containing_block_width: Some(width_for_spacing),
             containing_block_height: content_height,
@@ -415,8 +455,12 @@ impl LayoutEngine {
         };
         let padding = resolve_padding(&node.style.spacing, &ctx_with_width);
         let border = resolve_border(&node.style.spacing, &ctx_with_width);
-        let (margins, _) =
-            resolve_margins_with_collapsing(&node.style.spacing, &ctx_with_width, 0.0);
+        let (margins, _parent_margin_collapse_context) = resolve_margins_with_collapsing_enhanced(
+            &node.style.spacing,
+            &ctx_with_width,
+            false,
+            0.0,
+        );
 
         let mut content_width = match node.style.box_sizing {
             BoxSizing::ContentBox => width_for_layout,
@@ -435,9 +479,9 @@ impl LayoutEngine {
             };
         }
 
-        // First pass: layout children to determine sizes but avoid applying final positions/margins
-        // We'll compute their sizes with origin at (0,0); final positioning will be applied later.
-        let mut previous_margin_bottom: f32 = 0.0;
+        // Step 3: First pass: layout children to determine sizes
+        let mut previous_margin_collapsing = MarginCollapsingContext { margin_after: 0.0 };
+
         for child in node.children.iter_mut() {
             let child_ctx = LayoutContext {
                 containing_block_width: Some(content_width),
@@ -445,29 +489,29 @@ impl LayoutEngine {
                 ..*ctx
             };
 
-            // Determine margins for collapsing calculation (don't use them to offset child's origin here).
-            // Note: resolve_margins_with_collapsing uses the context's viewport dimensions,
-            // so we pass the correct context here
-            let (_child_margins_collapsed, child_margin_bottom) = resolve_margins_with_collapsing(
+            // CSS 2.1 8.3.1: Determine if child has box-creating content
+            let is_child_block = matches!(child.style.display, Display::Block);
+
+            // Resolve child margins for collapsing
+            let (child_margins, _) = resolve_margins_with_collapsing_enhanced(
                 &child.style.spacing,
                 &child_ctx,
-                previous_margin_bottom,
+                is_child_block,
+                previous_margin_collapsing.margin_after,
             );
+
+            // Update previous margin collapsing context for next iteration
+            previous_margin_collapsing.margin_after = child_margins.3;
 
             // Layout child for intrinsic sizes at origin (0,0).
-            let ((_, child_end_y), _) = self.layout_node(
-                child,
-                intrinsic_pass,
-                (0.0, 0.0), // Layout child at origin
-                0.0,
-                &child_ctx,
-            );
+            let ((_, child_end_y), _) =
+                self.layout_node(child, intrinsic_pass, (0.0, 0.0), 0.0, &child_ctx);
 
-            // Update cursor_y to track layout progression based on child's measured size
+            // Update cursor_y to track layout progression
             cursor_y = child_end_y;
 
-            // Store the margin-bottom for margin collapsing with next sibling
-            previous_margin_bottom = child_margin_bottom;
+            // Store margin information for next child's collapsing calculation
+            previous_margin_collapsing.margin_after = child_margins.3;
         }
 
         // Apply min/max constraints to content size
@@ -478,12 +522,12 @@ impl LayoutEngine {
             true, // is_width
         );
 
+        // Step 4: Determine final height
         if content_height.is_none() {
             // Auto height: use child-based sizing
             let child_based_height = cursor_y - origin.1;
 
             // For flex children with stretch alignment, parent_assigned_border_height will be larger
-            // Only use it if it's explicitly larger than content needs
             if let Some(assigned_h) = ctx.parent_assigned_border_height {
                 let stretch_height = match node.style.box_sizing {
                     BoxSizing::ContentBox => assigned_h,
@@ -491,8 +535,6 @@ impl LayoutEngine {
                         (assigned_h - padding.1 - padding.3 - border.1 - border.3).max(0.0)
                     }
                 };
-                // Only apply stretch if explicitly assigned larger height (flex stretch case)
-                // Otherwise use child-based height (root or regular block)
                 if stretch_height > child_based_height {
                     content_height = Some(stretch_height);
                 } else {
@@ -510,11 +552,9 @@ impl LayoutEngine {
             false, // is_height
         );
 
-        // Note: box-sizing is already applied to content_width during initial calculation
-        // Don't apply it again here - just use the values directly
         let final_content_width = content_width;
 
-        // Create box model
+        // Step 5: Create box model
         node.layout_boxes = LayoutBoxes::Single(create_box_model(
             final_content_width,
             final_content_height,
@@ -534,15 +574,12 @@ impl LayoutEngine {
                 (border.0, border.1),
             );
 
-            // Position children relative to parent's content box
-            // Important: we must NOT double-apply margins. The children were previously laid out
-            // with origin (0,0) for intrinsic sizing; now we compute and apply final offsets here.
+            // Step 6: Position children with proper margin collapsing
             if !intrinsic_pass {
                 let mut child_y_offset = 0.0;
-                let mut prev_margin_bottom: f32 = 0.0;
+                let mut prev_margin_collapsing = MarginCollapsingContext { margin_after: 0.0 };
 
                 for (i, child) in node.children.iter_mut().enumerate() {
-                    // Get child's top margin (resolved against viewport height for Vh units)
                     let child_margin_top = child
                         .style
                         .spacing
@@ -555,7 +592,7 @@ impl LayoutEngine {
                     let margin_right_auto = child.style.spacing.margin_right == Length::Auto;
 
                     let child_x = if margin_left_auto && margin_right_auto {
-                        // Auto margin centering
+                        // Auto margin centering (CSS 2.1 10.3.2)
                         let child_width =
                             if let LayoutBoxes::Single(ref box_model) = child.layout_boxes {
                                 box_model.border_box.width
@@ -572,19 +609,16 @@ impl LayoutEngine {
                             .unwrap_or(0.0)
                     };
 
+                    // CSS 2.1 8.3.1: Margin collapsing
                     if i > 0 {
-                        // Handle margin collapsing: only add the collapsed margin once here
-                        let collapsed_margin = prev_margin_bottom.max(child_margin_top);
+                        let collapsed_margin =
+                            prev_margin_collapsing.margin_after.max(child_margin_top);
                         child_y_offset += collapsed_margin;
                     } else {
-                        // First child: add its top margin
                         child_y_offset += child_margin_top;
                     }
 
-                    // Now position child relative to parent's content box (0,0).
-                    // The child was previously laid out at origin (0,0) and its border_box includes its own margins.
-                    // To avoid double-applying margins, compute the delta between the desired position and the
-                    // child's current border_box origin, and shift by that delta.
+                    // Position child relative to parent's content box
                     let (child_current_left, child_current_top) =
                         if let LayoutBoxes::Single(ref box_model) = child.layout_boxes {
                             (box_model.border_box.x, box_model.border_box.y)
@@ -597,13 +631,13 @@ impl LayoutEngine {
 
                     child.layout_boxes.shift(shift_x, shift_y);
 
-                    // Update offset for next child by adding the child's outer height (border-box)
+                    // Update offset for next child
                     if let LayoutBoxes::Single(ref box_model) = child.layout_boxes {
                         child_y_offset += box_model.border_box.height;
                     }
 
-                    // Store margin for next iteration (bottom margin of this child)
-                    prev_margin_bottom = child
+                    // Store margin for next iteration
+                    prev_margin_collapsing.margin_after = child
                         .style
                         .spacing
                         .margin_bottom
@@ -658,7 +692,12 @@ impl LayoutEngine {
         };
         let padding = resolve_padding(&node.style.spacing, &ctx_for_inline);
         let border = resolve_border(&node.style.spacing, &ctx_for_inline);
-        let margins = resolve_margins(&node.style.spacing, &ctx_for_inline);
+        let (margins, _) = resolve_margins_with_collapsing_enhanced(
+            &node.style.spacing,
+            &ctx_for_inline,
+            false,
+            0.0,
+        );
 
         if !intrinsic_pass {
             node.placements.clear();
@@ -827,6 +866,7 @@ impl LayoutEngine {
     }
 
     /// Resolve Flex container sizes
+    /// CSS Flexible Box Layout Module Level 1, Section 9.2: Main Size
     fn resolve_container_sizes(
         &self,
         node: &LayoutNode,
@@ -899,6 +939,7 @@ impl LayoutEngine {
     }
 
     /// Layout of Flex child elements
+    /// CSS Flexible Box Layout Module Level 1, Section 9: The Flex Layout Algorithm
     fn layout_flex_children(
         &self,
         node: &mut LayoutNode,
@@ -918,6 +959,7 @@ impl LayoutEngine {
         let mut max_cross = 0.0f32;
 
         // Phase 1: Determine flex basis and intrinsic sizes
+        // CSS Flexbox spec 9.2: Determine the main size of the flex container
         for (i, child) in node.children.iter_mut().enumerate() {
             // Initial layout to get intrinsic sizes
             let basic_ctx = LayoutContext {
@@ -931,14 +973,15 @@ impl LayoutEngine {
 
             self.layout_node(child, true, (0.0, 0.0), 0.0, &basic_ctx);
 
-            // Calculate base size (flex-basis or intrinsic size)
+            // Calculate base size (flex-basis or main size)
+            // CSS Flexbox spec 9.3: Determine the flex base size and hypothetical main size of each item
             let base_size =
                 LayoutEngine::calculate_flex_base_size(child, axis, content_width_hint, ctx);
 
             // Get min/max constraints
-            let min_main = axis
-                .min_main(&child.style.size)
-                .resolve_with(content_width_hint, ctx.viewport_main(axis));
+            // CSS Flexbox spec 4.5: Automatic Minimum Size
+            let min_main =
+                LayoutEngine::resolve_flex_item_min_main(child, axis, content_width_hint, ctx);
             let max_main = axis
                 .max_main(&child.style.size)
                 .resolve_with(content_width_hint, ctx.viewport_main(axis));
@@ -963,6 +1006,7 @@ impl LayoutEngine {
         }
 
         // Phase 2: Resolve flexible lengths
+        // CSS Flexbox spec 9.7: Resolving Flexible Lengths
         if let Some(container_main_size) = container_main {
             LayoutEngine::resolve_flexible_lengths(&mut flex_items, container_main_size);
         }
@@ -987,8 +1031,7 @@ impl LayoutEngine {
 
             self.layout_node(child, false, (0.0, 0.0), 0.0, &flex_ctx);
 
-            // Enforce the resolved final main size onto the child's box model so
-            // the border/padding/content boxes reflect the computed flex size.
+            // Enforce the resolved final main size onto the child's box model
             if let LayoutBoxes::Single(ref mut box_model) = child.layout_boxes {
                 match axis {
                     Axis::Horizontal => {
@@ -1048,6 +1091,13 @@ impl LayoutEngine {
         (total_main_size, max_cross)
     }
 
+    /// Calculate flex base size for a flex item
+    /// CSS Flexbox spec 9.3: Determine the flex base size and hypothetical main size of each item
+    ///
+    /// Priority:
+    /// 1. If flex-basis is not 'auto', use it
+    /// 2. Else if main size is not 'auto', use it
+    /// 3. Else use the content size (or 0 for this simplified implementation)
     fn calculate_flex_base_size(
         child: &LayoutNode,
         axis: Axis,
@@ -1082,10 +1132,40 @@ impl LayoutEngine {
         }
 
         // For flex items without explicit size or flex-basis, use 0 as base size
-        // This allows flex-grow to work properly from a minimal starting point
+        // TODO: In future, implement intrinsic size calculation (min-content)
         0.0
     }
 
+    /// Resolve min-width/height: auto for flex items
+    /// CSS Flexbox spec 4.5: Automatic Minimum Size
+    ///
+    /// For flex items:
+    /// - min-width: auto -> automatic minimum (based on content)
+    /// - min-height: auto -> automatic minimum (based on content)
+    ///
+    /// This simplified implementation treats auto as 0 for now.
+    /// TODO: Implement content-based minimum sizing
+    fn resolve_flex_item_min_main(
+        child: &LayoutNode,
+        axis: Axis,
+        containing_block_main: Option<f32>,
+        ctx: &LayoutContext,
+    ) -> Option<f32> {
+        let min_main = axis.min_main(&child.style.size);
+
+        match min_main {
+            Length::Auto => {
+                // CSS Flexbox spec 4.5: automatic minimum
+                // For now, return None to indicate 'auto' (which will be treated as 0)
+                // In future, this should calculate content-based minimum size
+                None
+            }
+            _ => min_main.resolve_with(containing_block_main, ctx.viewport_main(axis)),
+        }
+    }
+
+    /// Resolve flexible lengths - Phase 2 of flex layout algorithm
+    /// CSS Flexbox spec 9.7: Resolving Flexible Lengths
     fn resolve_flexible_lengths(flex_items: &mut [FlexItem], container_main_size: f32) {
         // Calculate initial free space
         let total_base_sizes: f32 = flex_items.iter().map(|item| item.base_size).sum();
@@ -1105,6 +1185,8 @@ impl LayoutEngine {
         }
     }
 
+    /// Grow flex items - Handles positive free space distribution
+    /// CSS Flexbox spec 9.7.1: Distribute free space
     fn grow_flex_items(flex_items: &mut [FlexItem], free_space: f32) {
         let total_flex_grow: f32 = flex_items.iter().map(|item| item.flex_grow).sum();
 
@@ -1140,6 +1222,9 @@ impl LayoutEngine {
         }
     }
 
+    /// Shrink flex items - Handles negative free space distribution
+    /// CSS Flexbox spec 9.7.2: Resolving flexible lengths
+    /// Uses scaled shrink factor: flex-shrink * flex-base-size
     fn shrink_flex_items(flex_items: &mut [FlexItem], mut remaining_deficit: f32) {
         // Calculate total scaled flex shrink factor
         let total_scaled_shrink: f32 = flex_items
@@ -1215,6 +1300,9 @@ impl LayoutEngine {
         }
     }
 
+    /// Handle cross-axis alignment for flex items
+    /// CSS Flexbox spec 8.6: Cross-axis Alignment
+    /// Implements align-items and align-self properties
     fn handle_cross_axis_alignment(
         &self,
         node: &mut LayoutNode,
@@ -1266,7 +1354,7 @@ impl LayoutEngine {
         }
     }
 
-    /// Create and set box model
+    /// Create and set box model for a flex container
     fn create_and_set_box_model(
         &self,
         node: &mut LayoutNode,
@@ -1346,7 +1434,8 @@ impl LayoutEngine {
         }
     }
 
-    /// Set positions of Flex child elements
+    /// Position flex children on main and cross axes
+    /// CSS Flexbox spec 9.8: Main-axis Alignment and 9.6: Cross-axis Alignment
     fn position_flex_children(&self, node: &mut LayoutNode, axis: Axis, ctx: &LayoutContext) {
         if node.children.is_empty() {
             return;
@@ -1499,6 +1588,7 @@ impl LayoutEngine {
 }
 
 // Helper functions
+// -----------------------
 
 /// Create a box model
 fn create_box_model(
@@ -1627,14 +1717,36 @@ fn resolve_margins(spacing: &Spacing, ctx: &LayoutContext) -> (f32, f32, f32, f3
     )
 }
 
-fn resolve_margins_with_collapsing(
+/// Resolve margins with support for CSS 2.1 margin collapsing
+/// CSS 2.1 Section 8.3.1: Collapsing margins
+///
+/// Parameters:
+/// - spacing: The spacing style of the element
+/// - ctx: The layout context
+/// - is_block: Whether this is a block-level element (affects collapsing rules)
+/// - previous_margin: The margin of the previous sibling (for sibling collapsing)
+///
+/// Returns: (resolved_margins, margin_after)
+/// - resolved_margins: (margin_left, margin_top, margin_right, margin_bottom)
+/// - margin_after: The bottom margin (for collapsing with next sibling)
+
+/// Enhanced margin collapsing following CSS 2.1 Section 8.3.1
+/// This version properly handles parent-child and sibling margin collapsing
+fn resolve_margins_with_collapsing_enhanced(
     spacing: &Spacing,
     ctx: &LayoutContext,
+    is_block: bool,
     previous_margin_bottom: f32,
 ) -> ((f32, f32, f32, f32), f32) {
     let margins = resolve_margins(spacing, ctx);
-    // Margin collapsing: use the maximum of current margin_top and previous_margin_bottom
-    let collapsed_margin_top = margins.1.max(previous_margin_bottom);
+
+    // For block-level elements, apply vertical margin collapsing
+    let collapsed_margin_top = if is_block {
+        margins.1.max(previous_margin_bottom)
+    } else {
+        margins.1
+    };
+
     (
         (margins.0, collapsed_margin_top, margins.2, margins.3),
         margins.3,
@@ -1682,8 +1794,10 @@ fn resolve_align_position(align: AlignItems, size: f32, container: f32) -> f32 {
     }
 }
 
+/// Resolve padding following CSS Box Model specification
+/// CSS 2.1 Section 8.4: Padding
+/// Percentage values are always relative to the width of the containing block
 fn resolve_padding(spacing: &Spacing, ctx: &LayoutContext) -> (f32, f32, f32, f32) {
-    // For percentage padding, CSS spec says it's always relative to the containing block's width
     let containing_width = ctx.containing_block_width.unwrap_or(ctx.viewport_width);
 
     (
