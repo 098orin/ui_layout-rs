@@ -239,8 +239,9 @@ impl LayoutEngine {
             containing_block_height: Some(height),
             viewport_width: width,
             viewport_height: height,
-            parent_assigned_border_width: Some(width),
-            parent_assigned_border_height: Some(height),
+            // Root element has no parent, so don't assign parent dimensions
+            parent_assigned_border_width: None,
+            parent_assigned_border_height: None,
         };
 
         let engine = LayoutEngine;
@@ -404,7 +405,7 @@ impl LayoutEngine {
         let (margins, _) =
             resolve_margins_with_collapsing(&node.style.spacing, &ctx_with_width, 0.0);
 
-        // Calculate actual content width based on box-sizing
+        // Calculate actual content width and height based on box-sizing
         let mut content_width = match node.style.box_sizing {
             BoxSizing::ContentBox => specified_width,
             BoxSizing::BorderBox => {
@@ -412,16 +413,14 @@ impl LayoutEngine {
             }
         };
 
-        // For stretch alignment: use parent_assigned_border_height if no explicit height
-        if content_height.is_none() {
-            if let Some(assigned_h) = ctx.parent_assigned_border_height {
-                content_height = Some(match node.style.box_sizing {
-                    BoxSizing::ContentBox => assigned_h,
-                    BoxSizing::BorderBox => {
-                        (assigned_h - padding.1 - padding.3 - border.1 - border.3).max(0.0)
-                    }
-                });
-            }
+        // Apply box-sizing to height as well
+        if let Some(h) = content_height {
+            content_height = match node.style.box_sizing {
+                BoxSizing::ContentBox => Some(h),
+                BoxSizing::BorderBox => {
+                    Some((h - padding.1 - padding.3 - border.1 - border.3).max(0.0))
+                }
+            };
         }
 
         // First pass: layout children to determine sizes but avoid applying final positions/margins
@@ -435,6 +434,8 @@ impl LayoutEngine {
             };
 
             // Determine margins for collapsing calculation (don't use them to offset child's origin here).
+            // Note: resolve_margins_with_collapsing uses the context's viewport dimensions,
+            // so we pass the correct context here
             let (_child_margins_collapsed, child_margin_bottom) = resolve_margins_with_collapsing(
                 &child.style.spacing,
                 &child_ctx,
@@ -466,7 +467,28 @@ impl LayoutEngine {
         );
 
         if content_height.is_none() {
-            content_height = Some(cursor_y - origin.1);
+            // Auto height: use child-based sizing
+            let child_based_height = cursor_y - origin.1;
+
+            // For flex children with stretch alignment, parent_assigned_border_height will be larger
+            // Only use it if it's explicitly larger than content needs
+            if let Some(assigned_h) = ctx.parent_assigned_border_height {
+                let stretch_height = match node.style.box_sizing {
+                    BoxSizing::ContentBox => assigned_h,
+                    BoxSizing::BorderBox => {
+                        (assigned_h - padding.1 - padding.3 - border.1 - border.3).max(0.0)
+                    }
+                };
+                // Only apply stretch if explicitly assigned larger height (flex stretch case)
+                // Otherwise use child-based height (root or regular block)
+                if stretch_height > child_based_height {
+                    content_height = Some(stretch_height);
+                } else {
+                    content_height = Some(child_based_height);
+                }
+            } else {
+                content_height = Some(child_based_height);
+            }
         }
         let mut final_content_height = content_height.unwrap_or(0.0);
         final_content_height = apply_size_constraints(
@@ -476,17 +498,9 @@ impl LayoutEngine {
             false, // is_height
         );
 
-        // Apply box-sizing logic
-        let (final_content_width, final_content_height) = match node.style.box_sizing {
-            BoxSizing::ContentBox => (content_width, final_content_height),
-            BoxSizing::BorderBox => {
-                let content_w =
-                    (content_width - padding.0 - padding.2 - border.0 - border.2).max(0.0);
-                let content_h =
-                    (final_content_height - padding.1 - padding.3 - border.1 - border.3).max(0.0);
-                (content_w, content_h)
-            }
-        };
+        // Note: box-sizing is already applied to content_width during initial calculation
+        // Don't apply it again here - just use the values directly
+        let final_content_width = content_width;
 
         // Create box model
         node.layout_boxes = LayoutBoxes::Single(create_box_model(
@@ -516,12 +530,12 @@ impl LayoutEngine {
                 let mut prev_margin_bottom: f32 = 0.0;
 
                 for (i, child) in node.children.iter_mut().enumerate() {
-                    // Get child's top margin (resolved against the final content width)
+                    // Get child's top margin (resolved against viewport height for Vh units)
                     let child_margin_top = child
                         .style
                         .spacing
                         .margin_top
-                        .resolve_with(Some(final_content_width), ctx.viewport_width)
+                        .resolve_with(Some(final_content_width), ctx.viewport_height)
                         .unwrap_or(0.0);
 
                     // Handle auto margins for horizontal centering
@@ -581,7 +595,7 @@ impl LayoutEngine {
                         .style
                         .spacing
                         .margin_bottom
-                        .resolve_with(Some(final_content_width), ctx.viewport_width)
+                        .resolve_with(Some(final_content_width), ctx.viewport_height)
                         .unwrap_or(0.0);
                 }
             }
