@@ -362,7 +362,8 @@ impl LayoutEngine {
         };
         let padding = resolve_padding(&node.style.spacing, &ctx_with_width);
         let border = resolve_border(&node.style.spacing, &ctx_with_width);
-        let margins = resolve_margins(&node.style.spacing, &ctx_with_width);
+        let (margins, _) =
+            resolve_margins_with_collapsing(&node.style.spacing, &ctx_with_width, 0.0);
 
         // Calculate actual content width based on box-sizing
         let mut content_width = match node.style.box_sizing {
@@ -372,75 +373,48 @@ impl LayoutEngine {
             }
         };
 
+        // For stretch alignment: use parent_assigned_border_height if no explicit height
+        if content_height.is_none() {
+            if let Some(assigned_h) = ctx.parent_assigned_border_height {
+                content_height = Some(match node.style.box_sizing {
+                    BoxSizing::ContentBox => assigned_h,
+                    BoxSizing::BorderBox => {
+                        (assigned_h - padding.1 - padding.3 - border.1 - border.3).max(0.0)
+                    }
+                });
+            }
+        }
+
         let mut previous_margin_bottom = 0.0f32;
 
         // Arrange children vertically
         for (i, child) in node.children.iter_mut().enumerate() {
-            let margin_left_auto = child.style.spacing.margin_left == Length::Auto;
-            let margin_right_auto = child.style.spacing.margin_right == Length::Auto;
-
-            let _child_x = if margin_left_auto && margin_right_auto {
-                // Auto margin centering
-                let child_width = child
-                    .style
-                    .size
-                    .width
-                    .resolve_with(Some(content_width), ctx.viewport_width)
-                    .unwrap_or(0.0);
-                origin.0 + (content_width - child_width) / 2.0
-            } else {
-                origin.0 // Let child handle its own margins
+            let child_ctx = LayoutContext {
+                containing_block_width: Some(content_width),
+                containing_block_height: content_height,
+                ..*ctx
             };
 
-            // Handle margin collapsing for adjacent block elements
-            if i > 0 {
-                let child_margin_top = child
-                    .style
-                    .spacing
-                    .margin_top
-                    .resolve_with(Some(content_width), ctx.viewport_width)
-                    .unwrap_or(0.0);
-
-                // Collapse margins: use the maximum of adjacent margins
-                let collapsed_margin = previous_margin_bottom.max(child_margin_top);
-
-                // Position child accounting for collapsed margin
-                let _cursor_y = cursor_y + collapsed_margin;
-            }
-
-            // For block layout children, remove vertical margins since parent controls positioning
-            let original_style = child.style.clone();
-            if !intrinsic_pass {
-                child.style.spacing.margin_top = Length::Px(0.0);
-                child.style.spacing.margin_bottom = Length::Px(0.0);
-            }
+            // Apply margin collapsing for adjacent block elements
+            let (_child_margins, child_margin_bottom) = resolve_margins_with_collapsing(
+                &child.style.spacing,
+                &child_ctx,
+                if i > 0 { previous_margin_bottom } else { 0.0 },
+            );
 
             let ((_, child_end_y), _) = self.layout_node(
                 child,
                 intrinsic_pass,
                 (0.0, 0.0), // Layout child at origin
                 0.0,
-                &LayoutContext {
-                    containing_block_width: Some(content_width),
-                    containing_block_height: None,
-                    ..*ctx
-                },
+                &child_ctx,
             );
 
-            // Restore original style
-            if !intrinsic_pass {
-                child.style = original_style;
-            }
-
-            // Store the margin-bottom of this child for next iteration
-            previous_margin_bottom = child
-                .style
-                .spacing
-                .margin_bottom
-                .resolve_with(Some(content_width), ctx.viewport_width)
-                .unwrap_or(0.0);
-
+            // Update cursor_y to track layout progression
             cursor_y = child_end_y;
+
+            // Store the margin-bottom for margin collapsing with next sibling
+            previous_margin_bottom = child_margin_bottom;
         }
 
         // Apply min/max constraints to content size
@@ -930,25 +904,7 @@ impl LayoutEngine {
                 parent_assigned_border_height: new_height,
             };
 
-            // For flex items, set the resolved size and keep it
-            let has_flex_properties = child.style.item_style.flex_grow > 0.0
-                || child.style.item_style.flex_shrink != 1.0
-                || child.style.item_style.flex_basis != Length::Auto;
-
-            if has_flex_properties {
-                match axis {
-                    Axis::Horizontal => {
-                        child.style.size.width = Length::Px(flex_item.final_main_size);
-                    }
-                    Axis::Vertical => {
-                        child.style.size.height = Length::Px(flex_item.final_main_size);
-                    }
-                }
-            }
-
             self.layout_node(child, false, (0.0, 0.0), 0.0, &flex_ctx);
-
-            // Don't restore the original style for flex properties - keep the resolved size
         }
 
         // Phase 4: Handle cross-axis alignment (stretch)
@@ -1074,7 +1030,7 @@ impl LayoutEngine {
         }
     }
 
-    fn shrink_flex_items(flex_items: &mut [FlexItem], deficit: f32) {
+    fn shrink_flex_items(flex_items: &mut [FlexItem], mut remaining_deficit: f32) {
         // Calculate total scaled flex shrink factor
         let total_scaled_shrink: f32 = flex_items
             .iter()
@@ -1089,22 +1045,63 @@ impl LayoutEngine {
             return;
         }
 
-        let remaining_deficit = deficit;
+        // First pass: calculate shrink amounts and track violations
+        let mut violations = vec![false; flex_items.len()];
+        let mut has_violations = true;
 
-        for item in flex_items.iter_mut() {
-            if item.flex_shrink == 0.0 {
-                item.final_main_size = item.base_size;
-                continue;
+        while has_violations && remaining_deficit > 0.001 {
+            has_violations = false;
+            let mut total_scaled = 0.0f32;
+
+            // Recalculate total scaled shrink without violated items
+            for (i, item) in flex_items.iter().enumerate() {
+                if !violations[i] && item.flex_shrink > 0.0 {
+                    total_scaled += item.base_size * item.flex_shrink;
+                }
             }
 
-            let scaled_shrink = item.base_size * item.flex_shrink;
-            let shrink_ratio = scaled_shrink / total_scaled_shrink;
-            let shrink_amount = remaining_deficit * shrink_ratio;
-            let target_size = item.base_size - shrink_amount;
+            if total_scaled < 0.001 {
+                // All items have been reduced to minimum
+                break;
+            }
 
-            // Apply min constraint (can't shrink below min)
-            let constrained_size = clamp(target_size, item.min_main, Some(item.base_size));
-            item.final_main_size = constrained_size;
+            // Apply shrink to non-violated items
+            for (i, item) in flex_items.iter_mut().enumerate() {
+                if violations[i] {
+                    continue;
+                }
+
+                if item.flex_shrink == 0.0 {
+                    item.final_main_size = item.base_size;
+                    continue;
+                }
+
+                let scaled_shrink = item.base_size * item.flex_shrink;
+                let shrink_ratio = scaled_shrink / total_scaled;
+                let shrink_amount = remaining_deficit * shrink_ratio;
+                let target_size = item.base_size - shrink_amount;
+
+                // Apply min constraint
+                if let Some(min) = item.min_main {
+                    if target_size < min {
+                        item.final_main_size = min;
+                        remaining_deficit -= item.base_size - min;
+                        violations[i] = true;
+                        has_violations = true;
+                    } else {
+                        item.final_main_size = target_size;
+                    }
+                } else {
+                    item.final_main_size = target_size.max(0.0);
+                }
+            }
+        }
+
+        // Ensure all items have final sizes set
+        for (i, item) in flex_items.iter_mut().enumerate() {
+            if !violations[i] || item.final_main_size == 0.0 {
+                item.final_main_size = item.final_main_size.max(item.min_main.unwrap_or(0.0));
+            }
         }
     }
 
@@ -1517,6 +1514,20 @@ fn resolve_margins(spacing: &Spacing, ctx: &LayoutContext) -> (f32, f32, f32, f3
             .margin_bottom
             .resolve_with(ctx.containing_block_height, ctx.viewport_height)
             .unwrap_or(0.0),
+    )
+}
+
+fn resolve_margins_with_collapsing(
+    spacing: &Spacing,
+    ctx: &LayoutContext,
+    previous_margin_bottom: f32,
+) -> ((f32, f32, f32, f32), f32) {
+    let margins = resolve_margins(spacing, ctx);
+    // Margin collapsing: use the maximum of current margin_top and previous_margin_bottom
+    let collapsed_margin_top = margins.1.max(previous_margin_bottom);
+    (
+        (margins.0, collapsed_margin_top, margins.2, margins.3),
+        margins.3,
     )
 }
 
