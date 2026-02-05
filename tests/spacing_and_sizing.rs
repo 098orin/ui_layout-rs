@@ -245,8 +245,8 @@ fn percentage_padding() {
         spacing: Spacing {
             padding_left: Length::Percent(10.0),  // 10% of width = 20px
             padding_right: Length::Percent(5.0),  // 5% of width = 10px
-            padding_top: Length::Percent(10.0), // 10% of width = 20px (CSS spec: all padding % relative to width)
-            padding_bottom: Length::Percent(5.0), // 5% of width = 10px (CSS spec: all padding % relative to width)
+            padding_top: Length::Percent(10.0),   // 10% of width = 20px
+            padding_bottom: Length::Percent(5.0), // 5% of width = 10px
             ..Default::default()
         },
         ..Default::default()
@@ -262,7 +262,7 @@ fn percentage_padding() {
 
             // Padding box should include percentage padding
             assert_eq!(box_model.padding_box.width, 230.0); // 200 + 20 + 10
-            assert_eq!(box_model.padding_box.height, 130.0); // 100 + 20 + 10 (all % relative to width per CSS spec)
+            assert_eq!(box_model.padding_box.height, 130.0); // 100 + 20 + 10
         }
         _ => panic!("Expected single box model"),
     }
@@ -280,7 +280,7 @@ fn viewport_relative_sizing() {
             margin_left: Length::Vw(5.0),  // 5% of 800px = 40px
             margin_top: Length::Vh(10.0),  // 10% of 600px = 60px
             padding_left: Length::Vw(2.5), // 2.5% of 800px = 20px
-            padding_top: Length::Vw(2.5), // 2.5% of 800px = 20px (CSS spec: all padding % relative to width)
+            padding_top: Length::Vw(2.5),  // 2.5% of 800px = 20px
             ..Default::default()
         },
         ..Default::default()
@@ -300,7 +300,7 @@ fn viewport_relative_sizing() {
 
             // Padding should be viewport-relative
             assert_eq!(box_model.padding_box.width, 420.0); // 400 + 20
-            assert_eq!(box_model.padding_box.height, 170.0); // 150 + 20 (padding % relative to width per CSS spec)
+            assert_eq!(box_model.padding_box.height, 170.0); // 150 + 20
         }
         _ => panic!("Expected single box model"),
     }
@@ -338,7 +338,7 @@ fn complex_spacing_calculation() {
 
     match &root.layout_boxes {
         LayoutBoxes::Single(box_model) => {
-            // Content box should be specified size (content box sizing)
+            // Content box should be specified size
             assert_eq!(box_model.content_box.width, 300.0);
             assert_eq!(box_model.content_box.height, 200.0);
 
@@ -464,8 +464,8 @@ fn auto_width_single_child() {
 
     match &root.layout_boxes {
         LayoutBoxes::Single(box_model) => {
-            // Parent with Auto width should adopt the child's width
-            assert_eq!(box_model.content_box.width, 150.0);
+            // Width should match containing block width
+            assert_eq!(box_model.content_box.width, 800.0);
             assert_eq!(box_model.content_box.height, 100.0);
         }
         _ => panic!("Expected single box model"),
@@ -543,8 +543,8 @@ fn auto_width_multiple_children() {
 
     match &root.layout_boxes {
         LayoutBoxes::Single(box_model) => {
-            // Parent with Auto width should adopt the largest child's width
-            assert_eq!(box_model.content_box.width, 120.0);
+            // Width should match containing block width
+            assert_eq!(box_model.content_box.width, 800.0);
             assert_eq!(box_model.content_box.height, 100.0);
         }
         _ => panic!("Expected single box model"),
@@ -629,12 +629,12 @@ fn auto_width_with_padding() {
 
     match &root.layout_boxes {
         LayoutBoxes::Single(box_model) => {
-            // Content box should include child size
-            assert_eq!(box_model.content_box.width, 100.0);
+            // Width should match containing block width
+            assert_eq!(box_model.content_box.width, 800.0);
             assert_eq!(box_model.content_box.height, 100.0);
 
             // Padding box should include padding
-            assert_eq!(box_model.padding_box.width, 125.0); // 100 + 10 + 15
+            assert_eq!(box_model.padding_box.width, 825.0); // 800 + 10 + 15
             assert_eq!(box_model.padding_box.height, 113.0); // 100 + 5 + 8
         }
         _ => panic!("Expected single box model"),
@@ -721,16 +721,16 @@ fn auto_width_with_border() {
 
     match &root.layout_boxes {
         LayoutBoxes::Single(box_model) => {
-            // Content box should include child size
-            assert_eq!(box_model.content_box.width, 100.0);
+            // Width should match containing block width
+            assert_eq!(box_model.content_box.width, 800.0);
             assert_eq!(box_model.content_box.height, 100.0);
 
             // Padding box should be same as content box (no padding)
-            assert_eq!(box_model.padding_box.width, 100.0);
+            assert_eq!(box_model.padding_box.width, 800.0);
             assert_eq!(box_model.padding_box.height, 100.0);
 
             // Border box should include borders
-            assert_eq!(box_model.border_box.width, 107.0); // 100 + 3 + 4
+            assert_eq!(box_model.border_box.width, 807.0); // 800 + 3 + 4
             assert_eq!(box_model.border_box.height, 104.0); // 100 + 2 + 2
         }
         _ => panic!("Expected single box model"),
@@ -825,16 +825,16 @@ fn auto_sizing_with_padding_and_border() {
 
     match &root.layout_boxes {
         LayoutBoxes::Single(box_model) => {
-            // Content box should be based on child size
-            assert_eq!(box_model.content_box.width, 80.0);
+            // Width should match containing block width
+            assert_eq!(box_model.content_box.width, 800.0);
             assert_eq!(box_model.content_box.height, 60.0);
 
             // Padding box should include padding
-            assert_eq!(box_model.padding_box.width, 100.0); // 80 + 10 + 10
+            assert_eq!(box_model.padding_box.width, 820.0); // 800 + 10 + 10
             assert_eq!(box_model.padding_box.height, 76.0); // 60 + 8 + 8
 
             // Border box should include borders
-            assert_eq!(box_model.border_box.width, 104.0); // 100 + 2 + 2
+            assert_eq!(box_model.border_box.width, 824.0); // 820 + 2 + 2
             assert_eq!(box_model.border_box.height, 78.0); // 76 + 1 + 1
         }
         _ => panic!("Expected single box model"),
@@ -888,6 +888,416 @@ fn padding_border_size_verification() {
             assert_eq!(box_model.padding_box.height, 175.0); // 150 + 25
             assert_eq!(box_model.border_box.width, 235.0); // 230 + 5
             assert_eq!(box_model.border_box.height, 180.0); // 175 + 5
+        }
+        _ => panic!("Expected single box model"),
+    }
+}
+
+#[test]
+fn auto_width_with_child_margins() {
+    let child = LayoutNode::new(Style {
+        size: SizeStyle {
+            width: Length::Px(100.0),
+            height: Length::Px(50.0),
+            ..Default::default()
+        },
+        spacing: Spacing {
+            margin_left: Length::Px(10.0),
+            margin_right: Length::Px(15.0),
+            margin_top: Length::Px(5.0),
+            margin_bottom: Length::Px(5.0),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: Length::Auto,
+                height: Length::Px(100.0),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        vec![child],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    match &root.layout_boxes {
+        LayoutBoxes::Single(box_model) => {
+            // Width should match containing block width
+            assert_eq!(box_model.content_box.width, 800.0);
+            assert_eq!(box_model.content_box.height, 100.0);
+        }
+        _ => panic!("Expected single box model"),
+    }
+}
+
+#[test]
+fn auto_width_with_child_padding() {
+    let child = LayoutNode::new(Style {
+        size: SizeStyle {
+            width: Length::Px(100.0),
+            height: Length::Px(50.0),
+            ..Default::default()
+        },
+        spacing: Spacing {
+            padding_left: Length::Px(10.0),
+            padding_right: Length::Px(15.0),
+            padding_top: Length::Px(5.0),
+            padding_bottom: Length::Px(5.0),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: Length::Auto,
+                height: Length::Px(100.0),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        vec![child],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    match &root.layout_boxes {
+        LayoutBoxes::Single(box_model) => {
+            // Width should match containing block width
+            assert_eq!(box_model.content_box.width, 800.0);
+            assert_eq!(box_model.content_box.height, 100.0);
+        }
+        _ => panic!("Expected single box model"),
+    }
+}
+
+#[test]
+fn auto_width_with_child_border() {
+    let child = LayoutNode::new(Style {
+        size: SizeStyle {
+            width: Length::Px(100.0),
+            height: Length::Px(50.0),
+            ..Default::default()
+        },
+        spacing: Spacing {
+            border_left: Length::Px(2.0),
+            border_right: Length::Px(3.0),
+            border_top: Length::Px(1.0),
+            border_bottom: Length::Px(1.0),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: Length::Auto,
+                height: Length::Px(100.0),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        vec![child],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    match &root.layout_boxes {
+        LayoutBoxes::Single(box_model) => {
+            // Width should match containing block width
+            assert_eq!(box_model.content_box.width, 800.0);
+            assert_eq!(box_model.content_box.height, 100.0);
+        }
+        _ => panic!("Expected single box model"),
+    }
+}
+
+#[test]
+fn auto_width_with_multiple_children_different_sizes() {
+    let child1 = LayoutNode::new(Style {
+        size: SizeStyle {
+            width: Length::Px(100.0),
+            height: Length::Px(50.0),
+            ..Default::default()
+        },
+        spacing: Spacing {
+            margin_left: Length::Px(5.0),
+            margin_right: Length::Px(5.0),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let child2 = LayoutNode::new(Style {
+        size: SizeStyle {
+            width: Length::Px(80.0),
+            height: Length::Px(50.0),
+            ..Default::default()
+        },
+        spacing: Spacing {
+            margin_left: Length::Px(10.0),
+            margin_right: Length::Px(10.0),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: Length::Auto,
+                height: Length::Px(100.0),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        vec![child1, child2],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    match &root.layout_boxes {
+        LayoutBoxes::Single(box_model) => {
+            // Width should match containing block width
+            assert_eq!(box_model.content_box.width, 800.0);
+            assert_eq!(box_model.content_box.height, 100.0);
+        }
+        _ => panic!("Expected single box model"),
+    }
+}
+
+#[test]
+fn auto_width_with_parent_padding() {
+    let child = LayoutNode::new(Style {
+        size: SizeStyle {
+            width: Length::Px(100.0),
+            height: Length::Px(50.0),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: Length::Auto,
+                height: Length::Px(100.0),
+                ..Default::default()
+            },
+            spacing: Spacing {
+                padding_left: Length::Px(10.0),
+                padding_right: Length::Px(15.0),
+                padding_top: Length::Px(5.0),
+                padding_bottom: Length::Px(5.0),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        vec![child],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    match &root.layout_boxes {
+        LayoutBoxes::Single(box_model) => {
+            // Width should match containing block width
+            assert_eq!(box_model.content_box.width, 800.0);
+            assert_eq!(box_model.content_box.height, 100.0);
+
+            // Padding box should include parent's padding
+            assert_eq!(box_model.padding_box.width, 825.0); // 800 + 10 + 15
+            assert_eq!(box_model.padding_box.height, 110.0); // 100 + 5 + 5
+        }
+        _ => panic!("Expected single box model"),
+    }
+}
+
+#[test]
+fn auto_width_with_parent_border() {
+    let child = LayoutNode::new(Style {
+        size: SizeStyle {
+            width: Length::Px(100.0),
+            height: Length::Px(50.0),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: Length::Auto,
+                height: Length::Px(100.0),
+                ..Default::default()
+            },
+            spacing: Spacing {
+                border_left: Length::Px(2.0),
+                border_right: Length::Px(3.0),
+                border_top: Length::Px(1.0),
+                border_bottom: Length::Px(1.0),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        vec![child],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    match &root.layout_boxes {
+        LayoutBoxes::Single(box_model) => {
+            // Width should match containing block width
+            assert_eq!(box_model.content_box.width, 800.0);
+            assert_eq!(box_model.content_box.height, 100.0);
+
+            // Padding box should be same as content (no padding)
+            assert_eq!(box_model.padding_box.width, 800.0);
+            assert_eq!(box_model.padding_box.height, 100.0);
+
+            // Border box should include parent's border
+            assert_eq!(box_model.border_box.width, 805.0); // 800 + 2 + 3
+            assert_eq!(box_model.border_box.height, 102.0); // 100 + 1 + 1
+        }
+        _ => panic!("Expected single box model"),
+    }
+}
+
+#[test]
+fn auto_width_nested_blocks() {
+    let grandchild = LayoutNode::new(Style {
+        size: SizeStyle {
+            width: Length::Px(80.0),
+            height: Length::Px(30.0),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let child = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: Length::Auto,
+                height: Length::Px(50.0),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        vec![grandchild],
+    );
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: Length::Auto,
+                height: Length::Px(100.0),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        vec![child],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    // Check grandchild
+    match &root.children[0].children[0].layout_boxes {
+        LayoutBoxes::Single(box_model) => {
+            assert_eq!(box_model.content_box.width, 80.0);
+            assert_eq!(box_model.content_box.height, 30.0);
+        }
+        _ => panic!("Expected single box model for grandchild"),
+    }
+
+    // Check child (width uses containing block width from root)
+    match &root.children[0].layout_boxes {
+        LayoutBoxes::Single(box_model) => {
+            assert_eq!(box_model.content_box.width, 800.0);
+            assert_eq!(box_model.content_box.height, 50.0);
+        }
+        _ => panic!("Expected single box model for child"),
+    }
+
+    // Check root (width uses viewport width)
+    match &root.layout_boxes {
+        LayoutBoxes::Single(box_model) => {
+            assert_eq!(box_model.content_box.width, 800.0);
+            assert_eq!(box_model.content_box.height, 100.0);
+        }
+        _ => panic!("Expected single box model for root"),
+    }
+}
+
+#[test]
+fn auto_width_empty_container() {
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: Length::Auto,
+                height: Length::Px(100.0),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        vec![],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    match &root.layout_boxes {
+        LayoutBoxes::Single(box_model) => {
+            // Width should match containing block width
+            assert_eq!(box_model.content_box.width, 800.0);
+            assert_eq!(box_model.content_box.height, 100.0);
+        }
+        _ => panic!("Expected single box model"),
+    }
+}
+
+#[test]
+fn auto_width_with_border_box_sizing() {
+    let child = LayoutNode::new(Style {
+        size: SizeStyle {
+            width: Length::Px(100.0),
+            height: Length::Px(50.0),
+            ..Default::default()
+        },
+        spacing: Spacing {
+            padding_left: Length::Px(10.0),
+            padding_right: Length::Px(10.0),
+            border_left: Length::Px(2.0),
+            border_right: Length::Px(2.0),
+            ..Default::default()
+        },
+        box_sizing: BoxSizing::BorderBox,
+        ..Default::default()
+    });
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: Length::Auto,
+                height: Length::Px(100.0),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        vec![child],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    match &root.layout_boxes {
+        LayoutBoxes::Single(box_model) => {
+            // Width should match containing block width
+            assert_eq!(box_model.content_box.width, 800.0);
+            assert_eq!(box_model.content_box.height, 100.0);
         }
         _ => panic!("Expected single box model"),
     }
