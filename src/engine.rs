@@ -3,6 +3,31 @@ use crate::{
     JustifyContent, LayoutBoxes, LayoutNode, Length, Rect, Spacing, Style,
 };
 
+type ContainerSizes = (
+    Option<f32>,
+    Option<f32>,
+    (f32, f32, f32, f32),
+    (f32, f32, f32, f32),
+);
+
+struct BoxModelParams {
+    content_main: f32,
+    content_cross: f32,
+    axis: Axis,
+    origin: (f32, f32),
+    padding: (f32, f32, f32, f32),
+    border: (f32, f32, f32, f32),
+}
+
+struct FragmentLayoutContext {
+    cursor_x: f32,
+    cursor_y: f32,
+    line_height: f32,
+    max_width: f32,
+    line_index: usize,
+    origin: (f32, f32),
+}
+
 pub(crate) struct LayoutContext {
     pub(crate) containing_block_width: Option<f32>,
     pub(crate) containing_block_height: Option<f32>,
@@ -60,6 +85,17 @@ impl LayoutContext {
 enum Axis {
     Horizontal,
     Vertical,
+}
+
+#[derive(Debug)]
+struct FlexItem {
+    index: usize,
+    base_size: f32,
+    flex_grow: f32,
+    flex_shrink: f32,
+    min_main: Option<f32>,
+    max_main: Option<f32>,
+    final_main_size: f32,
 }
 
 impl Axis {
@@ -147,34 +183,6 @@ impl Axis {
         }
     }
 
-    fn margin_main_start<'a>(&self, spacing: &'a Spacing) -> &'a Length {
-        match self {
-            Axis::Horizontal => &spacing.margin_left,
-            Axis::Vertical => &spacing.margin_top,
-        }
-    }
-
-    fn margin_main_end<'a>(&self, spacing: &'a Spacing) -> &'a Length {
-        match self {
-            Axis::Horizontal => &spacing.margin_right,
-            Axis::Vertical => &spacing.margin_bottom,
-        }
-    }
-
-    fn margin_cross_start<'a>(&self, spacing: &'a Spacing) -> &'a Length {
-        match self {
-            Axis::Horizontal => &spacing.margin_top,
-            Axis::Vertical => &spacing.margin_left,
-        }
-    }
-
-    fn margin_cross_end<'a>(&self, spacing: &'a Spacing) -> &'a Length {
-        match self {
-            Axis::Horizontal => &spacing.margin_bottom,
-            Axis::Vertical => &spacing.margin_right,
-        }
-    }
-
     fn gap<'a>(&self, style: &'a Style) -> &'a Length {
         match self {
             Axis::Horizontal => &style.column_gap,
@@ -196,10 +204,12 @@ impl LayoutEngine {
             parent_assigned_border_height: Some(height),
         };
 
-        Self::layout_node(root, false, (0.0, 0.0), 0.0, &ctx);
+        let engine = LayoutEngine;
+        engine.layout_node(root, false, (0.0, 0.0), 0.0, &ctx);
     }
 
     fn layout_node(
+        &self,
         node: &mut LayoutNode,
         intrinsic_pass: bool,
         origin: (f32, f32),
@@ -220,7 +230,7 @@ impl LayoutEngine {
                 (origin, 0.0)
             }
             Display::Block | Display::Inline | Display::Flex { .. } => {
-                Self::layout_unified_flow(node, intrinsic_pass, origin, incoming_line_height, ctx)
+                self.layout_unified_flow(node, intrinsic_pass, origin, incoming_line_height, ctx)
             }
         };
 
@@ -234,6 +244,7 @@ impl LayoutEngine {
 
     /// Unified Flow layout: handles Block, Inline, and Flex layouts
     fn layout_unified_flow(
+        &self,
         node: &mut LayoutNode,
         intrinsic_pass: bool,
         origin: (f32, f32),
@@ -246,7 +257,7 @@ impl LayoutEngine {
                     FlexDirection::Row => Axis::Horizontal,
                     FlexDirection::Column => Axis::Vertical,
                 };
-                Self::layout_flex_as_flow(
+                self.layout_flex_as_flow(
                     node,
                     axis,
                     intrinsic_pass,
@@ -256,10 +267,10 @@ impl LayoutEngine {
                 )
             }
             Display::Block => {
-                Self::layout_block_flow(node, intrinsic_pass, origin, incoming_line_height, ctx)
+                self.layout_block_flow(node, intrinsic_pass, origin, incoming_line_height, ctx)
             }
             Display::Inline => {
-                Self::layout_inline_flow(node, intrinsic_pass, origin, incoming_line_height, ctx)
+                self.layout_inline_flow(node, intrinsic_pass, origin, incoming_line_height, ctx)
             }
             Display::None => unreachable!(),
         }
@@ -267,6 +278,7 @@ impl LayoutEngine {
 
     /// Handle Flex container as Flow layout
     fn layout_flex_as_flow(
+        &self,
         node: &mut LayoutNode,
         axis: Axis,
         intrinsic_pass: bool,
@@ -276,14 +288,14 @@ impl LayoutEngine {
     ) -> ((f32, f32), f32) {
         // Determine Flex container size
         let (content_main, content_cross, padding, border) =
-            Self::resolve_container_sizes(node, axis, ctx);
+            self.resolve_container_sizes(node, axis, ctx);
 
         // Execute layout for child elements
         let (children_main, children_cross) = if !intrinsic_pass
             || content_main.is_none()
             || content_cross.is_none()
         {
-            Self::layout_flex_children(node, axis, intrinsic_pass, content_main, content_cross, ctx)
+            self.layout_flex_children(node, axis, intrinsic_pass, content_main, content_cross, ctx)
         } else {
             (0.0, 0.0)
         };
@@ -293,21 +305,22 @@ impl LayoutEngine {
         let final_content_cross = content_cross.unwrap_or(children_cross);
 
         // Create box model
-        Self::create_and_set_box_model(
+        self.create_and_set_box_model(
             node,
-            final_content_main,
-            final_content_cross,
-            children_main,
-            children_cross,
-            axis,
-            origin,
-            padding,
-            border,
+            BoxModelParams {
+                content_main: final_content_main,
+                content_cross: final_content_cross,
+                axis,
+                origin,
+                padding,
+                border,
+            },
+            ctx,
         );
 
         // Set child positions (only in non-intrinsic pass)
         if !intrinsic_pass {
-            Self::position_flex_children(node, axis, ctx);
+            self.position_flex_children(node, axis, ctx);
         }
 
         let end_x = origin.0 + node.layout_boxes.width();
@@ -316,7 +329,9 @@ impl LayoutEngine {
     }
 
     /// Block layout
+    /// Handle Block container as Flow layout
     fn layout_block_flow(
+        &self,
         node: &mut LayoutNode,
         intrinsic_pass: bool,
         origin: (f32, f32),
@@ -326,7 +341,7 @@ impl LayoutEngine {
         let mut cursor_y = origin.1;
 
         // Resolve node's own size first
-        let mut content_width = node
+        let specified_width = node
             .style
             .size
             .width
@@ -341,7 +356,7 @@ impl LayoutEngine {
 
         // Resolve padding, border, and margins for constraint calculations
         let ctx_with_width = LayoutContext {
-            containing_block_width: Some(content_width),
+            containing_block_width: Some(specified_width),
             containing_block_height: content_height,
             ..*ctx
         };
@@ -349,12 +364,22 @@ impl LayoutEngine {
         let border = resolve_border(&node.style.spacing, &ctx_with_width);
         let margins = resolve_margins(&node.style.spacing, &ctx_with_width);
 
+        // Calculate actual content width based on box-sizing
+        let mut content_width = match node.style.box_sizing {
+            BoxSizing::ContentBox => specified_width,
+            BoxSizing::BorderBox => {
+                (specified_width - padding.0 - padding.2 - border.0 - border.2).max(0.0)
+            }
+        };
+
+        let mut previous_margin_bottom = 0.0f32;
+
         // Arrange children vertically
-        for child in &mut node.children {
+        for (i, child) in node.children.iter_mut().enumerate() {
             let margin_left_auto = child.style.spacing.margin_left == Length::Auto;
             let margin_right_auto = child.style.spacing.margin_right == Length::Auto;
 
-            let child_x = if margin_left_auto && margin_right_auto {
+            let _child_x = if margin_left_auto && margin_right_auto {
                 // Auto margin centering
                 let child_width = child
                     .style
@@ -367,10 +392,33 @@ impl LayoutEngine {
                 origin.0 // Let child handle its own margins
             };
 
-            let ((_, child_end_y), _) = Self::layout_node(
+            // Handle margin collapsing for adjacent block elements
+            if i > 0 {
+                let child_margin_top = child
+                    .style
+                    .spacing
+                    .margin_top
+                    .resolve_with(Some(content_width), ctx.viewport_width)
+                    .unwrap_or(0.0);
+
+                // Collapse margins: use the maximum of adjacent margins
+                let collapsed_margin = previous_margin_bottom.max(child_margin_top);
+
+                // Position child accounting for collapsed margin
+                let _cursor_y = cursor_y + collapsed_margin;
+            }
+
+            // For block layout children, remove vertical margins since parent controls positioning
+            let original_style = child.style.clone();
+            if !intrinsic_pass {
+                child.style.spacing.margin_top = Length::Px(0.0);
+                child.style.spacing.margin_bottom = Length::Px(0.0);
+            }
+
+            let ((_, child_end_y), _) = self.layout_node(
                 child,
                 intrinsic_pass,
-                (child_x, cursor_y),
+                (0.0, 0.0), // Layout child at origin
                 0.0,
                 &LayoutContext {
                     containing_block_width: Some(content_width),
@@ -378,6 +426,20 @@ impl LayoutEngine {
                     ..*ctx
                 },
             );
+
+            // Restore original style
+            if !intrinsic_pass {
+                child.style = original_style;
+            }
+
+            // Store the margin-bottom of this child for next iteration
+            previous_margin_bottom = child
+                .style
+                .spacing
+                .margin_bottom
+                .resolve_with(Some(content_width), ctx.viewport_width)
+                .unwrap_or(0.0);
+
             cursor_y = child_end_y;
         }
 
@@ -431,6 +493,69 @@ impl LayoutEngine {
                 (padding.0, padding.1),
                 (border.0, border.1),
             );
+
+            // Position children relative to parent's content box
+            if !intrinsic_pass {
+                let mut child_y_offset = 0.0;
+                let mut prev_margin_bottom: f32 = 0.0;
+
+                for (i, child) in node.children.iter_mut().enumerate() {
+                    // Get child margins from original style
+                    let child_margin_top = child
+                        .style
+                        .spacing
+                        .margin_top
+                        .resolve_with(Some(final_content_width), ctx.viewport_width)
+                        .unwrap_or(0.0);
+
+                    // Handle auto margins for horizontal centering
+                    let margin_left_auto = child.style.spacing.margin_left == Length::Auto;
+                    let margin_right_auto = child.style.spacing.margin_right == Length::Auto;
+
+                    let child_x = if margin_left_auto && margin_right_auto {
+                        // Auto margin centering
+                        let child_width =
+                            if let LayoutBoxes::Single(ref box_model) = child.layout_boxes {
+                                box_model.border_box.width
+                            } else {
+                                0.0
+                            };
+                        (final_content_width - child_width) / 2.0
+                    } else {
+                        child
+                            .style
+                            .spacing
+                            .margin_left
+                            .resolve_with(Some(final_content_width), ctx.viewport_width)
+                            .unwrap_or(0.0)
+                    };
+
+                    if i > 0 {
+                        // Handle margin collapsing
+                        let collapsed_margin = prev_margin_bottom.max(child_margin_top);
+                        child_y_offset += collapsed_margin;
+                    } else {
+                        // First child: add its top margin
+                        child_y_offset += child_margin_top;
+                    }
+
+                    // Position child relative to parent's content box (0,0)
+                    child.layout_boxes.shift(child_x, child_y_offset);
+
+                    // Update offset for next child
+                    if let LayoutBoxes::Single(ref box_model) = child.layout_boxes {
+                        child_y_offset += box_model.border_box.height;
+                    }
+
+                    // Store margin for next iteration
+                    prev_margin_bottom = child
+                        .style
+                        .spacing
+                        .margin_bottom
+                        .resolve_with(Some(final_content_width), ctx.viewport_width)
+                        .unwrap_or(0.0);
+                }
+            }
         }
 
         let total_width = final_content_width
@@ -455,7 +580,9 @@ impl LayoutEngine {
     }
 
     /// Inline layout
+    /// Handle Inline container as Flow layout
     fn layout_inline_flow(
+        &self,
         node: &mut LayoutNode,
         intrinsic_pass: bool,
         origin: (f32, f32),
@@ -514,16 +641,19 @@ impl LayoutEngine {
                         }
                     }
                 } else {
-                    Self::layout_fragment(
-                        frag,
-                        &mut cursor_x,
-                        &mut cursor_y,
-                        &mut line_height,
+                    let mut ctx = FragmentLayoutContext {
+                        cursor_x,
+                        cursor_y,
+                        line_height,
                         max_width,
-                        &mut node.placements,
-                        &mut line_index,
-                        (content_start_x, content_start_y),
-                    );
+                        line_index,
+                        origin: (content_start_x, content_start_y),
+                    };
+                    self.layout_fragment(frag, &mut ctx, &mut node.placements);
+                    cursor_x = ctx.cursor_x;
+                    cursor_y = ctx.cursor_y;
+                    line_height = ctx.line_height;
+                    line_index = ctx.line_index;
                 }
             }
 
@@ -566,154 +696,88 @@ impl LayoutEngine {
                 (origin.0 + total_width, origin.1 + total_height),
                 total_height,
             );
-        } else {
-            // Empty inline element - still create box model with spacing
-            let content_width = 0.0;
-            let content_height = 0.0;
-
-            node.layout_boxes = LayoutBoxes::Single(create_box_model(
-                content_width,
-                content_height,
-                content_width,
-                content_height,
-                padding,
-                border,
-            ));
-
-            if let LayoutBoxes::Single(ref mut box_model) = node.layout_boxes {
-                let pos_x = origin.0 + margins.0;
-                let pos_y = origin.1 + margins.1;
-                set_position(
-                    box_model,
-                    (pos_x, pos_y),
-                    (padding.0, padding.1),
-                    (border.0, border.1),
-                );
-            }
-
-            let total_width =
-                content_width + padding.0 + padding.2 + border.0 + border.2 + margins.0 + margins.2;
-            let total_height = content_height
-                + padding.1
-                + padding.3
-                + border.1
-                + border.3
-                + margins.1
-                + margins.3;
-
-            return (
-                (origin.0 + total_width, origin.1 + total_height),
-                total_height,
-            );
         }
 
-        // Inline layout for child elements
-        for child in &mut node.children {
-            match child.style.display {
-                Display::Inline => {
-                    let ((next_x, next_y), next_lh) = Self::layout_node(
-                        child,
-                        intrinsic_pass,
-                        (cursor_x, cursor_y),
-                        line_height,
-                        ctx,
-                    );
-                    cursor_x = next_x;
-                    cursor_y = next_y;
-                    line_height = next_lh;
-                }
-                Display::Block | Display::Flex { .. } => {
-                    // Block elements force line break
-                    if cursor_x > origin.0 {
-                        cursor_x = origin.0;
-                        cursor_y += line_height;
-                        line_height = 0.0;
-                        line_index += 1;
-                    }
-
-                    let ((_, child_end_y), _) =
-                        Self::layout_node(child, intrinsic_pass, (origin.0, cursor_y), 0.0, ctx);
-
-                    cursor_y = child_end_y;
-                    cursor_x = origin.0;
-                    line_height = 0.0;
-                }
-                Display::None => {}
-            }
-        }
-
-        // Container inline layout - handle mixed content
-        let container_height = cursor_y - origin.1 + line_height;
+        // Empty inline element - still create box model with spacing
+        let content_width = 0.0;
+        let content_height = 0.0;
 
         node.layout_boxes = LayoutBoxes::Single(create_box_model(
-            cursor_x - origin.0,
-            container_height,
-            cursor_x - origin.0,
-            container_height,
-            (0.0, 0.0, 0.0, 0.0),
-            (0.0, 0.0, 0.0, 0.0),
+            content_width,
+            content_height,
+            content_width,
+            content_height,
+            padding,
+            border,
         ));
 
         if let LayoutBoxes::Single(ref mut box_model) = node.layout_boxes {
-            set_position(box_model, origin, (0.0, 0.0), (0.0, 0.0));
+            let pos_x = origin.0 + margins.0;
+            let pos_y = origin.1 + margins.1;
+            set_position(
+                box_model,
+                (pos_x, pos_y),
+                (padding.0, padding.1),
+                (border.0, border.1),
+            );
         }
 
-        ((cursor_x, cursor_y), line_height)
+        let total_width =
+            content_width + padding.0 + padding.2 + border.0 + border.2 + margins.0 + margins.2;
+        let total_height =
+            content_height + padding.1 + padding.3 + border.1 + border.3 + margins.1 + margins.3;
+
+        (
+            (origin.0 + total_width, origin.1 + total_height),
+            total_height,
+        )
     }
 
     fn layout_fragment(
+        &self,
         frag: &ItemFragment,
-        cursor_x: &mut f32,
-        cursor_y: &mut f32,
-        line_height: &mut f32,
-        max_width: f32,
+        ctx: &mut FragmentLayoutContext,
         placements: &mut Vec<FragmentPlacement>,
-        line_index: &mut usize,
-        origin: (f32, f32),
     ) {
         match frag {
             ItemFragment::LineBreak => {
-                *cursor_x = origin.0;
-                *cursor_y += *line_height;
-                *line_height = 0.0;
-                *line_index += 1;
+                ctx.cursor_x = ctx.origin.0;
+                ctx.cursor_y += ctx.line_height;
+                ctx.line_height = 0.0;
+                ctx.line_index += 1;
 
                 placements.push(FragmentPlacement {
-                    offset: (*cursor_x - origin.0, *cursor_y - origin.1),
-                    line_index: *line_index,
+                    offset: (ctx.cursor_x - ctx.origin.0, ctx.cursor_y - ctx.origin.1),
+                    line_index: ctx.line_index,
                 });
             }
             ItemFragment::Fragment(f) => {
                 // Check for line wrapping
-                if *cursor_x + f.width > max_width && *cursor_x > origin.0 {
-                    *cursor_x = origin.0;
-                    *cursor_y += *line_height;
-                    *line_height = 0.0;
-                    *line_index += 1;
+                if ctx.cursor_x + f.width > ctx.max_width && ctx.cursor_x > ctx.origin.0 {
+                    ctx.cursor_x = ctx.origin.0;
+                    ctx.cursor_y += ctx.line_height;
+                    ctx.line_height = 0.0;
+                    ctx.line_index += 1;
                 }
 
                 placements.push(FragmentPlacement {
-                    offset: (*cursor_x - origin.0, *cursor_y - origin.1),
-                    line_index: *line_index,
+                    offset: (ctx.cursor_x - ctx.origin.0, ctx.cursor_y - ctx.origin.1),
+                    line_index: ctx.line_index,
                 });
 
-                *cursor_x += f.width;
-                *line_height = line_height.max(f.height);
+                ctx.cursor_x += f.width;
+                ctx.line_height = ctx.line_height.max(f.height);
             }
         }
     }
 
     /// Resolve Flex container sizes
     fn resolve_container_sizes(
+        &self,
         node: &LayoutNode,
         axis: Axis,
         ctx: &LayoutContext,
-    ) -> (
-        Option<f32>,
-        Option<f32>,
-        (f32, f32, f32, f32),
-        (f32, f32, f32, f32),
-    ) {
+    ) -> ContainerSizes {
         let vm = ctx.viewport_main(axis);
         let vc = ctx.viewport_cross(axis);
         let cbm = ctx.containing_block_main(axis);
@@ -781,6 +845,7 @@ impl LayoutEngine {
 
     /// Layout of Flex child elements
     fn layout_flex_children(
+        &self,
         node: &mut LayoutNode,
         axis: Axis,
         _intrinsic_pass: bool,
@@ -794,23 +859,12 @@ impl LayoutEngine {
             Axis::Vertical => (container_cross, container_main),
         };
 
-        let child_ctx = LayoutContext {
-            containing_block_width: content_width_hint,
-            containing_block_height: content_height_hint,
-            viewport_width: ctx.viewport_width,
-            viewport_height: ctx.viewport_height,
-            parent_assigned_border_width: content_width_hint,
-            parent_assigned_border_height: content_height_hint,
-        };
-
-        let mut total_main = 0.0;
-        let mut max_cross: f32 = 0.0;
         let mut flex_items = Vec::new();
-        let mut fixed_items_main = 0.0;
+        let mut max_cross = 0.0f32;
 
-        // First phase: layout children with intrinsic sizes
+        // Phase 1: Determine flex basis and intrinsic sizes
         for (i, child) in node.children.iter_mut().enumerate() {
-            // Use basic layout context first
+            // Initial layout to get intrinsic sizes
             let basic_ctx = LayoutContext {
                 containing_block_width: content_width_hint,
                 containing_block_height: content_height_hint,
@@ -820,140 +874,99 @@ impl LayoutEngine {
                 parent_assigned_border_height: None,
             };
 
-            let ((_, _), _) = Self::layout_node(child, true, (0.0, 0.0), 0.0, &basic_ctx);
+            self.layout_node(child, true, (0.0, 0.0), 0.0, &basic_ctx);
 
-            let mut child_main = if let LayoutBoxes::Single(ref box_model) = child.layout_boxes {
-                axis.main(&box_model.border_box)
-            } else {
-                0.0
-            };
-            let child_cross = if let LayoutBoxes::Single(ref box_model) = child.layout_boxes {
-                axis.cross(&box_model.border_box)
-            } else {
-                0.0
-            };
+            // Calculate base size (flex-basis or intrinsic size)
+            let base_size =
+                LayoutEngine::calculate_flex_base_size(child, axis, content_width_hint, ctx);
 
-            // Apply min/max constraints to child size
+            // Get min/max constraints
             let min_main = axis
                 .min_main(&child.style.size)
                 .resolve_with(content_width_hint, ctx.viewport_main(axis));
             let max_main = axis
                 .max_main(&child.style.size)
                 .resolve_with(content_width_hint, ctx.viewport_main(axis));
-            child_main = clamp(child_main, min_main, max_main);
 
-            if child.style.item_style.flex_grow > 0.0 {
-                flex_items.push((i, child_main));
+            let cross_size = if let LayoutBoxes::Single(ref box_model) = child.layout_boxes {
+                axis.cross(&box_model.border_box)
             } else {
-                fixed_items_main += child_main;
-            }
+                0.0
+            };
 
-            max_cross = max_cross.max(child_cross);
+            max_cross = max_cross.max(cross_size);
+
+            flex_items.push(FlexItem {
+                index: i,
+                base_size: clamp(base_size, min_main, max_main),
+                flex_grow: child.style.item_style.flex_grow,
+                flex_shrink: child.style.item_style.flex_shrink,
+                min_main,
+                max_main,
+                final_main_size: base_size,
+            });
         }
 
-        total_main = fixed_items_main;
-
-        // Flex grow processing
-        if let Some(available_main) = container_main {
-            let total_flex_grow: f32 = flex_items
-                .iter()
-                .map(|(i, _)| node.children[*i].style.item_style.flex_grow)
-                .sum();
-
-            if total_flex_grow > 0.0 && !flex_items.is_empty() {
-                let remaining_space = (available_main - fixed_items_main).max(0.0);
-
-                for (i, _) in &flex_items {
-                    let child = &node.children[*i];
-                    let flex_grow = child.style.item_style.flex_grow;
-                    let mut flex_size = remaining_space * flex_grow / total_flex_grow;
-
-                    // Apply min/max constraints to flex size
-                    let min_main = axis
-                        .min_main(&child.style.size)
-                        .resolve_with(content_width_hint, ctx.viewport_main(axis));
-                    let max_main = axis
-                        .max_main(&child.style.size)
-                        .resolve_with(content_width_hint, ctx.viewport_main(axis));
-                    flex_size = clamp(flex_size, min_main, max_main);
-
-                    // Update child with new flex size
-                    let (new_width, new_height) = match axis {
-                        Axis::Horizontal => (Some(flex_size), content_height_hint),
-                        Axis::Vertical => (content_width_hint, Some(flex_size)),
-                    };
-
-                    let flex_ctx = LayoutContext {
-                        containing_block_width: new_width,
-                        containing_block_height: new_height,
-                        viewport_width: ctx.viewport_width,
-                        viewport_height: ctx.viewport_height,
-                        parent_assigned_border_width: new_width,
-                        parent_assigned_border_height: new_height,
-                    };
-
-                    Self::layout_node(&mut node.children[*i], true, (0.0, 0.0), 0.0, &flex_ctx);
-                }
-                total_main = available_main;
-            } else {
-                total_main = fixed_items_main;
-            }
+        // Phase 2: Resolve flexible lengths
+        if let Some(container_main_size) = container_main {
+            LayoutEngine::resolve_flexible_lengths(&mut flex_items, container_main_size);
         }
 
-        // Apply stretch for cross axis
-        {
-            let container_cross_size = container_cross.unwrap_or(max_cross);
-            for child in &mut node.children {
-                let align = child
-                    .style
-                    .item_style
-                    .align_self
-                    .unwrap_or(node.style.align_items);
-                if align == crate::AlignItems::Stretch {
-                    // Check if the child has an explicit cross-axis size (not Auto)
-                    let should_stretch = match axis {
-                        Axis::Horizontal => child.style.size.height == Length::Auto,
-                        Axis::Vertical => child.style.size.width == Length::Auto,
-                    };
+        // Phase 3: Layout children with resolved sizes
+        for flex_item in &flex_items {
+            let child = &mut node.children[flex_item.index];
 
-                    // Only stretch if the child has Auto cross-axis size
-                    if should_stretch {
-                        // Get current main size of the child after flex grow
-                        let current_main =
-                            if let LayoutBoxes::Single(ref box_model) = child.layout_boxes {
-                                axis.main(&box_model.border_box)
-                            } else {
-                                0.0
-                            };
+            let (new_width, new_height) = match axis {
+                Axis::Horizontal => (Some(flex_item.final_main_size), content_height_hint),
+                Axis::Vertical => (content_width_hint, Some(flex_item.final_main_size)),
+            };
 
-                        // For stretch, force the cross dimension to match container
-                        let (stretch_width, stretch_height) = match axis {
-                            Axis::Horizontal => (Some(current_main), Some(container_cross_size)),
-                            Axis::Vertical => (Some(container_cross_size), Some(current_main)),
-                        };
+            let flex_ctx = LayoutContext {
+                containing_block_width: new_width,
+                containing_block_height: new_height,
+                viewport_width: ctx.viewport_width,
+                viewport_height: ctx.viewport_height,
+                parent_assigned_border_width: new_width,
+                parent_assigned_border_height: new_height,
+            };
 
-                        let stretch_ctx = LayoutContext {
-                            containing_block_width: stretch_width,
-                            containing_block_height: stretch_height,
-                            viewport_width: ctx.viewport_width,
-                            viewport_height: ctx.viewport_height,
-                            parent_assigned_border_width: stretch_width,
-                            parent_assigned_border_height: stretch_height,
-                        };
+            // For flex items, set the resolved size and keep it
+            let has_flex_properties = child.style.item_style.flex_grow > 0.0
+                || child.style.item_style.flex_shrink != 1.0
+                || child.style.item_style.flex_basis != Length::Auto;
 
-                        Self::layout_node(child, false, (0.0, 0.0), 0.0, &stretch_ctx);
-
-                        // Update max_cross with the actual stretched size
-                        if let LayoutBoxes::Single(ref box_model) = child.layout_boxes {
-                            let child_cross = axis.cross(&box_model.border_box);
-                            max_cross = max_cross.max(child_cross);
-                        }
+            if has_flex_properties {
+                match axis {
+                    Axis::Horizontal => {
+                        child.style.size.width = Length::Px(flex_item.final_main_size);
+                    }
+                    Axis::Vertical => {
+                        child.style.size.height = Length::Px(flex_item.final_main_size);
                     }
                 }
             }
+
+            self.layout_node(child, false, (0.0, 0.0), 0.0, &flex_ctx);
+
+            // Don't restore the original style for flex properties - keep the resolved size
         }
 
-        // Calculate gap for children_box width/height
+        // Phase 4: Handle cross-axis alignment (stretch)
+        self.handle_cross_axis_alignment(node, axis, container_cross.unwrap_or(max_cross), ctx);
+
+        // Calculate total main axis size including gaps
+        let children_main_total: f32 = node
+            .children
+            .iter()
+            .map(|child| {
+                if let LayoutBoxes::Single(ref box_model) = child.layout_boxes {
+                    axis.main(&box_model.border_box)
+                } else {
+                    0.0
+                }
+            })
+            .sum();
+
         let gap_total = if node.children.len() > 1 {
             let gap = axis
                 .gap(&node.style)
@@ -964,29 +977,250 @@ impl LayoutEngine {
             0.0
         };
 
-        (gap_total, max_cross)
+        let total_main_size = children_main_total + gap_total;
+
+        (total_main_size, max_cross)
+    }
+
+    fn calculate_flex_base_size(
+        child: &LayoutNode,
+        axis: Axis,
+        containing_block_main: Option<f32>,
+        ctx: &LayoutContext,
+    ) -> f32 {
+        let flex_basis = &child.style.item_style.flex_basis;
+
+        // If flex-basis is not auto, use it
+        if let Some(basis_size) =
+            flex_basis.resolve_with(containing_block_main, ctx.viewport_main(axis))
+        {
+            return basis_size;
+        }
+
+        // Check if explicit main size is set
+        let explicit_main_size = match axis {
+            Axis::Horizontal => child
+                .style
+                .size
+                .width
+                .resolve_with(containing_block_main, ctx.viewport_main(axis)),
+            Axis::Vertical => child
+                .style
+                .size
+                .height
+                .resolve_with(containing_block_main, ctx.viewport_main(axis)),
+        };
+
+        if let Some(explicit_size) = explicit_main_size {
+            return explicit_size;
+        }
+
+        // For flex items without explicit size or flex-basis, use 0 as base size
+        // This allows flex-grow to work properly from a minimal starting point
+        0.0
+    }
+
+    fn resolve_flexible_lengths(flex_items: &mut [FlexItem], container_main_size: f32) {
+        // Calculate initial free space
+        let total_base_sizes: f32 = flex_items.iter().map(|item| item.base_size).sum();
+        let initial_free_space = container_main_size - total_base_sizes;
+
+        if initial_free_space > 0.0 {
+            // Positive free space: grow items
+            LayoutEngine::grow_flex_items(flex_items, initial_free_space);
+        } else if initial_free_space < 0.0 {
+            // Negative free space: shrink items
+            LayoutEngine::shrink_flex_items(flex_items, -initial_free_space);
+        } else {
+            // Exactly zero free space: use base sizes
+            for item in flex_items.iter_mut() {
+                item.final_main_size = item.base_size;
+            }
+        }
+    }
+
+    fn grow_flex_items(flex_items: &mut [FlexItem], free_space: f32) {
+        let total_flex_grow: f32 = flex_items.iter().map(|item| item.flex_grow).sum();
+
+        if total_flex_grow == 0.0 {
+            // No flexible items, use base sizes
+            for item in flex_items.iter_mut() {
+                item.final_main_size = item.base_size;
+            }
+            return;
+        }
+
+        let mut remaining_free_space = free_space;
+        let mut remaining_flex_grow = total_flex_grow;
+
+        // Distribute free space proportionally
+        for item in flex_items.iter_mut() {
+            if item.flex_grow == 0.0 {
+                item.final_main_size = item.base_size;
+                continue;
+            }
+
+            let flex_share = remaining_free_space * (item.flex_grow / remaining_flex_grow);
+            let target_size = item.base_size + flex_share;
+
+            // Apply min/max constraints
+            let constrained_size = clamp(target_size, item.min_main, item.max_main);
+            item.final_main_size = constrained_size;
+
+            // Update remaining values for fair distribution
+            let actual_growth = constrained_size - item.base_size;
+            remaining_free_space -= actual_growth;
+            remaining_flex_grow -= item.flex_grow;
+        }
+    }
+
+    fn shrink_flex_items(flex_items: &mut [FlexItem], deficit: f32) {
+        // Calculate total scaled flex shrink factor
+        let total_scaled_shrink: f32 = flex_items
+            .iter()
+            .map(|item| item.base_size * item.flex_shrink)
+            .sum();
+
+        if total_scaled_shrink == 0.0 {
+            // No flexible items for shrinking, use base sizes
+            for item in flex_items.iter_mut() {
+                item.final_main_size = item.base_size;
+            }
+            return;
+        }
+
+        let remaining_deficit = deficit;
+
+        for item in flex_items.iter_mut() {
+            if item.flex_shrink == 0.0 {
+                item.final_main_size = item.base_size;
+                continue;
+            }
+
+            let scaled_shrink = item.base_size * item.flex_shrink;
+            let shrink_ratio = scaled_shrink / total_scaled_shrink;
+            let shrink_amount = remaining_deficit * shrink_ratio;
+            let target_size = item.base_size - shrink_amount;
+
+            // Apply min constraint (can't shrink below min)
+            let constrained_size = clamp(target_size, item.min_main, Some(item.base_size));
+            item.final_main_size = constrained_size;
+        }
+    }
+
+    fn handle_cross_axis_alignment(
+        &self,
+        node: &mut LayoutNode,
+        axis: Axis,
+        container_cross_size: f32,
+        ctx: &LayoutContext,
+    ) {
+        for child in &mut node.children {
+            let align = child
+                .style
+                .item_style
+                .align_self
+                .unwrap_or(node.style.align_items);
+
+            if align == crate::AlignItems::Stretch {
+                // Check if the child has an explicit cross-axis size
+                let should_stretch = match axis {
+                    Axis::Horizontal => child.style.size.height == Length::Auto,
+                    Axis::Vertical => child.style.size.width == Length::Auto,
+                };
+
+                if should_stretch {
+                    // Get current main size
+                    let current_main =
+                        if let LayoutBoxes::Single(ref box_model) = child.layout_boxes {
+                            axis.main(&box_model.border_box)
+                        } else {
+                            0.0
+                        };
+
+                    // Stretch cross dimension
+                    let (stretch_width, stretch_height) = match axis {
+                        Axis::Horizontal => (Some(current_main), Some(container_cross_size)),
+                        Axis::Vertical => (Some(container_cross_size), Some(current_main)),
+                    };
+
+                    let stretch_ctx = LayoutContext {
+                        containing_block_width: stretch_width,
+                        containing_block_height: stretch_height,
+                        viewport_width: ctx.viewport_width,
+                        viewport_height: ctx.viewport_height,
+                        parent_assigned_border_width: stretch_width,
+                        parent_assigned_border_height: stretch_height,
+                    };
+
+                    self.layout_node(child, false, (0.0, 0.0), 0.0, &stretch_ctx);
+                }
+            }
+        }
     }
 
     /// Create and set box model
     fn create_and_set_box_model(
+        &self,
         node: &mut LayoutNode,
-        content_main: f32,
-        content_cross: f32,
-        children_main: f32,
-        children_cross: f32,
-        axis: Axis,
-        origin: (f32, f32),
-        padding: (f32, f32, f32, f32),
-        border: (f32, f32, f32, f32),
+        params: BoxModelParams,
+        ctx: &LayoutContext,
     ) {
-        let (content_width, content_height) = match axis {
-            Axis::Horizontal => (content_main, content_cross),
-            Axis::Vertical => (content_cross, content_main),
+        let (content_width, content_height) = match params.axis {
+            Axis::Horizontal => (params.content_main, params.content_cross),
+            Axis::Vertical => (params.content_cross, params.content_main),
         };
 
-        let (children_width, children_height) = match axis {
-            Axis::Horizontal => (children_main, children_cross),
-            Axis::Vertical => (children_cross, children_main),
+        // Calculate actual children box size including gaps
+        let (children_width, children_height) = if node.children.is_empty() {
+            (0.0, 0.0)
+        } else {
+            // Calculate total size of children
+            let children_main_total: f32 = node
+                .children
+                .iter()
+                .map(|child| {
+                    if let LayoutBoxes::Single(ref box_model) = child.layout_boxes {
+                        params.axis.main(&box_model.border_box)
+                    } else {
+                        0.0
+                    }
+                })
+                .sum();
+
+            // Calculate gaps
+            let gap_total = if node.children.len() > 1 {
+                let gap = params
+                    .axis
+                    .gap(&node.style)
+                    .resolve_with(
+                        ctx.containing_block_main(params.axis),
+                        ctx.viewport_main(params.axis),
+                    )
+                    .unwrap_or(0.0);
+                gap * (node.children.len() as f32 - 1.0)
+            } else {
+                0.0
+            };
+
+            let total_children_main = children_main_total + gap_total;
+
+            let children_cross_max: f32 = node
+                .children
+                .iter()
+                .map(|child| {
+                    if let LayoutBoxes::Single(ref box_model) = child.layout_boxes {
+                        params.axis.cross(&box_model.border_box)
+                    } else {
+                        0.0
+                    }
+                })
+                .fold(0.0, f32::max);
+
+            match params.axis {
+                Axis::Horizontal => (total_children_main, children_cross_max),
+                Axis::Vertical => (children_cross_max, total_children_main),
+            }
         };
 
         node.layout_boxes = LayoutBoxes::Single(create_box_model(
@@ -994,19 +1228,19 @@ impl LayoutEngine {
             content_height,
             children_width,
             children_height,
-            padding,
-            border,
+            params.padding,
+            params.border,
         ));
 
         if let LayoutBoxes::Single(ref mut box_model) = node.layout_boxes {
-            let (pl, pt, _, _) = padding;
-            let (bl, bt, _, _) = border;
-            set_position(box_model, origin, (pl, pt), (bl, bt));
+            let (pl, pt, _, _) = params.padding;
+            let (bl, bt, _, _) = params.border;
+            set_position(box_model, params.origin, (pl, pt), (bl, bt));
         }
     }
 
     /// Set positions of Flex child elements
-    fn position_flex_children(node: &mut LayoutNode, axis: Axis, ctx: &LayoutContext) {
+    fn position_flex_children(&self, node: &mut LayoutNode, axis: Axis, ctx: &LayoutContext) {
         if node.children.is_empty() {
             return;
         }
@@ -1043,17 +1277,70 @@ impl LayoutEngine {
 
         let remaining_space = axis.main(content_box) - children_main_total - gaps_total;
 
-        // Determine start position and gap based on justify-content
-        let (start_offset, gap_between) = resolve_justify_content(
-            node.style.justify_content,
-            remaining_space.max(0.0),
-            node.children.len(),
-        );
+        // Check if any child has auto margins on the main axis
+        let has_auto_margins = node.children.iter().any(|child| match axis {
+            Axis::Horizontal => {
+                child.style.spacing.margin_left == Length::Auto
+                    || child.style.spacing.margin_right == Length::Auto
+            }
+            Axis::Vertical => {
+                child.style.spacing.margin_top == Length::Auto
+                    || child.style.spacing.margin_bottom == Length::Auto
+            }
+        });
+
+        // If auto margins are present, distribute remaining space among auto margins
+        // Otherwise, use justify-content
+        let (start_offset, gap_between) = if has_auto_margins {
+            (0.0, 0.0) // Auto margins handle the spacing
+        } else {
+            resolve_justify_content(
+                node.style.justify_content,
+                remaining_space.max(0.0),
+                node.children.len(),
+            )
+        };
 
         // Position child elements
         let mut cursor_main = start_offset;
+        let mut remaining_auto_space = remaining_space.max(0.0);
 
         for child in &mut node.children {
+            // Handle auto margins on main axis
+            let (margin_start_auto, margin_end_auto) = match axis {
+                Axis::Horizontal => (
+                    child.style.spacing.margin_left == Length::Auto,
+                    child.style.spacing.margin_right == Length::Auto,
+                ),
+                Axis::Vertical => (
+                    child.style.spacing.margin_top == Length::Auto,
+                    child.style.spacing.margin_bottom == Length::Auto,
+                ),
+            };
+
+            // Calculate auto margin values
+            let mut margin_start = 0.0;
+            let mut margin_end = 0.0;
+
+            if has_auto_margins && remaining_auto_space > 0.0 {
+                if margin_start_auto && margin_end_auto {
+                    // Both auto: split equally
+                    margin_start = remaining_auto_space / 2.0;
+                    margin_end = remaining_auto_space / 2.0;
+                    remaining_auto_space = 0.0;
+                } else if margin_start_auto {
+                    // Only start is auto
+                    margin_start = remaining_auto_space;
+                    remaining_auto_space = 0.0;
+                } else if margin_end_auto {
+                    // Only end is auto (will be handled after positioning)
+                    margin_end = remaining_auto_space;
+                    remaining_auto_space = 0.0;
+                }
+            }
+
+            cursor_main += margin_start;
+
             // Calculate main axis position
             let child_main_pos = match axis {
                 Axis::Horizontal => content_box.x + cursor_main,
@@ -1088,8 +1375,10 @@ impl LayoutEngine {
                 Axis::Vertical => (child_cross_pos, child_main_pos),
             };
 
-            // Update child layout boxes
-            child.layout_boxes.shift(child_origin.0, child_origin.1);
+            // Position child relative to parent's content box
+            let relative_x = child_origin.0 - content_box.x;
+            let relative_y = child_origin.1 - content_box.y;
+            child.layout_boxes.shift(relative_x, relative_y);
 
             // Advance cursor
             let child_main_size = if let LayoutBoxes::Single(ref box_model) = child.layout_boxes {
@@ -1097,7 +1386,7 @@ impl LayoutEngine {
             } else {
                 0.0
             };
-            cursor_main += child_main_size + gap + gap_between;
+            cursor_main += child_main_size + margin_end + gap + gap_between;
         }
     }
 }
