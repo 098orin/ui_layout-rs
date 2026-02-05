@@ -86,12 +86,13 @@ fn main() {
         start.elapsed()
     };
 
+    println!("1st layout: {:?}", t1);
+
     let t2 = {
         let start = Instant::now();
         LayoutEngine::layout(&mut root, 800.0, 600.0);
         start.elapsed()
     };
 
-    println!("1st layout: {:?}", t1);
     println!("2nd layout: {:?}", t2);
 }
