@@ -385,9 +385,11 @@ impl LayoutEngine {
             }
         }
 
+        // First pass: layout children to determine sizes but avoid applying final positions/margins
+        // We'll compute their sizes but ensure they remain origin-relative for layout sizing.
+        // To avoid double-applying margins we offset the child's layout origin by the negative
+        // of its resolved margins so the child's internal layout places its border-box at (0,0).
         let mut previous_margin_bottom: f32 = 0.0;
-
-        // Arrange children vertically
         for child in node.children.iter_mut() {
             let child_ctx = LayoutContext {
                 containing_block_width: Some(content_width),
@@ -395,22 +397,26 @@ impl LayoutEngine {
                 ..*ctx
             };
 
-            // Apply margin collapsing for adjacent block elements
-            let (_child_margins, child_margin_bottom) = resolve_margins_with_collapsing(
+            // Determine margins for collapsing calculation and use the margins to offset the child's origin.
+            let (child_margins, child_margin_bottom) = resolve_margins_with_collapsing(
                 &child.style.spacing,
                 &child_ctx,
                 previous_margin_bottom,
             );
 
+            // Offset child's layout origin by negative margins so the child's border-box will start at 0,0.
+            // This prevents the parent's later shift from double-applying the child's margins.
+            let child_origin = (-child_margins.0, -child_margins.1);
+
             let ((_, child_end_y), _) = self.layout_node(
                 child,
                 intrinsic_pass,
-                (0.0, 0.0), // Layout child at origin
+                child_origin, // Layout child at negated margin origin
                 0.0,
                 &child_ctx,
             );
 
-            // Update cursor_y to track layout progression
+            // Update cursor_y to track layout progression based on child's measured size
             cursor_y = child_end_y;
 
             // Store the margin-bottom for margin collapsing with next sibling
@@ -469,12 +475,14 @@ impl LayoutEngine {
             );
 
             // Position children relative to parent's content box
+            // Important: we must NOT double-apply margins. The children were previously laid out
+            // with origin (0,0) for intrinsic sizing; now we compute and apply final offsets here.
             if !intrinsic_pass {
                 let mut child_y_offset = 0.0;
                 let mut prev_margin_bottom: f32 = 0.0;
 
                 for (i, child) in node.children.iter_mut().enumerate() {
-                    // Get child margins from original style
+                    // Get child's top margin (resolved against the final content width)
                     let child_margin_top = child
                         .style
                         .spacing
@@ -505,7 +513,7 @@ impl LayoutEngine {
                     };
 
                     if i > 0 {
-                        // Handle margin collapsing
+                        // Handle margin collapsing: only add the collapsed margin once here
                         let collapsed_margin = prev_margin_bottom.max(child_margin_top);
                         child_y_offset += collapsed_margin;
                     } else {
@@ -513,15 +521,16 @@ impl LayoutEngine {
                         child_y_offset += child_margin_top;
                     }
 
-                    // Position child relative to parent's content box (0,0)
+                    // Now position child relative to parent's content box (0,0).
+                    // We must ensure the child is positioned using its current box_model which was laid out at origin.
                     child.layout_boxes.shift(child_x, child_y_offset);
 
-                    // Update offset for next child
+                    // Update offset for next child by adding the child's outer height (border-box)
                     if let LayoutBoxes::Single(ref box_model) = child.layout_boxes {
                         child_y_offset += box_model.border_box.height;
                     }
 
-                    // Store margin for next iteration
+                    // Store margin for next iteration (bottom margin of this child)
                     prev_margin_bottom = child
                         .style
                         .spacing
