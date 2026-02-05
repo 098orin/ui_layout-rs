@@ -925,14 +925,36 @@ impl LayoutEngine {
         let (bms_len, bme_len) = axis.border_main(&node.style.spacing);
         let (bcs_len, bce_len) = axis.border_cross(&node.style.spacing);
 
-        let pms = pms_len.resolve_with(cbm, vm).unwrap_or(0.0);
-        let pme = pme_len.resolve_with(cbm, vm).unwrap_or(0.0);
-        let pcs = pcs_len.resolve_with(cbc, vc).unwrap_or(0.0);
-        let pce = pce_len.resolve_with(cbc, vc).unwrap_or(0.0);
-        let bms = bms_len.resolve_with(cbm, vm).unwrap_or(0.0);
-        let bme = bme_len.resolve_with(cbm, vm).unwrap_or(0.0);
-        let bcs = bcs_len.resolve_with(cbc, vc).unwrap_or(0.0);
-        let bce = bce_len.resolve_with(cbc, vc).unwrap_or(0.0);
+        // CSS rule: percentage values for padding/margin/border are resolved
+        // relative to the containing block's width (not height). Use the
+        // containing block width (or viewport width fallback) for percentage
+        // resolution on vertical edges as well.
+        let containing_width = ctx.containing_block_width.unwrap_or(ctx.viewport_width);
+
+        let pms = pms_len
+            .resolve_with(Some(containing_width), ctx.viewport_width)
+            .unwrap_or(0.0);
+        let pme = pme_len
+            .resolve_with(Some(containing_width), ctx.viewport_width)
+            .unwrap_or(0.0);
+        let pcs = pcs_len
+            .resolve_with(Some(containing_width), ctx.viewport_width)
+            .unwrap_or(0.0);
+        let pce = pce_len
+            .resolve_with(Some(containing_width), ctx.viewport_width)
+            .unwrap_or(0.0);
+        let bms = bms_len
+            .resolve_with(Some(containing_width), ctx.viewport_width)
+            .unwrap_or(0.0);
+        let bme = bme_len
+            .resolve_with(Some(containing_width), ctx.viewport_width)
+            .unwrap_or(0.0);
+        let bcs = bcs_len
+            .resolve_with(Some(containing_width), ctx.viewport_width)
+            .unwrap_or(0.0);
+        let bce = bce_len
+            .resolve_with(Some(containing_width), ctx.viewport_width)
+            .unwrap_or(0.0);
 
         // Resolve specified sizes
         let specified_main = axis.size_main(&node.style.size).resolve_with(cbm, vm);
@@ -1738,6 +1760,9 @@ fn apply_size_constraints(
 }
 
 fn resolve_margins(spacing: &Spacing, ctx: &LayoutContext) -> (f32, f32, f32, f32) {
+    // Percentage margins are resolved against the containing block's width.
+    let containing_width = ctx.containing_block_width.unwrap_or(ctx.viewport_width);
+
     (
         spacing
             .margin_left
@@ -1745,7 +1770,7 @@ fn resolve_margins(spacing: &Spacing, ctx: &LayoutContext) -> (f32, f32, f32, f3
             .unwrap_or(0.0),
         spacing
             .margin_top
-            .resolve_with(ctx.containing_block_height, ctx.viewport_height)
+            .resolve_with(Some(containing_width), ctx.viewport_width)
             .unwrap_or(0.0),
         spacing
             .margin_right
@@ -1753,7 +1778,7 @@ fn resolve_margins(spacing: &Spacing, ctx: &LayoutContext) -> (f32, f32, f32, f3
             .unwrap_or(0.0),
         spacing
             .margin_bottom
-            .resolve_with(ctx.containing_block_height, ctx.viewport_height)
+            .resolve_with(Some(containing_width), ctx.viewport_width)
             .unwrap_or(0.0),
     )
 }
@@ -1862,6 +1887,11 @@ fn resolve_padding(spacing: &Spacing, ctx: &LayoutContext) -> (f32, f32, f32, f3
 }
 
 fn resolve_border(spacing: &Spacing, ctx: &LayoutContext) -> (f32, f32, f32, f32) {
+    // Percentage borders (if used) should also resolve relative to the
+    // containing block's width per CSS conventions for percentage-based
+    // box offsets.
+    let containing_width = ctx.containing_block_width.unwrap_or(ctx.viewport_width);
+
     (
         spacing
             .border_left
@@ -1869,7 +1899,7 @@ fn resolve_border(spacing: &Spacing, ctx: &LayoutContext) -> (f32, f32, f32, f32
             .unwrap_or(0.0),
         spacing
             .border_top
-            .resolve_with(ctx.containing_block_height, ctx.viewport_height)
+            .resolve_with(Some(containing_width), ctx.viewport_width)
             .unwrap_or(0.0),
         spacing
             .border_right
@@ -1877,7 +1907,7 @@ fn resolve_border(spacing: &Spacing, ctx: &LayoutContext) -> (f32, f32, f32, f32
             .unwrap_or(0.0),
         spacing
             .border_bottom
-            .resolve_with(ctx.containing_block_height, ctx.viewport_height)
+            .resolve_with(Some(containing_width), ctx.viewport_width)
             .unwrap_or(0.0),
     )
 }
