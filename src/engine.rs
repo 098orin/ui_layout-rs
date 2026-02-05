@@ -377,8 +377,42 @@ impl LayoutEngine {
         };
 
         // Step 3: Determine final container size
-        let final_content_main = content_main.unwrap_or(children_main);
-        let final_content_cross = content_cross.unwrap_or(children_cross);
+        let mut final_content_main = content_main.unwrap_or(children_main);
+        let mut final_content_cross = content_cross.unwrap_or(children_cross);
+
+        // Step 3a: Apply min/max constraints to auto-sized dimensions
+        let vm = ctx.viewport_main(axis);
+        let vc = ctx.viewport_cross(axis);
+        let cbm = ctx.containing_block_main(axis);
+        let cbc = ctx.containing_block_cross(axis);
+
+        let main_size_was_auto = content_main.is_none();
+        let cross_size_was_auto = content_cross.is_none();
+
+        if main_size_was_auto {
+            let min_main = axis.min_main(&node.style.size).resolve_with(cbm, vm);
+            let max_main = axis.max_main(&node.style.size).resolve_with(cbm, vm);
+            final_content_main = clamp(final_content_main, min_main, max_main);
+        }
+
+        if cross_size_was_auto {
+            let min_cross = axis.min_cross(&node.style.size).resolve_with(cbc, vc);
+            let max_cross = axis.max_cross(&node.style.size).resolve_with(cbc, vc);
+            final_content_cross = clamp(final_content_cross, min_cross, max_cross);
+        }
+
+        // Step 3b: If main size was auto and changed due to min/max, re-layout children
+        // to distribute the new container size using flex algorithm
+        if !intrinsic_pass && main_size_was_auto && final_content_main != children_main {
+            self.layout_flex_children(
+                node,
+                axis,
+                false,
+                Some(final_content_main),
+                Some(final_content_cross),
+                ctx,
+            );
+        }
 
         // Step 4: Create box model
         self.create_and_set_box_model(
@@ -393,6 +427,13 @@ impl LayoutEngine {
             },
             ctx,
         );
+
+        // Step 4.5: Re-apply cross-axis alignment with final container size
+        // This is necessary because min/max constraints may have changed the container size
+        // after children layout but before child positioning
+        if !intrinsic_pass {
+            self.handle_cross_axis_alignment(node, axis, final_content_cross, ctx);
+        }
 
         // Step 5: Set child positions (only in non-intrinsic pass)
         if !intrinsic_pass {
