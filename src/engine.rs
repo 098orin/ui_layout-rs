@@ -385,10 +385,10 @@ impl LayoutEngine {
             }
         }
 
-        let mut previous_margin_bottom = 0.0f32;
+        let mut previous_margin_bottom: f32 = 0.0;
 
         // Arrange children vertically
-        for (i, child) in node.children.iter_mut().enumerate() {
+        for child in node.children.iter_mut() {
             let child_ctx = LayoutContext {
                 containing_block_width: Some(content_width),
                 containing_block_height: content_height,
@@ -399,7 +399,7 @@ impl LayoutEngine {
             let (_child_margins, child_margin_bottom) = resolve_margins_with_collapsing(
                 &child.style.spacing,
                 &child_ctx,
-                if i > 0 { previous_margin_bottom } else { 0.0 },
+                previous_margin_bottom,
             );
 
             let ((_, child_end_y), _) = self.layout_node(
