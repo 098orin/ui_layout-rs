@@ -7,6 +7,28 @@ and this project loosely follows Semantic Versioning.
 
 ---
 
+## [Unreleased]
+### Added
+- Implemented complete `flex_basis` support:
+  - Support for `auto`, pixel values (`Px`), and percentage values
+  - Proper interaction with `flex_grow` and `flex_shrink`
+  - Priority handling over explicit width/height in flex contexts
+- Implemented `flex_shrink` with proportional space reduction when container overflows
+- Enhanced flex layout algorithm with proper flex item sizing resolution
+- Added comprehensive test suite for flex basis scenarios
+
+### Changed
+- Refactored flex layout engine for better modularity and maintainability
+- Improved flex item size calculation to properly handle flex-basis vs. explicit sizes
+- Reduced function argument counts by introducing parameter structs (addresses clippy warnings)
+
+### Fixed
+- Fixed flex items not respecting parent-assigned sizes from flex container
+- Resolved issues where explicit width/height would override flex-basis calculations
+- Fixed clippy warnings including complex type definitions and excessive function parameters
+
+---
+
 ## [0.8.3] - 2026-01-26
 ### Added
 - Implemented margin collapsing for Block layouts:
