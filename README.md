@@ -10,6 +10,7 @@ custom GUI frameworks, editors, and experimental UI engines.
 
 > [!NOTE]
 > This crate is under active development; patch releases may be frequent.
+> **CSS3 Specification Compliance**: Phase 1 improvements have been implemented for CSS Box Model and Flexbox.
 
 ## Features
 
@@ -98,19 +99,35 @@ For more examples and to understand the behavior of gaps, alignment, and sizing,
 see the unit tests in the [`tests/`](tests/) directory. They provide practical usage patterns and expected layouts.
 
 
+## Specification Compliance
+
+This implementation follows CSS3 specifications with current focus on:
+
+- ✅ **CSS Box Model Module Level 3**: Full margin collapsing, padding, border, box-sizing support
+- ✅ **CSS Flexible Box Layout Module Level 1**: Complete flexbox algorithm including flex-grow, flex-shrink, flex-basis
+- ✅ **CSS Display Module Level 3**: Block, Inline, Flex, and None display values
+- ✅ **CSS Values and Units Module Level 3**: px, %, vw, vh, auto, and calc() support
+
+
 ## Status
 
 See [CHANGELOG.md](CHANGELOG.md) for a detailed list of changes.
 
 * Version: **0.8.3**
 * API is evolving but now includes full Flexbox-like alignment and gaps
+* **Phase 1 improvements**: Enhanced margin collapsing, improved flex item min-size semantics, comprehensive specification references
 
 Future versions may add:
 
 * `grid`
-* Flex wrap support
+* Flex wrap support (`flex-wrap: wrap | nowrap | wrap-reverse`)
+* Flex direction reverse (`flex-direction: row-reverse | column-reverse`)
 * Additional flex sizing rules (fr units, etc.)
 * Absolute / fixed positioning
+* Display: inline-block explicit support
+* Complete parent-child margin collapsing
+* Content-based minimum sizing for flex items
+
 
 ## License
 
