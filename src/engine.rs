@@ -386,9 +386,7 @@ impl LayoutEngine {
         }
 
         // First pass: layout children to determine sizes but avoid applying final positions/margins
-        // We'll compute their sizes but ensure they remain origin-relative for layout sizing.
-        // To avoid double-applying margins we offset the child's layout origin by the negative
-        // of its resolved margins so the child's internal layout places its border-box at (0,0).
+        // We'll compute their sizes with origin at (0,0); final positioning will be applied later.
         let mut previous_margin_bottom: f32 = 0.0;
         for child in node.children.iter_mut() {
             let child_ctx = LayoutContext {
@@ -397,21 +395,18 @@ impl LayoutEngine {
                 ..*ctx
             };
 
-            // Determine margins for collapsing calculation and use the margins to offset the child's origin.
-            let (child_margins, child_margin_bottom) = resolve_margins_with_collapsing(
+            // Determine margins for collapsing calculation (don't use them to offset child's origin here).
+            let (_child_margins_collapsed, child_margin_bottom) = resolve_margins_with_collapsing(
                 &child.style.spacing,
                 &child_ctx,
                 previous_margin_bottom,
             );
 
-            // Offset child's layout origin by negative margins so the child's border-box will start at 0,0.
-            // This prevents the parent's later shift from double-applying the child's margins.
-            let child_origin = (-child_margins.0, -child_margins.1);
-
+            // Layout child for intrinsic sizes at origin (0,0).
             let ((_, child_end_y), _) = self.layout_node(
                 child,
                 intrinsic_pass,
-                child_origin, // Layout child at negated margin origin
+                (0.0, 0.0), // Layout child at origin
                 0.0,
                 &child_ctx,
             );
@@ -522,8 +517,19 @@ impl LayoutEngine {
                     }
 
                     // Now position child relative to parent's content box (0,0).
-                    // We must ensure the child is positioned using its current box_model which was laid out at origin.
-                    child.layout_boxes.shift(child_x, child_y_offset);
+                    // Child was previously laid out at origin with its own margins applied, so compute
+                    // the delta between desired target and the child's current border-box origin and shift by that.
+                    let (child_current_left, child_current_top) =
+                        if let LayoutBoxes::Single(ref box_model) = child.layout_boxes {
+                            (box_model.border_box.x, box_model.border_box.y)
+                        } else {
+                            (0.0, 0.0)
+                        };
+
+                    let shift_x = child_x - child_current_left;
+                    let shift_y = child_y_offset - child_current_top;
+
+                    child.layout_boxes.shift(shift_x, shift_y);
 
                     // Update offset for next child by adding the child's outer height (border-box)
                     if let LayoutBoxes::Single(ref box_model) = child.layout_boxes {
