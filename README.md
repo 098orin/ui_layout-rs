@@ -17,7 +17,8 @@ custom GUI frameworks, editors, and experimental UI engines.
 ### Flexbox Support
 - Flex layout (Row / Column direction)
 - `flex_grow` with proportional space distribution
-- `flex_basis` for initial sizing
+- `flex_shrink` with proportional space reduction when overflowing
+- `flex_basis` for initial sizing (supports `auto`, pixel values, and percentages)
 - `justify_content` (Start, Center, End, SpaceBetween, SpaceAround, SpaceEvenly)
 - `align_items` with full `stretch` support (Start, Center, End, Stretch)
 - `align_self` for individual item alignment override
@@ -65,13 +66,15 @@ let mut root = LayoutNode::with_children(
         LayoutNode::new(Style {
             item_style: ItemStyle {
                 flex_grow: 1.0,
+                flex_basis: Length::Auto,
                 ..Default::default()
             },
             ..Default::default()
         }),
         LayoutNode::new(Style {
-            size: SizeStyle {
-                width: Length::Px(100.0),
+            item_style: ItemStyle {
+                flex_basis: Length::Px(100.0),
+                flex_shrink: 0.0,
                 ..Default::default()
             },
             ..Default::default()
@@ -104,9 +107,9 @@ See [CHANGELOG.md](CHANGELOG.md) for a detailed list of changes.
 
 Future versions may add:
 
-* `flex_shrink`
 * `grid`
-* Additional flex sizing rules (wrap, fr units, etc.)
+* Flex wrap support
+* Additional flex sizing rules (fr units, etc.)
 * Absolute / fixed positioning
 
 ## License
