@@ -1,8 +1,22 @@
+// Layout engine
+// -----------------------
+// This module implements the layout algorithm for `LayoutNode` trees.
+// It computes box-models (content / padding / border / children boxes)
+// and positions children for block, inline and flex layout modes.
+//
+// The imports below bring types from the crate that the engine relies on.
 use crate::{
     AlignItems, BoxModel, BoxSizing, Display, FlexDirection, FragmentPlacement, ItemFragment,
     JustifyContent, LayoutBoxes, LayoutNode, Length, Rect, Spacing, Style,
 };
 
+// Helper alias describing resolved container sizes for a flex container.
+//
+// Tuple contents:
+// - Option<f32> : resolved main-axis content size (None if auto)
+// - Option<f32> : resolved cross-axis content size (None if auto)
+// - (f32, f32, f32, f32) : padding edge (start, before, end, after)
+// - (f32, f32, f32, f32) : border edge  (start, before, end, after)
 type ContainerSizes = (
     Option<f32>,
     Option<f32>,
@@ -10,15 +24,24 @@ type ContainerSizes = (
     (f32, f32, f32, f32),
 );
 
+// Parameters used when creating and setting a `BoxModel` for a node.
+// This centralizes inputs for `create_and_set_box_model` / `create_box_model`.
 struct BoxModelParams {
+    // content sizes along main and cross axes (already resolved)
     content_main: f32,
     content_cross: f32,
+    // layout axis (horizontal/vertical)
     axis: Axis,
+    // origin point (border-box top-left) in the parent's coordinate space
     origin: (f32, f32),
+    // padding edges: (start, before, end, after)
     padding: (f32, f32, f32, f32),
+    // border edges: (start, before, end, after)
     border: (f32, f32, f32, f32),
 }
 
+// Context used while laying out inline fragments (text runs, inline fragments, line breaks).
+// This keeps the mutable cursor and metrics for wrapping/line calculation.
 struct FragmentLayoutContext {
     cursor_x: f32,
     cursor_y: f32,
@@ -28,6 +51,12 @@ struct FragmentLayoutContext {
     origin: (f32, f32),
 }
 
+// LayoutContext
+// -----------------------
+// Carries resolved sizing information down the tree during layout passes.
+// - `containing_block_*` represent the size of the containing block (may be None for auto).
+// - `viewport_*` are the absolute viewport dimensions used for vw/vh/percentage resolution.
+// - `parent_assigned_border_*` are the border-box sizes assigned by the parent (used for stretch).
 pub(crate) struct LayoutContext {
     pub(crate) containing_block_width: Option<f32>,
     pub(crate) containing_block_height: Option<f32>,
@@ -38,6 +67,7 @@ pub(crate) struct LayoutContext {
 }
 
 impl LayoutContext {
+    // Return the containing-block size along the main axis for `axis`
     fn containing_block_main(&self, axis: Axis) -> Option<f32> {
         match axis {
             Axis::Horizontal => self.containing_block_width,
@@ -45,6 +75,7 @@ impl LayoutContext {
         }
     }
 
+    // Return the containing-block size along the cross axis for `axis`
     fn containing_block_cross(&self, axis: Axis) -> Option<f32> {
         match axis {
             Axis::Horizontal => self.containing_block_height,
@@ -52,6 +83,7 @@ impl LayoutContext {
         }
     }
 
+    // Viewport length along the main axis (used for resolving vw/vh/percentage)
     fn viewport_main(&self, axis: Axis) -> f32 {
         match axis {
             Axis::Horizontal => self.viewport_width,
@@ -59,6 +91,7 @@ impl LayoutContext {
         }
     }
 
+    // Viewport length along the cross axis
     fn viewport_cross(&self, axis: Axis) -> f32 {
         match axis {
             Axis::Horizontal => self.viewport_height,
@@ -66,6 +99,7 @@ impl LayoutContext {
         }
     }
 
+    // Parent assigned border-box size along main axis (used for stretch/relative fallback)
     fn parent_assigned_border_main(&self, axis: Axis) -> Option<f32> {
         match axis {
             Axis::Horizontal => self.parent_assigned_border_width,
@@ -73,6 +107,7 @@ impl LayoutContext {
         }
     }
 
+    // Parent assigned border-box size along cross axis
     fn parent_assigned_border_cross(&self, axis: Axis) -> Option<f32> {
         match axis {
             Axis::Horizontal => self.parent_assigned_border_height,
@@ -81,6 +116,10 @@ impl LayoutContext {
     }
 }
 
+// Axis helpers
+// -----------------------
+// Represents the main/cross axis orientation used by flex and flow layout code.
+// Various helper methods below use `Axis` to abstract width/height selection.
 #[derive(Debug, Clone, Copy)]
 enum Axis {
     Horizontal,
@@ -517,8 +556,9 @@ impl LayoutEngine {
                     }
 
                     // Now position child relative to parent's content box (0,0).
-                    // Child was previously laid out at origin with its own margins applied, so compute
-                    // the delta between desired target and the child's current border-box origin and shift by that.
+                    // The child was previously laid out at origin (0,0) and its border_box includes its own margins.
+                    // To avoid double-applying margins, compute the delta between the desired position and the
+                    // child's current border_box origin, and shift by that delta.
                     let (child_current_left, child_current_top) =
                         if let LayoutBoxes::Single(ref box_model) = child.layout_boxes {
                             (box_model.border_box.x, box_model.border_box.y)
