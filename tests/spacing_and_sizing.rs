@@ -99,7 +99,7 @@ fn margins_affect_positioning() {
         ..Default::default()
     });
 
-    let mut root = LayoutNode::with_children(
+    let inner = LayoutNode::with_children(
         Style {
             size: SizeStyle {
                 width: Length::Px(300.0),
@@ -111,9 +111,11 @@ fn margins_affect_positioning() {
         vec![child],
     );
 
+    let mut root = LayoutNode::with_children(Style::default(), vec![inner]);
+
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
-    match &root.children[0].layout_boxes {
+    match &root.children[0].children[0].layout_boxes {
         LayoutBoxes::Single(box_model) => {
             // Child should be positioned with margins
             assert_eq!(box_model.border_box.x, 20.0); // margin_left
@@ -125,7 +127,7 @@ fn margins_affect_positioning() {
     }
 
     // Root should account for child margins in its height
-    match &root.layout_boxes {
+    match &root.children[0].layout_boxes {
         LayoutBoxes::Single(box_model) => {
             assert_eq!(box_model.content_box.height, 75.0); // 10 + 50 + 15
         }
