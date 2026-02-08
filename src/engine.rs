@@ -54,6 +54,7 @@ struct FragmentLayoutContext {
 // -----------------------
 // Tracks margin information needed for proper margin collapsing in block flow.
 // This context helps implement those rules correctly.
+#[allow(dead_code)]
 #[derive(Debug, Clone, Copy)]
 struct MarginCollapsingContext {
     // The bottom margin of this element (for collapsing with next sibling)
@@ -482,9 +483,16 @@ impl LayoutEngine {
                 .parent_assigned_border_height
                 .map(|b| b - border.1 - border.3 - padding.1 - padding.3));
 
-        // Step 3: First pass: layout children to determine sizes
-        let mut previous_margin_collapsing = MarginCollapsingContext { margin_after: 0.0 };
+        // Step 3: Resolve all children's margins using unified approach (parent resolves children's margins)
+        let containing_width = content_width_opt.unwrap_or(0.0);
+        let children_margins = resolve_all_children_margins(
+            &node.children,
+            containing_width,
+            ctx.viewport_width,
+            ctx.viewport_height,
+        );
 
+        // Step 3b: First pass: layout children to determine sizes
         for child in node.children.iter_mut() {
             let child_ctx = LayoutContext {
                 containing_block_width: content_width_opt,
@@ -494,30 +502,12 @@ impl LayoutEngine {
                 ..*ctx
             };
 
-            // Determine if child has box-creating content
-            let is_child_block_level =
-                matches!(child.style.display, Display::Block | Display::Flex { .. });
-
-            // Resolve child margins for collapsing
-            let (child_margins, _) = resolve_margins_with_collapsing_enhanced(
-                &child.style.spacing,
-                &child_ctx,
-                is_child_block_level,
-                previous_margin_collapsing.margin_after,
-            );
-
-            // Update previous margin collapsing context for next iteration
-            previous_margin_collapsing.margin_after = child_margins.3;
-
             // Layout child for intrinsic sizes at origin (0,0).
             let ((_, child_end_y), _) =
                 self.layout_node(child, intrinsic_pass, (0.0, 0.0), 0.0, &child_ctx);
 
             // Update cursor_y to track layout progression
             cursor_y = child_end_y;
-
-            // Store margin information for next child's collapsing calculation
-            previous_margin_collapsing.margin_after = child_margins.3;
         }
 
         // Step 3b: Apply min/max constraints to content width
@@ -584,18 +574,16 @@ impl LayoutEngine {
                 (border.0, border.1),
             );
 
-            // Step 6: Position children with proper margin collapsing
+            // Step 6: Position children using unified resolved margins from parent
             if !intrinsic_pass {
                 let mut child_y_offset = 0.0;
-                let mut prev_margin_collapsing = MarginCollapsingContext { margin_after: 0.0 };
 
                 for (i, child) in node.children.iter_mut().enumerate() {
-                    let child_margin_top = child
-                        .style
-                        .spacing
-                        .margin_top
-                        .resolve_with(Some(final_content_width), ctx.viewport_height)
-                        .unwrap_or(0.0);
+                    // Use the unified margins resolved by parent
+                    let (margin_left, margin_top, _margin_right, _) = children_margins
+                        .get(i)
+                        .copied()
+                        .unwrap_or((0.0, 0.0, 0.0, 0.0));
 
                     // Handle auto margins for horizontal centering
                     let margin_left_auto = child.style.spacing.margin_left == Length::Auto;
@@ -611,22 +599,11 @@ impl LayoutEngine {
                             };
                         (final_content_width - child_width) / 2.0
                     } else {
-                        child
-                            .style
-                            .spacing
-                            .margin_left
-                            .resolve_with(Some(final_content_width), ctx.viewport_width)
-                            .unwrap_or(0.0)
+                        margin_left
                     };
 
-                    // Margin collapsing
-                    if i > 0 {
-                        let collapsed_margin =
-                            prev_margin_collapsing.margin_after.max(child_margin_top);
-                        child_y_offset += collapsed_margin;
-                    } else {
-                        child_y_offset += child_margin_top;
-                    }
+                    // Apply parent-resolved margin (already includes collapsing with previous sibling)
+                    child_y_offset += margin_top;
 
                     // Position child relative to parent's content box
                     let (child_current_left, child_current_top) =
@@ -641,18 +618,11 @@ impl LayoutEngine {
 
                     child.layout_boxes.shift(shift_x, shift_y);
 
-                    // Update offset for next child
+                    // Update offset for next child (only add child's height, not margins)
+                    // Next child's margin_top already includes proper collapsing via parent's unified resolution
                     if let LayoutBoxes::Single(ref box_model) = child.layout_boxes {
                         child_y_offset += box_model.border_box.height;
                     }
-
-                    // Store margin for next iteration
-                    prev_margin_collapsing.margin_after = child
-                        .style
-                        .spacing
-                        .margin_bottom
-                        .resolve_with(Some(final_content_width), ctx.viewport_height)
-                        .unwrap_or(0.0);
                 }
             }
         }
@@ -1798,6 +1768,79 @@ fn resolve_margins_with_collapsing_enhanced(
         (margins.0, collapsed_margin_top, margins.2, margins.3),
         margins.3,
     )
+}
+
+/// Unified helper to compute resolved margins for all children with proper collapsing.
+///
+/// This function resolves margins for all children in a block container, applying:
+/// - Sibling margin collapsing (each child's top margin collapses with previous child's bottom)
+/// - Parent-child margin collapsing (first child's top margin with parent's top border)
+///
+/// Returns a vector of resolved margins for each child, where each entry is:
+/// (margin_left, margin_top, margin_right, margin_bottom)
+fn resolve_all_children_margins(
+    children: &[LayoutNode],
+    containing_block_width: f32,
+    viewport_width: f32,
+    _viewport_height: f32,
+) -> Vec<(f32, f32, f32, f32)> {
+    let mut resolved_margins = Vec::with_capacity(children.len());
+    let mut previous_margin_bottom = 0.0;
+
+    for (i, child) in children.iter().enumerate() {
+        let is_block_level = matches!(child.style.display, Display::Block | Display::Flex { .. });
+
+        // Resolve all four margins first
+        let raw_margins = (
+            child
+                .style
+                .spacing
+                .margin_left
+                .resolve_with(Some(containing_block_width), viewport_width)
+                .unwrap_or(0.0),
+            child
+                .style
+                .spacing
+                .margin_top
+                .resolve_with(Some(containing_block_width), viewport_width)
+                .unwrap_or(0.0),
+            child
+                .style
+                .spacing
+                .margin_right
+                .resolve_with(Some(containing_block_width), viewport_width)
+                .unwrap_or(0.0),
+            child
+                .style
+                .spacing
+                .margin_bottom
+                .resolve_with(Some(containing_block_width), viewport_width)
+                .unwrap_or(0.0),
+        );
+
+        // Apply margin collapsing for block-level children
+        let collapsed_margin_top = if is_block_level && i > 0 {
+            // Sibling margin collapsing: take max of current top and previous bottom
+            raw_margins.1.max(previous_margin_bottom)
+        } else {
+            raw_margins.1
+        };
+
+        let collapsed_margins = (
+            raw_margins.0,
+            collapsed_margin_top,
+            raw_margins.2,
+            raw_margins.3,
+        );
+        resolved_margins.push(collapsed_margins);
+
+        // Update previous margin for next iteration
+        if is_block_level {
+            previous_margin_bottom = raw_margins.3;
+        }
+    }
+
+    resolved_margins
 }
 
 fn resolve_justify_content(justify: JustifyContent, remaining: f32, count: usize) -> (f32, f32) {
