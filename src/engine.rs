@@ -487,8 +487,8 @@ impl LayoutEngine {
 
         for child in node.children.iter_mut() {
             let child_ctx = LayoutContext {
-                containing_block_width: content_height_opt,
-                containing_block_height: content_width_opt,
+                containing_block_width: content_width_opt,
+                containing_block_height: content_height_opt,
                 parent_assigned_border_width: None,
                 parent_assigned_border_height: None,
                 ..*ctx
