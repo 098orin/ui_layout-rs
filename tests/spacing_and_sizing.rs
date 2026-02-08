@@ -728,16 +728,16 @@ fn auto_width_with_border() {
     match &root.layout_boxes {
         LayoutBoxes::Single(box_model) => {
             // Width should match containing block width
-            assert_eq!(box_model.content_box.width, 800.0);
+            assert_eq!(box_model.content_box.width, 800.0 - 3.0 - 4.0);
             assert_eq!(box_model.content_box.height, 100.0);
 
             // Padding box should be same as content box (no padding)
-            assert_eq!(box_model.padding_box.width, 800.0);
+            assert_eq!(box_model.padding_box.width, 800.0 - 3.0 - 4.0);
             assert_eq!(box_model.padding_box.height, 100.0);
 
             // Border box should include borders
-            assert_eq!(box_model.border_box.width, 807.0); // 800 + 3 + 4
-            assert_eq!(box_model.border_box.height, 104.0); // 100 + 2 + 2
+            assert_eq!(box_model.border_box.width, 800.0);
+            assert_eq!(box_model.border_box.height, 100.0 + 2.0 + 2.0);
         }
         _ => panic!("Expected single box model"),
     }
