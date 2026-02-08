@@ -479,12 +479,62 @@ impl LayoutEngine {
 
         // Step 2: Resolve all children's margins (parent resolves children's margins)
         let containing_width = content_width_opt.unwrap_or(0.0);
-        let children_margins = resolve_all_children_margins(
-            &node.children,
-            containing_width,
-            ctx.viewport_width,
-            ctx.viewport_height,
-        );
+        let mut children_margins = Vec::with_capacity(node.children.len());
+        let mut previous_margin_bottom = 0.0;
+
+        for (i, child) in node.children.iter().enumerate() {
+            let is_block_level =
+                matches!(child.style.display, Display::Block | Display::Flex { .. });
+
+            // Resolve all four margins
+            let raw_margins = (
+                child
+                    .style
+                    .spacing
+                    .margin_left
+                    .resolve_with(Some(containing_width), ctx.viewport_width)
+                    .unwrap_or(0.0),
+                child
+                    .style
+                    .spacing
+                    .margin_top
+                    .resolve_with(Some(containing_width), ctx.viewport_width)
+                    .unwrap_or(0.0),
+                child
+                    .style
+                    .spacing
+                    .margin_right
+                    .resolve_with(Some(containing_width), ctx.viewport_width)
+                    .unwrap_or(0.0),
+                child
+                    .style
+                    .spacing
+                    .margin_bottom
+                    .resolve_with(Some(containing_width), ctx.viewport_width)
+                    .unwrap_or(0.0),
+            );
+
+            // Apply sibling margin collapsing for block-level children
+            let collapsed_margin_top = if is_block_level && i > 0 {
+                // Take max of current top and previous sibling's bottom
+                raw_margins.1.max(previous_margin_bottom)
+            } else {
+                raw_margins.1
+            };
+
+            let collapsed_margins = (
+                raw_margins.0,
+                collapsed_margin_top,
+                raw_margins.2,
+                raw_margins.3,
+            );
+            children_margins.push(collapsed_margins);
+
+            // Update previous margin for next iteration
+            if is_block_level {
+                previous_margin_bottom = raw_margins.3;
+            }
+        }
 
         // Step 2b: First pass - layout children to determine sizes
         for child in node.children.iter_mut() {
@@ -1767,79 +1817,6 @@ fn resolve_margins_with_collapsing_enhanced(
         (margins.0, collapsed_margin_top, margins.2, margins.3),
         margins.3,
     )
-}
-
-/// Computes resolved margins for all children with proper collapsing.
-///
-/// Resolves margins for all children in a block container, applying:
-/// - Sibling collapsing: each child's top margin collapses with previous bottom
-/// - Parent-child collapsing: first child's top margin with parent border
-///
-/// # Returns
-/// Vector of resolved margins per child: (margin_left, margin_top, margin_right, margin_bottom)
-fn resolve_all_children_margins(
-    children: &[LayoutNode],
-    containing_block_width: f32,
-    viewport_width: f32,
-    _viewport_height: f32,
-) -> Vec<(f32, f32, f32, f32)> {
-    let mut resolved_margins = Vec::with_capacity(children.len());
-    let mut previous_margin_bottom = 0.0;
-
-    for (i, child) in children.iter().enumerate() {
-        let is_block_level = matches!(child.style.display, Display::Block | Display::Flex { .. });
-
-        // Resolve all four margins
-        let raw_margins = (
-            child
-                .style
-                .spacing
-                .margin_left
-                .resolve_with(Some(containing_block_width), viewport_width)
-                .unwrap_or(0.0),
-            child
-                .style
-                .spacing
-                .margin_top
-                .resolve_with(Some(containing_block_width), viewport_width)
-                .unwrap_or(0.0),
-            child
-                .style
-                .spacing
-                .margin_right
-                .resolve_with(Some(containing_block_width), viewport_width)
-                .unwrap_or(0.0),
-            child
-                .style
-                .spacing
-                .margin_bottom
-                .resolve_with(Some(containing_block_width), viewport_width)
-                .unwrap_or(0.0),
-        );
-
-        // Apply sibling margin collapsing for block-level children
-        let collapsed_margin_top = if is_block_level && i > 0 {
-            // Take max of current top and previous sibling's bottom
-            raw_margins.1.max(previous_margin_bottom)
-        } else {
-            raw_margins.1
-        };
-
-        let collapsed_margins = (
-            raw_margins.0,
-            collapsed_margin_top,
-            raw_margins.2,
-            raw_margins.3,
-        );
-        resolved_margins.push(collapsed_margins);
-
-        // Update previous margin for next iteration
-        if is_block_level {
-            previous_margin_bottom = raw_margins.3;
-        }
-    }
-
-    resolved_margins
 }
 
 /// Computes justify-content offset and gap spacing.
