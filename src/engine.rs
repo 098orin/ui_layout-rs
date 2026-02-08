@@ -463,7 +463,10 @@ impl LayoutEngine {
             })
             .or(ctx
                 .parent_assigned_border_width
-                .map(|b| b - border.0 - border.2 - padding.0 - padding.2));
+                .map(|b| b - border.0 - border.2 - padding.0 - padding.2))
+            .or(ctx
+                .containing_block_width
+                .map(|cbw| cbw - border.0 - border.2 - padding.0 - padding.2));
 
         let content_height_opt = node
             .style
@@ -486,6 +489,8 @@ impl LayoutEngine {
             let child_ctx = LayoutContext {
                 containing_block_width: content_height_opt,
                 containing_block_height: content_width_opt,
+                parent_assigned_border_width: None,
+                parent_assigned_border_height: None,
                 ..*ctx
             };
 
