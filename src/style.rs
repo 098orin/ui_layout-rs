@@ -38,20 +38,26 @@ impl Length {
     /// Resolves a length value to pixels.
     ///
     /// If the containing block is `auto`, percentages are treated as `auto` for layout purposes.
-    pub fn resolve_with(&self, containing_block: Option<f32>, viewport: f32) -> Option<f32> {
+    /// This version uses a single viewport value (for backward compatibility with axis-based layout).
+    pub fn resolve_with(
+        &self,
+        containing_block: Option<f32>,
+        viewport_width: f32,
+        viewport_height: f32,
+    ) -> Option<f32> {
         match self {
             Length::Auto => None,
             Length::Px(v) => Some(*v),
             Length::Percent(p) => containing_block.map(|cb| cb * *p / 100.0),
-            Length::Vw(v) => Some(viewport * *v / 100.0),
-            Length::Vh(v) => Some(viewport * *v / 100.0),
+            Length::Vw(v) => Some(viewport_width * *v / 100.0),
+            Length::Vh(v) => Some(viewport_height * *v / 100.0),
             Length::Add(a, b) => Some(
-                a.resolve_with(containing_block, viewport)?
-                    + b.resolve_with(containing_block, viewport)?,
+                a.resolve_with(containing_block, viewport_width, viewport_height)?
+                    + b.resolve_with(containing_block, viewport_width, viewport_height)?,
             ),
             Length::Sub(a, b) => Some(
-                a.resolve_with(containing_block, viewport)?
-                    - b.resolve_with(containing_block, viewport)?,
+                a.resolve_with(containing_block, viewport_width, viewport_height)?
+                    - b.resolve_with(containing_block, viewport_width, viewport_height)?,
             ),
         }
     }

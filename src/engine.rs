@@ -82,22 +82,6 @@ impl LayoutContext {
         }
     }
 
-    /// Returns viewport length along the main axis (used for percentage resolution).
-    fn viewport_main(&self, axis: Axis) -> f32 {
-        match axis {
-            Axis::Horizontal => self.viewport_width,
-            Axis::Vertical => self.viewport_height,
-        }
-    }
-
-    /// Returns viewport length along the cross axis.
-    fn viewport_cross(&self, axis: Axis) -> f32 {
-        match axis {
-            Axis::Horizontal => self.viewport_height,
-            Axis::Vertical => self.viewport_width,
-        }
-    }
-
     /// Returns parent-assigned border-box size along the main axis (for stretch/relative fallback).
     fn parent_assigned_border_main(&self, axis: Axis) -> Option<f32> {
         match axis {
@@ -363,23 +347,23 @@ impl LayoutEngine {
         let mut final_content_cross = content_cross.unwrap_or(children_cross);
 
         // Step 3a: Apply min/max constraints to auto-sized flex container dimensions
-        let vm = ctx.viewport_main(axis);
-        let vc = ctx.viewport_cross(axis);
         let cbm = ctx.containing_block_main(axis);
         let cbc = ctx.containing_block_cross(axis);
+        let vw = ctx.viewport_width;
+        let vh = ctx.viewport_height;
 
         let main_size_was_auto = content_main.is_none();
         let cross_size_was_auto = content_cross.is_none();
 
         if main_size_was_auto {
-            let min_main = axis.min_main(&node.style.size).resolve_with(cbm, vm);
-            let max_main = axis.max_main(&node.style.size).resolve_with(cbm, vm);
+            let min_main = axis.min_main(&node.style.size).resolve_with(cbm, vw, vh);
+            let max_main = axis.max_main(&node.style.size).resolve_with(cbm, vw, vh);
             final_content_main = clamp(final_content_main, min_main, max_main);
         }
 
         if cross_size_was_auto {
-            let min_cross = axis.min_cross(&node.style.size).resolve_with(cbc, vc);
-            let max_cross = axis.max_cross(&node.style.size).resolve_with(cbc, vc);
+            let min_cross = axis.min_cross(&node.style.size).resolve_with(cbc, vw, vh);
+            let max_cross = axis.max_cross(&node.style.size).resolve_with(cbc, vw, vh);
             final_content_cross = clamp(final_content_cross, min_cross, max_cross);
         }
 
@@ -446,11 +430,14 @@ impl LayoutEngine {
         let border = resolve_border(&node.style.spacing, &ctx);
 
         // Step 1: Resolve the block's own size
+        let vw = ctx.viewport_width;
+        let vh = ctx.viewport_height;
+
         let content_width_opt = node
             .style
             .size
             .width
-            .resolve_with(ctx.containing_block_width, ctx.viewport_width)
+            .resolve_with(ctx.containing_block_width, vw, vh)
             .map(|width| {
                 let padding_edge = (padding.0, padding.2);
                 let border_edge = (border.0, border.2);
@@ -467,7 +454,7 @@ impl LayoutEngine {
             .style
             .size
             .height
-            .resolve_with(ctx.containing_block_height, ctx.viewport_height)
+            .resolve_with(ctx.containing_block_height, vw, vh)
             .map(|height| {
                 let padding_edge = (padding.1, padding.3);
                 let border_edge = (border.1, border.3);
@@ -492,25 +479,25 @@ impl LayoutEngine {
                     .style
                     .spacing
                     .margin_left
-                    .resolve_with(Some(containing_width), ctx.viewport_width)
+                    .resolve_with(Some(containing_width), vw, vh)
                     .unwrap_or(0.0),
                 child
                     .style
                     .spacing
                     .margin_top
-                    .resolve_with(Some(containing_width), ctx.viewport_width)
+                    .resolve_with(Some(containing_width), vw, vh)
                     .unwrap_or(0.0),
                 child
                     .style
                     .spacing
                     .margin_right
-                    .resolve_with(Some(containing_width), ctx.viewport_width)
+                    .resolve_with(Some(containing_width), vw, vh)
                     .unwrap_or(0.0),
                 child
                     .style
                     .spacing
                     .margin_bottom
-                    .resolve_with(Some(containing_width), ctx.viewport_width)
+                    .resolve_with(Some(containing_width), vw, vh)
                     .unwrap_or(0.0),
             );
 
@@ -897,10 +884,10 @@ impl LayoutEngine {
         axis: Axis,
         ctx: &LayoutContext,
     ) -> ContainerSizes {
-        let vm = ctx.viewport_main(axis);
-        let vc = ctx.viewport_cross(axis);
         let cbm = ctx.containing_block_main(axis);
         let cbc = ctx.containing_block_cross(axis);
+        let vw = ctx.viewport_width;
+        let vh = ctx.viewport_height;
 
         // Resolve padding and border
         let (pms_len, pme_len) = axis.padding_main(&node.style.spacing);
@@ -912,35 +899,35 @@ impl LayoutEngine {
         // relative to the containing block's width (not height). Use the
         // containing block width (or viewport width fallback) for percentage
         // resolution on vertical edges as well.
-        let containing_width = ctx.containing_block_width.unwrap_or(ctx.viewport_width);
+        let containing_width = ctx.containing_block_width.unwrap_or(vw);
 
         let pms = pms_len
-            .resolve_with(Some(containing_width), ctx.viewport_width)
+            .resolve_with(Some(containing_width), vw, vh)
             .unwrap_or(0.0);
         let pme = pme_len
-            .resolve_with(Some(containing_width), ctx.viewport_width)
+            .resolve_with(Some(containing_width), vw, vh)
             .unwrap_or(0.0);
         let pcs = pcs_len
-            .resolve_with(Some(containing_width), ctx.viewport_width)
+            .resolve_with(Some(containing_width), vw, vh)
             .unwrap_or(0.0);
         let pce = pce_len
-            .resolve_with(Some(containing_width), ctx.viewport_width)
+            .resolve_with(Some(containing_width), vw, vh)
             .unwrap_or(0.0);
         let bms = bms_len
-            .resolve_with(Some(containing_width), ctx.viewport_width)
+            .resolve_with(Some(containing_width), vw, vh)
             .unwrap_or(0.0);
         let bme = bme_len
-            .resolve_with(Some(containing_width), ctx.viewport_width)
+            .resolve_with(Some(containing_width), vw, vh)
             .unwrap_or(0.0);
         let bcs = bcs_len
-            .resolve_with(Some(containing_width), ctx.viewport_width)
+            .resolve_with(Some(containing_width), vw, vh)
             .unwrap_or(0.0);
         let bce = bce_len
-            .resolve_with(Some(containing_width), ctx.viewport_width)
+            .resolve_with(Some(containing_width), vw, vh)
             .unwrap_or(0.0);
 
         // Resolve specified sizes
-        let specified_main = axis.size_main(&node.style.size).resolve_with(cbm, vm);
+        let specified_main = axis.size_main(&node.style.size).resolve_with(cbm, vw, vh);
         let mut content_main = match (specified_main, node.style.box_sizing) {
             (Some(m), BoxSizing::BorderBox) => Some((m - pms - pme - bms - bme).max(0.0)),
             (Some(m), BoxSizing::ContentBox) => Some(m),
@@ -949,7 +936,7 @@ impl LayoutEngine {
                 .map(|m| (m - pms - pme - bms - bme).max(0.0)),
         };
 
-        let specified_cross = axis.size_cross(&node.style.size).resolve_with(cbc, vc);
+        let specified_cross = axis.size_cross(&node.style.size).resolve_with(cbc, vw, vh);
         let mut content_cross = match (specified_cross, node.style.box_sizing) {
             (Some(c), BoxSizing::BorderBox) => Some((c - pcs - pce - bcs - bce).max(0.0)),
             (Some(c), BoxSizing::ContentBox) => Some(c),
@@ -960,14 +947,14 @@ impl LayoutEngine {
 
         // Apply min/max constraints if sizes are specified
         if let Some(ref mut main) = content_main {
-            let min_main = axis.min_main(&node.style.size).resolve_with(cbm, vm);
-            let max_main = axis.max_main(&node.style.size).resolve_with(cbm, vm);
+            let min_main = axis.min_main(&node.style.size).resolve_with(cbm, vw, vh);
+            let max_main = axis.max_main(&node.style.size).resolve_with(cbm, vw, vh);
             *main = clamp(*main, min_main, max_main);
         }
 
         if let Some(ref mut cross) = content_cross {
-            let min_cross = axis.min_cross(&node.style.size).resolve_with(cbc, vc);
-            let max_cross = axis.max_cross(&node.style.size).resolve_with(cbc, vc);
+            let min_cross = axis.min_cross(&node.style.size).resolve_with(cbc, vw, vh);
+            let max_cross = axis.max_cross(&node.style.size).resolve_with(cbc, vw, vh);
             *cross = clamp(*cross, min_cross, max_cross);
         }
 
@@ -1025,9 +1012,11 @@ impl LayoutEngine {
             // Get min/max constraints
             let min_main =
                 LayoutEngine::resolve_flex_item_min_main(child, axis, content_width_hint, ctx);
-            let max_main = axis
-                .max_main(&child.style.size)
-                .resolve_with(content_width_hint, ctx.viewport_main(axis));
+            let max_main = axis.max_main(&child.style.size).resolve_with(
+                content_width_hint,
+                ctx.viewport_width,
+                ctx.viewport_height,
+            );
 
             let cross_size = if let LayoutBoxes::Single(ref box_model) = child.layout_boxes {
                 axis.cross(&box_model.border_box)
@@ -1119,9 +1108,11 @@ impl LayoutEngine {
             .sum();
 
         let gap_total = if node.children.len() > 1 {
+            let vw = ctx.viewport_width;
+            let vh = ctx.viewport_height;
             let gap = axis
                 .gap(&node.style)
-                .resolve_with(container_main, ctx.viewport_main(axis))
+                .resolve_with(container_main, vw, vh)
                 .unwrap_or(0.0);
             gap * (node.children.len() as f32 - 1.0)
         } else {
@@ -1147,10 +1138,11 @@ impl LayoutEngine {
     ) -> f32 {
         let flex_basis = &child.style.item_style.flex_basis;
 
+        let vw = ctx.viewport_width;
+        let vh = ctx.viewport_height;
+
         // If flex-basis is not auto, use it
-        if let Some(basis_size) =
-            flex_basis.resolve_with(containing_block_main, ctx.viewport_main(axis))
-        {
+        if let Some(basis_size) = flex_basis.resolve_with(containing_block_main, vw, vh) {
             return basis_size;
         }
 
@@ -1160,12 +1152,12 @@ impl LayoutEngine {
                 .style
                 .size
                 .width
-                .resolve_with(containing_block_main, ctx.viewport_main(axis)),
+                .resolve_with(containing_block_main, vw, vh),
             Axis::Vertical => child
                 .style
                 .size
                 .height
-                .resolve_with(containing_block_main, ctx.viewport_main(axis)),
+                .resolve_with(containing_block_main, vw, vh),
         };
 
         if let Some(explicit_size) = explicit_main_size {
@@ -1200,7 +1192,11 @@ impl LayoutEngine {
                 // In future, this should calculate content-based minimum size
                 None
             }
-            _ => min_main.resolve_with(containing_block_main, ctx.viewport_main(axis)),
+            _ => {
+                let vw = ctx.viewport_width;
+                let vh = ctx.viewport_height;
+                min_main.resolve_with(containing_block_main, vw, vh)
+            }
         }
     }
 
@@ -1423,13 +1419,12 @@ impl LayoutEngine {
 
             // Calculate gaps
             let gap_total = if node.children.len() > 1 {
+                let vw = ctx.viewport_width;
+                let vh = ctx.viewport_height;
                 let gap = params
                     .axis
                     .gap(&node.style)
-                    .resolve_with(
-                        ctx.containing_block_main(params.axis),
-                        ctx.viewport_main(params.axis),
-                    )
+                    .resolve_with(ctx.containing_block_main(params.axis), vw, vh)
                     .unwrap_or(0.0);
                 gap * (node.children.len() as f32 - 1.0)
             } else {
@@ -1485,9 +1480,11 @@ impl LayoutEngine {
         };
 
         // Resolve gap between flex items
+        let vw = ctx.viewport_width;
+        let vh = ctx.viewport_height;
         let gap = axis
             .gap(&node.style)
-            .resolve_with(ctx.containing_block_main(axis), ctx.viewport_main(axis))
+            .resolve_with(ctx.containing_block_main(axis), vw, vh)
             .unwrap_or(0.0);
 
         // Calculate total size of all flex children
@@ -1738,23 +1735,26 @@ fn apply_size_constraints(
     ctx: &LayoutContext,
     is_width: bool,
 ) -> f32 {
+    let vw = ctx.viewport_width;
+    let vh = ctx.viewport_height;
+
     let (min_constraint, max_constraint) = if is_width {
         (
             size_style
                 .min_width
-                .resolve_with(ctx.containing_block_width, ctx.viewport_width),
+                .resolve_with(ctx.containing_block_width, vw, vh),
             size_style
                 .max_width
-                .resolve_with(ctx.containing_block_width, ctx.viewport_width),
+                .resolve_with(ctx.containing_block_width, vw, vh),
         )
     } else {
         (
             size_style
                 .min_height
-                .resolve_with(ctx.containing_block_height, ctx.viewport_height),
+                .resolve_with(ctx.containing_block_height, vw, vh),
             size_style
                 .max_height
-                .resolve_with(ctx.containing_block_height, ctx.viewport_height),
+                .resolve_with(ctx.containing_block_height, vw, vh),
         )
     };
 
@@ -1764,23 +1764,25 @@ fn apply_size_constraints(
 fn resolve_margins(spacing: &Spacing, ctx: &LayoutContext) -> (f32, f32, f32, f32) {
     // Percentage margins resolve against containing block width
     let containing_width = ctx.containing_block_width.unwrap_or(ctx.viewport_width);
+    let vw = ctx.viewport_width;
+    let vh = ctx.viewport_height;
 
     (
         spacing
             .margin_left
-            .resolve_with(ctx.containing_block_width, ctx.viewport_width)
+            .resolve_with(ctx.containing_block_width, vw, vh)
             .unwrap_or(0.0),
         spacing
             .margin_top
-            .resolve_with(Some(containing_width), ctx.viewport_width)
+            .resolve_with(Some(containing_width), vw, vh)
             .unwrap_or(0.0),
         spacing
             .margin_right
-            .resolve_with(ctx.containing_block_width, ctx.viewport_width)
+            .resolve_with(ctx.containing_block_width, vw, vh)
             .unwrap_or(0.0),
         spacing
             .margin_bottom
-            .resolve_with(Some(containing_width), ctx.viewport_width)
+            .resolve_with(Some(containing_width), vw, vh)
             .unwrap_or(0.0),
     )
 }
@@ -1867,23 +1869,25 @@ fn resolve_align_position(align: AlignItems, size: f32, container: f32) -> f32 {
 /// Percentage values resolve relative to the containing block's width.
 fn resolve_padding(spacing: &Spacing, ctx: &LayoutContext) -> (f32, f32, f32, f32) {
     let containing_width = ctx.containing_block_width.unwrap_or(ctx.viewport_width);
+    let vw = ctx.viewport_width;
+    let vh = ctx.viewport_height;
 
     (
         spacing
             .padding_left
-            .resolve_with(Some(containing_width), ctx.viewport_width)
+            .resolve_with(Some(containing_width), vw, vh)
             .unwrap_or(0.0),
         spacing
             .padding_top
-            .resolve_with(Some(containing_width), ctx.viewport_width)
+            .resolve_with(Some(containing_width), vw, vh)
             .unwrap_or(0.0),
         spacing
             .padding_right
-            .resolve_with(Some(containing_width), ctx.viewport_width)
+            .resolve_with(Some(containing_width), vw, vh)
             .unwrap_or(0.0),
         spacing
             .padding_bottom
-            .resolve_with(Some(containing_width), ctx.viewport_width)
+            .resolve_with(Some(containing_width), vw, vh)
             .unwrap_or(0.0),
     )
 }
@@ -1891,25 +1895,26 @@ fn resolve_padding(spacing: &Spacing, ctx: &LayoutContext) -> (f32, f32, f32, f3
 /// Resolves border values.
 /// Percentage values resolve relative to the containing block's width.
 fn resolve_border(spacing: &Spacing, ctx: &LayoutContext) -> (f32, f32, f32, f32) {
-    // Per CSS spec, percentage borders resolve to containing block width
     let containing_width = ctx.containing_block_width.unwrap_or(ctx.viewport_width);
+    let vw = ctx.viewport_width;
+    let vh = ctx.viewport_height;
 
     (
         spacing
             .border_left
-            .resolve_with(ctx.containing_block_width, ctx.viewport_width)
+            .resolve_with(Some(containing_width), vw, vh)
             .unwrap_or(0.0),
         spacing
             .border_top
-            .resolve_with(Some(containing_width), ctx.viewport_width)
+            .resolve_with(Some(containing_width), vw, vh)
             .unwrap_or(0.0),
         spacing
             .border_right
-            .resolve_with(ctx.containing_block_width, ctx.viewport_width)
+            .resolve_with(Some(containing_width), vw, vh)
             .unwrap_or(0.0),
         spacing
             .border_bottom
-            .resolve_with(Some(containing_width), ctx.viewport_width)
+            .resolve_with(Some(containing_width), vw, vh)
             .unwrap_or(0.0),
     )
 }
