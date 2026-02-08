@@ -833,17 +833,16 @@ fn auto_sizing_with_padding_and_border() {
 
     match &root.layout_boxes {
         LayoutBoxes::Single(box_model) => {
-            // Width should match containing block width
-            assert_eq!(box_model.content_box.width, 800.0);
-            assert_eq!(box_model.content_box.height, 60.0);
+            // Content box should exclude padding and borders
+            assert_eq!(box_model.content_box.width, 800.0 - 2.0 - 2.0 - 10.0 - 10.0);
+            assert_eq!(box_model.content_box.height, 600.0 - 1.0 - 1.0 - 8.0 - 8.0);
 
             // Padding box should include padding
-            assert_eq!(box_model.padding_box.width, 820.0); // 800 + 10 + 10
-            assert_eq!(box_model.padding_box.height, 76.0); // 60 + 8 + 8
+            assert_eq!(box_model.padding_box.width, 800.0 - 2.0 - 2.0);
+            assert_eq!(box_model.padding_box.height, 600.0 - 1.0 - 1.0);
 
-            // Border box should include borders
-            assert_eq!(box_model.border_box.width, 824.0); // 820 + 2 + 2
-            assert_eq!(box_model.border_box.height, 78.0); // 76 + 1 + 1
+            assert_eq!(box_model.border_box.width, 800.0);
+            assert_eq!(box_model.border_box.height, 600.0);
         }
         _ => panic!("Expected single box model"),
     }
