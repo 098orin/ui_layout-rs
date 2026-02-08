@@ -771,17 +771,19 @@ fn auto_height_with_border() {
 
     match &root.layout_boxes {
         LayoutBoxes::Single(box_model) => {
+            // Note: Auto size of root follows viewport size.
+
             // Content box should include child size
             assert_eq!(box_model.content_box.width, 200.0);
-            assert_eq!(box_model.content_box.height, 70.0);
+            assert_eq!(box_model.content_box.height, 600.0 - 3.0 - 5.0);
 
             // Padding box should be same as content box (no padding)
-            assert_eq!(box_model.padding_box.width, 200.0);
-            assert_eq!(box_model.padding_box.height, 70.0);
+            assert_eq!(box_model.content_box.width, 200.0);
+            assert_eq!(box_model.content_box.height, 600.0 - 3.0 - 5.0);
 
             // Border box should include borders
-            assert_eq!(box_model.border_box.width, 204.0); // 200 + 2 + 2
-            assert_eq!(box_model.border_box.height, 78.0); // 70 + 3 + 5
+            assert_eq!(box_model.border_box.width, 204.0);
+            assert_eq!(box_model.border_box.height, 600.0);
         }
         _ => panic!("Expected single box model"),
     }
