@@ -483,7 +483,7 @@ fn auto_height_single_child() {
         ..Default::default()
     });
 
-    let mut root = LayoutNode::with_children(
+    let inner = LayoutNode::with_children(
         Style {
             size: SizeStyle {
                 width: Length::Px(200.0),
@@ -495,9 +495,11 @@ fn auto_height_single_child() {
         vec![child],
     );
 
+    let mut root = LayoutNode::with_children(Style::default(), vec![inner]);
+
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
-    match &root.layout_boxes {
+    match &root.children[0].layout_boxes {
         LayoutBoxes::Single(box_model) => {
             // Parent with Auto height should adopt the child's height
             assert_eq!(box_model.content_box.width, 200.0);
