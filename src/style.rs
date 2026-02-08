@@ -35,9 +35,9 @@ impl Default for Length {
 }
 
 impl Length {
-    // Resolve Length
-    //
-    // If the containing block’s is `auto`, then the percentage is treated as `auto` for the purpose of layout.
+    /// Resolves a length value to pixels.
+    ///
+    /// If the containing block is `auto`, percentages are treated as `auto` for layout purposes.
     pub fn resolve_with(&self, containing_block: Option<f32>, viewport: f32) -> Option<f32> {
         match self {
             Length::Auto => None,

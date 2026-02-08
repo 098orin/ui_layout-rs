@@ -11,7 +11,7 @@ pub struct BoxModel {
     pub border_box: Rect,
     pub padding_box: Rect,
     pub content_box: Rect,
-    /// scroll size
+    /// Scrollable content size
     pub children_box: Rect,
 }
 
@@ -43,7 +43,7 @@ impl Rect {
 }
 
 impl BoxModel {
-    /// ボックス全体を平行移動
+    /// Translates the entire box by the given offset.
     fn shift(&mut self, dx: f32, dy: f32) {
         self.border_box.shift(dx, dy);
         self.padding_box.shift(dx, dy);
@@ -51,12 +51,12 @@ impl BoxModel {
         self.children_box.shift(dx, dy);
     }
 
-    /// 横幅（border-box ベース）
+    /// Returns the width based on border-box dimensions.
     pub fn width(&self) -> f32 {
         self.border_box.width
     }
 
-    /// 高さ（border-box ベース）
+    /// Returns the height based on border-box dimensions.
     pub fn height(&self) -> f32 {
         self.border_box.height
     }
@@ -75,7 +75,7 @@ impl LayoutBoxes {
         }
     }
 
-    /// Get max width
+    /// Returns the maximum width among all boxes.
     pub fn width(&self) -> f32 {
         match self {
             LayoutBoxes::None => 0.0,
@@ -84,7 +84,7 @@ impl LayoutBoxes {
         }
     }
 
-    /// Culc height sum
+    /// Returns the total height (sum of all boxes).
     pub fn height(&self) -> f32 {
         match self {
             LayoutBoxes::None => 0.0,

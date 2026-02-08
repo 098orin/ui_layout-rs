@@ -13,8 +13,8 @@ pub fn make_layout_key(ctx: &crate::engine::LayoutContext) -> u32 {
 
 use std::hash::Hasher;
 
-/// Lightweight hasher for layout caching
-/// Designed for hashing layout-related data efficiently.
+/// Lightweight hasher for layout caching.
+/// Designed for hashing layout-related data efficiently using FNV-like algorithm.
 #[derive(Debug, Clone)]
 struct LayoutHasher {
     state: u64,
@@ -23,7 +23,7 @@ struct LayoutHasher {
 impl LayoutHasher {
     #[inline]
     pub fn new() -> Self {
-        // Random seed（FNV offset basis）
+        // FNV offset basis (64-bit)
         Self {
             state: 0xcbf29ce484222325,
         }
@@ -31,7 +31,7 @@ impl LayoutHasher {
 
     #[inline]
     fn mix(&mut self, v: u64) {
-        // xor + 64bit 乗算（黄金比）
+        // XOR followed by multiplication with golden ratio for avalanche effect
         self.state ^= v;
         self.state = self.state.wrapping_mul(0x9E3779B97F4A7C15);
     }
@@ -52,8 +52,7 @@ impl Hasher for LayoutHasher {
 
     #[inline]
     fn write(&mut self, bytes: &[u8]) {
-        // layout 用なのでバイト列は想定しない
-        // 最低限だけ対応
+        // Process bytes in 8-byte chunks for layout data hashing
         let mut i = 0;
         while i + 8 <= bytes.len() {
             let chunk = u64::from_le_bytes(bytes[i..i + 8].try_into().unwrap());
@@ -61,6 +60,7 @@ impl Hasher for LayoutHasher {
             i += 8;
         }
 
+        // Handle remaining bytes
         if i < bytes.len() {
             let mut last = 0u64;
             for (shift, b) in bytes[i..].iter().enumerate() {
