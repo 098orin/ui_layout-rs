@@ -256,8 +256,8 @@ impl LayoutEngine {
             viewport_width: width,
             viewport_height: height,
             // Root element has no parent, so don't assign parent dimensions
-            parent_assigned_border_width: None,
-            parent_assigned_border_height: None,
+            parent_assigned_border_width: Some(width),
+            parent_assigned_border_height: Some(height),
         };
 
         let engine = LayoutEngine;
