@@ -634,12 +634,12 @@ fn auto_width_with_padding() {
     match &root.layout_boxes {
         LayoutBoxes::Single(box_model) => {
             // Width should match containing block width
-            assert_eq!(box_model.content_box.width, 800.0);
+            assert_eq!(box_model.content_box.width, 800.0 - 10.0 - 15.0);
             assert_eq!(box_model.content_box.height, 100.0);
 
             // Padding box should include padding
-            assert_eq!(box_model.padding_box.width, 825.0); // 800 + 10 + 15
-            assert_eq!(box_model.padding_box.height, 113.0); // 100 + 5 + 8
+            assert_eq!(box_model.padding_box.width, 800.0);
+            assert_eq!(box_model.padding_box.height, 100.0 + 5.0 + 8.0);
         }
         _ => panic!("Expected single box model"),
     }
