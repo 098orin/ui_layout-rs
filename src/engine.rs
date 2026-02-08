@@ -256,7 +256,7 @@ impl LayoutEngine {
             containing_block_height: Some(height),
             viewport_width: width,
             viewport_height: height,
-            // Root element has no parent, so don't assign parent dimensions
+            // Root element has no parent, but assign viewport dimensions for layout calculations
             parent_assigned_border_width: Some(width),
             parent_assigned_border_height: Some(height),
         };
