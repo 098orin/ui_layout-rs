@@ -50,14 +50,6 @@ struct FragmentLayoutContext {
     origin: (f32, f32),
 }
 
-/// Margin collapsing context for block flow layout.
-/// Tracks margin information needed for proper margin collapsing between siblings.
-#[derive(Debug, Clone, Copy)]
-struct MarginCollapsingContext {
-    /// The bottom margin of this element (for collapsing with next sibling)
-    margin_after: f32,
-}
-
 /// Layout context carrying resolved sizing information down the tree.
 ///
 /// Fields:
