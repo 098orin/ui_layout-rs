@@ -245,10 +245,10 @@ fn percentage_padding() {
             ..Default::default()
         },
         spacing: Spacing {
-            padding_left: Length::Percent(10.0),  // 10% of width = 20px
-            padding_right: Length::Percent(5.0),  // 5% of width = 10px
-            padding_top: Length::Percent(10.0),   // 10% of width = 20px
-            padding_bottom: Length::Percent(5.0), // 5% of width = 10px
+            padding_left: Length::Percent(10.0), // 10% of containing block width = 80px
+            padding_right: Length::Percent(5.0), // 5% of containing block width = 40px
+            padding_top: Length::Percent(10.0),  // 10% of containing block width = 80px
+            padding_bottom: Length::Percent(5.0), // 5% of containing block width = 40px
             ..Default::default()
         },
         ..Default::default()
@@ -263,8 +263,8 @@ fn percentage_padding() {
             assert_eq!(box_model.content_box.height, 100.0);
 
             // Padding box should include percentage padding
-            assert_eq!(box_model.padding_box.width, 230.0); // 200 + 20 + 10
-            assert_eq!(box_model.padding_box.height, 130.0); // 100 + 20 + 10
+            assert_eq!(box_model.padding_box.width, 320.0); // 200 + 80 + 40
+            assert_eq!(box_model.padding_box.height, 220.0); // 100 + 80 + 40
         }
         _ => panic!("Expected single box model"),
     }
