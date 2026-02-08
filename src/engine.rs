@@ -447,83 +447,57 @@ impl LayoutEngine {
     ) -> ((f32, f32), f32) {
         let mut cursor_y = origin.1;
 
+        let padding = resolve_padding(&node.style.spacing, &ctx);
+        let border = resolve_border(&node.style.spacing, &ctx);
+
         // Step 1: Resolve node's own size
-        let specified_width = node
+        let content_width_opt = node
             .style
             .size
             .width
-            .resolve_with(ctx.containing_block_width, ctx.viewport_width);
+            .resolve_with(ctx.containing_block_width, ctx.viewport_width)
+            .map(|width| {
+                let padding_edge = (padding.0, padding.2);
+                let border_edge = (border.0, border.2);
+                resolve_content_size_with_box_sizing(node, width, padding_edge, border_edge)
+            })
+            .or(ctx
+                .parent_assigned_border_width
+                .map(|b| b - border.0 - border.2 - padding.0 - padding.2));
 
-        let mut content_height = node
+        let content_height_opt = node
             .style
             .size
             .height
-            .resolve_with(ctx.containing_block_height, ctx.viewport_height);
-
-        let is_width_from_spec = specified_width.is_some();
-        let is_width_from_parent = ctx.parent_assigned_border_width.is_some();
-        let is_width_auto = !is_width_from_spec && !is_width_from_parent;
-
-        let width_for_layout = if is_width_auto {
-            ctx.containing_block_width.unwrap_or(ctx.viewport_width)
-        } else {
-            specified_width
-                .or(ctx.parent_assigned_border_width)
-                .unwrap_or_else(|| ctx.containing_block_width.unwrap_or(ctx.viewport_width))
-        };
-
-        let width_for_spacing = width_for_layout;
-
-        // Step 2: Resolve padding, border, and margins for constraint calculations
-        let ctx_with_width = LayoutContext {
-            containing_block_width: Some(width_for_spacing),
-            containing_block_height: content_height,
-            ..*ctx
-        };
-        let padding = resolve_padding(&node.style.spacing, &ctx_with_width);
-        let border = resolve_border(&node.style.spacing, &ctx_with_width);
-        let (margins, _parent_margin_collapse_context) = resolve_margins_with_collapsing_enhanced(
-            &node.style.spacing,
-            &ctx_with_width,
-            false,
-            0.0,
-        );
-
-        let mut content_width = match node.style.box_sizing {
-            BoxSizing::ContentBox => width_for_layout,
-            BoxSizing::BorderBox => {
-                (width_for_layout - padding.0 - padding.2 - border.0 - border.2).max(0.0)
-            }
-        };
-
-        // Apply box-sizing to height as well
-        if let Some(h) = content_height {
-            content_height = match node.style.box_sizing {
-                BoxSizing::ContentBox => Some(h),
-                BoxSizing::BorderBox => {
-                    Some((h - padding.1 - padding.3 - border.1 - border.3).max(0.0))
-                }
-            };
-        }
+            .resolve_with(ctx.containing_block_height, ctx.viewport_height)
+            .map(|height| {
+                let padding_edge = (padding.1, padding.3);
+                let border_edge = (border.1, border.3);
+                resolve_content_size_with_box_sizing(node, height, padding_edge, border_edge)
+            })
+            .or(ctx
+                .parent_assigned_border_height
+                .map(|b| b - border.1 - border.3 - padding.1 - padding.3));
 
         // Step 3: First pass: layout children to determine sizes
         let mut previous_margin_collapsing = MarginCollapsingContext { margin_after: 0.0 };
 
         for child in node.children.iter_mut() {
             let child_ctx = LayoutContext {
-                containing_block_width: Some(content_width),
-                containing_block_height: content_height,
+                containing_block_width: content_height_opt,
+                containing_block_height: content_width_opt,
                 ..*ctx
             };
 
             // Determine if child has box-creating content
-            let is_child_block = matches!(child.style.display, Display::Block);
+            let is_child_block_level =
+                matches!(child.style.display, Display::Block | Display::Flex { .. });
 
             // Resolve child margins for collapsing
             let (child_margins, _) = resolve_margins_with_collapsing_enhanced(
                 &child.style.spacing,
                 &child_ctx,
-                is_child_block,
+                is_child_block_level,
                 previous_margin_collapsing.margin_after,
             );
 
@@ -541,16 +515,19 @@ impl LayoutEngine {
             previous_margin_collapsing.margin_after = child_margins.3;
         }
 
-        // Apply min/max constraints to content size
-        content_width = apply_size_constraints(
-            content_width,
+        // Step 3b: Apply min/max constraints to content width
+        let mut final_content_width = content_width_opt.unwrap_or(0.0);
+        final_content_width = apply_size_constraints(
+            final_content_width,
             &node.style.size,
             ctx,
             true, // is_width
         );
 
         // Step 4: Determine final height
-        if content_height.is_none() {
+        let mut final_content_height = if let Some(h) = content_height_opt {
+            h
+        } else {
             // Auto height: use child-based sizing
             let child_based_height = cursor_y - origin.1;
 
@@ -563,15 +540,14 @@ impl LayoutEngine {
                     }
                 };
                 if stretch_height > child_based_height {
-                    content_height = Some(stretch_height);
+                    stretch_height
                 } else {
-                    content_height = Some(child_based_height);
+                    child_based_height
                 }
             } else {
-                content_height = Some(child_based_height);
+                child_based_height
             }
-        }
-        let mut final_content_height = content_height.unwrap_or(0.0);
+        };
         final_content_height = apply_size_constraints(
             final_content_height,
             &node.style.size,
@@ -579,7 +555,9 @@ impl LayoutEngine {
             false, // is_height
         );
 
-        let final_content_width = content_width;
+        // Step 4b: Resolve node's margins
+        let (margins, _) =
+            resolve_margins_with_collapsing_enhanced(&node.style.spacing, &ctx, true, 0.0);
 
         // Step 5: Create box model
         node.layout_boxes = LayoutBoxes::Single(create_box_model(
@@ -1623,8 +1601,34 @@ impl LayoutEngine {
     }
 }
 
+// -----------------------
 // Helper functions
 // -----------------------
+
+/// Resolve the content size based on the box-sizing property
+///
+/// # Arguments
+/// * `node` - The layout node
+/// * `size` - The size to resolve
+/// * `padding_edge` - (padding start, padding end)
+/// * `border_edge` - (border start, border end)
+///
+/// # Returns
+/// The resolved content size
+fn resolve_content_size_with_box_sizing(
+    node: &LayoutNode,
+    size: f32,
+    padding_edge: (f32, f32),
+    border_edge: (f32, f32),
+) -> f32 {
+    match node.style.box_sizing {
+        BoxSizing::ContentBox => size,
+        BoxSizing::BorderBox => {
+            size - padding_edge.0 - padding_edge.1 - border_edge.0 - border_edge.1
+        }
+    }
+    .max(0.0)
+}
 
 /// Create a box model
 fn create_box_model(
@@ -1834,6 +1838,8 @@ fn resolve_align_position(align: AlignItems, size: f32, container: f32) -> f32 {
 
 /// Resolve padding
 /// Percentage values are always relative to the width of the containing block
+/// # Returns
+/// (padding_left, padding_top, padding_right, padding_bottom)
 fn resolve_padding(spacing: &Spacing, ctx: &LayoutContext) -> (f32, f32, f32, f32) {
     let containing_width = ctx.containing_block_width.unwrap_or(ctx.viewport_width);
 
@@ -1857,6 +1863,10 @@ fn resolve_padding(spacing: &Spacing, ctx: &LayoutContext) -> (f32, f32, f32, f3
     )
 }
 
+/// Resolve border
+/// Percentage values are always relative to the width of the containing block
+/// # Returns
+/// (border_left, border_top, border_right, border_bottom)
 fn resolve_border(spacing: &Spacing, ctx: &LayoutContext) -> (f32, f32, f32, f32) {
     // Percentage borders (if used) should also resolve relative to the
     // containing block's width per standard conventions for percentage-based
