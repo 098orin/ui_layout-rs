@@ -198,7 +198,7 @@ fn inline_with_margins() {
     });
     inline_node.set_fragments(vec![fragment1]);
 
-    let mut root = LayoutNode::with_children(
+    let inner = LayoutNode::with_children(
         Style {
             size: SizeStyle {
                 width: Length::Px(200.0),
@@ -210,10 +210,12 @@ fn inline_with_margins() {
         vec![inline_node],
     );
 
+    let mut root = LayoutNode::with_children(Style::default(), vec![inner]);
+
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
     // Check that inline element is positioned with margins
-    match &root.children[0].layout_boxes {
+    match &root.children[0].children[0].layout_boxes {
         LayoutBoxes::Single(box_model) => {
             // Border box should be positioned with margins
             assert_eq!(box_model.border_box.x, 10.0); // margin_left
@@ -227,7 +229,7 @@ fn inline_with_margins() {
     }
 
     // Root should account for inline element margins in its dimensions
-    match &root.layout_boxes {
+    match &root.children[0].layout_boxes {
         LayoutBoxes::Single(box_model) => {
             // Height should include top and bottom margins
             assert_eq!(box_model.content_box.height, 33.0); // 5 + 20 + 8
