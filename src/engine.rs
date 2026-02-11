@@ -1359,14 +1359,6 @@ impl LayoutEngine {
             })
             .unwrap_or(0.0);
 
-        dbg!(
-            total_base_main,
-            total_main_margin,
-            total_main_border,
-            total_main_padding,
-            total_grow
-        );
-
         /* ---------- redistribute: grow or shrink ---------- */
 
         if remaining_signed > 0.0 {
