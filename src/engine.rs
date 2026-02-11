@@ -1368,12 +1368,6 @@ impl LayoutEngine {
                     }
 
                     let grow = child.style.item_style.flex_grow;
-                    if grow == 0.0 {
-                        // should already be frozen but guard anyway
-                        frozen[i] = true;
-                        total_grow -= grow;
-                        continue;
-                    }
 
                     let delta = remaining * (grow / total_grow);
 
