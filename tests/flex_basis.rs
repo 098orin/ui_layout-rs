@@ -63,11 +63,8 @@ fn test_flex_basis_auto() {
     }
 }
 
-/// Tests that explicit flex_basis values (in pixels) override the intrinsic
-/// content size of flex items. The flex-basis should take precedence over
-/// the explicit width/height properties of the items.
 #[test]
-fn test_flex_basis_fixed() {
+fn flex_basis_overrides_width_when_no_grow_or_shrink() {
     let mut container = LayoutNode::new(Style {
         display: Display::Flex {
             flex_direction: FlexDirection::Row,
@@ -80,44 +77,85 @@ fn test_flex_basis_fixed() {
         ..Default::default()
     });
 
-    // Child 1: Content 50px, flex-basis 100px
-    let child1 = LayoutNode::new(Style {
+    let child = LayoutNode::new(Style {
         size: SizeStyle {
             width: Length::Px(50.0),
-            height: Length::Px(50.0),
             ..Default::default()
         },
         item_style: ItemStyle {
-            flex_basis: Length::Px(100.0),
+            flex_basis: Length::Px(120.0),
+            flex_grow: 0.0,
+            flex_shrink: 0.0,
             ..Default::default()
         },
         ..Default::default()
     });
 
-    // Child 2: Content 80px, flex-basis 60px
-    let child2 = LayoutNode::new(Style {
-        size: SizeStyle {
-            width: Length::Px(80.0),
-            height: Length::Px(50.0),
-            ..Default::default()
-        },
-        item_style: ItemStyle {
-            flex_basis: Length::Px(60.0),
-            ..Default::default()
-        },
-        ..Default::default()
-    });
-
-    container.children = vec![child1, child2];
+    container.children = vec![child];
     LayoutEngine::layout(&mut container, 800.0, 600.0);
 
-    // flex-basis should override content size
+    if let LayoutBoxes::Single(ref child_box) = container.children[0].layout_boxes {
+        assert_eq!(child_box.border_box.width, 120.0);
+    }
+}
+
+#[test]
+fn flex_basis_is_starting_point_for_grow() {
+    let mut container = LayoutNode::new(Style {
+        display: Display::Flex {
+            flex_direction: FlexDirection::Row,
+        },
+        size: SizeStyle {
+            width: Length::Px(300.0),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let child = LayoutNode::new(Style {
+        item_style: ItemStyle {
+            flex_basis: Length::Px(100.0),
+            flex_grow: 1.0,
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    container.children = vec![child];
+    LayoutEngine::layout(&mut container, 800.0, 600.0);
+
+    if let LayoutBoxes::Single(ref child_box) = container.children[0].layout_boxes {
+        assert_eq!(child_box.border_box.width, 300.0);
+    }
+}
+
+#[test]
+fn flex_basis_is_starting_point_for_shrink() {
+    let mut container = LayoutNode::new(Style {
+        display: Display::Flex {
+            flex_direction: FlexDirection::Row,
+        },
+        size: SizeStyle {
+            width: Length::Px(100.0),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let child = LayoutNode::new(Style {
+        item_style: ItemStyle {
+            flex_basis: Length::Px(200.0),
+            flex_shrink: 1.0,
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    container.children = vec![child];
+    LayoutEngine::layout(&mut container, 800.0, 600.0);
+
     if let LayoutBoxes::Single(ref child_box) = container.children[0].layout_boxes {
         assert_eq!(child_box.border_box.width, 100.0);
-    }
-
-    if let LayoutBoxes::Single(ref child_box) = container.children[1].layout_boxes {
-        assert_eq!(child_box.border_box.width, 60.0);
     }
 }
 
