@@ -677,8 +677,8 @@ impl LayoutEngine {
     ) -> ((f32, f32), f32) {
         let mut cursor_y = origin.1;
 
-        let padding = resolve_padding(&node.style.spacing, &ctx);
-        let border = resolve_border(&node.style.spacing, &ctx);
+        let padding = resolve_padding(&node.style.spacing, ctx);
+        let border = resolve_border(&node.style.spacing, ctx);
 
         // Step 1: Resolve the block's own size
         let vw = ctx.viewport_width;
@@ -834,7 +834,7 @@ impl LayoutEngine {
 
         // Step 5: Resolve block's margins
         let (margins, _) =
-            resolve_margins_with_collapsing_enhanced(&node.style.spacing, &ctx, true, 0.0);
+            resolve_margins_with_collapsing_enhanced(&node.style.spacing, ctx, true, 0.0);
 
         // Step 6: Create box model
         node.layout_boxes = LayoutBoxes::Single(create_box_model(
