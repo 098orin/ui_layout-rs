@@ -415,14 +415,20 @@ impl LayoutEngine {
                 }
             };
 
-            node.layout_boxes = LayoutBoxes::Single(create_box_model(
-                final_content_main,
-                final_content_cross,
-                children_width,
-                children_height,
-                padding,
-                border,
-            ));
+            node.layout_boxes = {
+                let (content_width, content_height) = match axis {
+                    Axis::Horizontal => (final_content_main, final_content_cross),
+                    Axis::Vertical => (final_content_cross, final_content_main),
+                };
+                LayoutBoxes::Single(create_box_model(
+                    content_width,
+                    content_height,
+                    children_width,
+                    children_height,
+                    padding,
+                    border,
+                ))
+            };
 
             if let LayoutBoxes::Single(ref mut box_model) = node.layout_boxes {
                 let (pl, pt, _, _) = padding;
