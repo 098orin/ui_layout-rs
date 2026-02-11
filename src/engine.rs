@@ -1347,16 +1347,15 @@ impl LayoutEngine {
         let gaps = gap * count.saturating_sub(1) as f32;
 
         // signed remaining: positive => free space (grow), negative => deficit (shrink)
-        let remaining_signed = dbg!(
-            cbm.map(|m| {
+        let remaining_signed = cbm
+            .map(|m| {
                 m - (total_base_main
                     + gaps
                     + total_main_padding
                     + total_main_border
                     + total_main_margin)
             })
-            .unwrap_or(0.0)
-        );
+            .unwrap_or(0.0);
 
         /* ---------- redistribute: grow or shrink ---------- */
 
