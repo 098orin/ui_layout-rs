@@ -7,6 +7,17 @@ and this project loosely follows Semantic Versioning.
 
 ---
 
+## [0.9.1] - 2026-02-11
+
+### Added
+
+* Implemented `IntoIterator` for `LayoutBoxes`, `&LayoutBoxes`, and `&mut LayoutBoxes`.
+* Added `iter()` and `iter_mut()` convenience methods to `LayoutBoxes` for ergonomic iteration over contained `BoxModel` values.
+* Enabled use of standard iterator traits for `LayoutBoxes`, including `ExactSizeIterator`, `DoubleEndedIterator`, and `FusedIterator` through delegation to the standard library iterators.
+
+
+---
+
 ## [0.9.0] - 2026-02-11
 ### Added
 - Inline layout support:
