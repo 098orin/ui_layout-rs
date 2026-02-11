@@ -1305,9 +1305,11 @@ impl LayoutEngine {
                     match explicit {
                         None => {
                             // intrinsic measurement
+                            // Set containing block size to none
+                            // to prevent the child from expanding out of the parent's size
                             let intrinsic_ctx = LayoutContext {
-                                containing_block_width: cbm,
-                                containing_block_height: cbc,
+                                containing_block_width: None,
+                                containing_block_height: None,
                                 viewport_width: vm,
                                 viewport_height: vh,
                                 parent_assigned_border_width: None,
@@ -1356,6 +1358,14 @@ impl LayoutEngine {
                     + total_main_margin)
             })
             .unwrap_or(0.0);
+
+        dbg!(
+            total_base_main,
+            total_main_margin,
+            total_main_border,
+            total_main_padding,
+            total_grow
+        );
 
         /* ---------- redistribute: grow or shrink ---------- */
 
