@@ -41,9 +41,6 @@ custom GUI frameworks, editors, and experimental UI engines.
 ## Example
 
 ```rust
-use layout::*;
-
-```rust
 use ui_layout::*;
 
 // Create a flex container
