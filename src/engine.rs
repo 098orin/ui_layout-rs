@@ -93,25 +93,6 @@ enum Axis {
     Vertical,
 }
 
-/// A flex item with computed layout parameters.
-/// Used internally during flex layout algorithm phases.
-#[derive(Debug)]
-struct FlexItem {
-    index: usize,
-    /// flex-basis resolved value
-    base_size: f32,
-    /// flex-grow property
-    flex_grow: f32,
-    /// flex-shrink property
-    flex_shrink: f32,
-    /// min-width/height constraint (or auto)
-    min_main: Option<f32>,
-    /// max-width/height constraint
-    max_main: Option<f32>,
-    /// Computed main size after flex algorithm
-    final_main_size: f32,
-}
-
 impl Axis {
     fn main(&self, rect: &Rect) -> f32 {
         match self {
@@ -194,6 +175,34 @@ impl Axis {
         match self {
             Axis::Horizontal => (&spacing.border_top, &spacing.border_bottom),
             Axis::Vertical => (&spacing.border_left, &spacing.border_right),
+        }
+    }
+
+    fn margin_main_start<'a>(&self, s: &'a Spacing) -> &'a Length {
+        match self {
+            Axis::Horizontal => &s.margin_left,
+            Axis::Vertical => &s.margin_top,
+        }
+    }
+
+    fn margin_main_end<'a>(&self, s: &'a Spacing) -> &'a Length {
+        match self {
+            Axis::Horizontal => &s.margin_right,
+            Axis::Vertical => &s.margin_bottom,
+        }
+    }
+
+    fn margin_cross_start<'a>(&self, s: &'a Spacing) -> &'a Length {
+        match self {
+            Axis::Horizontal => &s.margin_top,
+            Axis::Vertical => &s.margin_left,
+        }
+    }
+
+    fn margin_cross_end<'a>(&self, s: &'a Spacing) -> &'a Length {
+        match self {
+            Axis::Horizontal => &s.margin_bottom,
+            Axis::Vertical => &s.margin_right,
         }
     }
 
@@ -1227,341 +1236,346 @@ impl LayoutEngine {
         container_cross: Option<f32>,
         ctx: &LayoutContext,
     ) -> (f32, f32) {
-        // Create context for child elements
-        let (content_width_hint, content_height_hint) = match axis {
-            Axis::Horizontal => (container_main, container_cross),
-            Axis::Vertical => (container_cross, container_main),
-        };
+        // map intrinsic flag to the "self_only" behavior used in child layouts
+        let self_only = _intrinsic_pass;
 
-        let mut flex_items = Vec::new();
-        let mut max_cross = 0.0f32;
+        let count = node.children.len();
 
-        // Phase 1: Determine flex basis and intrinsic sizes
+        let vm = ctx.viewport_width;
+        let vh = ctx.viewport_height;
+
+        let cbm = container_main;
+        let cbc = container_cross;
+
+        let gap = axis
+            .gap(&node.style)
+            .resolve_with(cbm, vm, vh)
+            .unwrap_or(0.0)
+            .max(0.0);
+
+        /* ---------- intrinsic pass / base sizes ---------- */
+
+        let mut frozen = vec![false; count];
+        let mut total_grow = 0.0;
+
+        let mut main_sizes = vec![0.0; count]; // content-box main size (base or current)
+        let mut main_padding = vec![(0.0, 0.0); count];
+        let mut main_border = vec![(0.0, 0.0); count];
+        let mut main_margin = vec![(0.0, 0.0); count];
+        let mut main_min_max = vec![(None, None); count];
+
         for (i, child) in node.children.iter_mut().enumerate() {
-            // Initial layout to get intrinsic sizes
-            let basic_ctx = LayoutContext {
-                containing_block_width: content_width_hint,
-                containing_block_height: content_height_hint,
-                viewport_width: ctx.viewport_width,
-                viewport_height: ctx.viewport_height,
-                parent_assigned_border_width: None,
-                parent_assigned_border_height: None,
-            };
-
-            self.layout_node(child, true, (0.0, 0.0), 0.0, &basic_ctx);
-
-            // Inline calculation of flex base size (previously `calculate_flex_base_size`)
-            let flex_basis = &child.style.item_style.flex_basis;
-            let vw = ctx.viewport_width;
-            let vh = ctx.viewport_height;
-
-            let base_size =
-                if let Some(basis_size) = flex_basis.resolve_with(content_width_hint, vw, vh) {
-                    basis_size
-                } else {
-                    // Check if explicit main size is set
-                    let explicit_main_size = match axis {
-                        Axis::Horizontal => {
-                            child
-                                .style
-                                .size
-                                .width
-                                .resolve_with(content_width_hint, vw, vh)
-                        }
-                        Axis::Vertical => {
-                            child
-                                .style
-                                .size
-                                .height
-                                .resolve_with(content_width_hint, vw, vh)
-                        }
-                    };
-
-                    if let Some(explicit_size) = explicit_main_size {
-                        explicit_size
-                    } else {
-                        // default simplified fallback
-                        0.0
-                    }
-                };
-
-            // Inline resolution of min_main (previously `resolve_flex_item_min_main`)
-            let min_main_len = axis.min_main(&child.style.size);
-            let min_main = match min_main_len {
-                Length::Auto => None,
-                _ => min_main_len.resolve_with(content_width_hint, vw, vh),
-            };
-
-            let max_main = axis.max_main(&child.style.size).resolve_with(
-                content_width_hint,
-                ctx.viewport_width,
-                ctx.viewport_height,
+            let (pad_start, pad_end) = axis.padding_main(&child.style.spacing);
+            main_padding[i] = (
+                pad_start.resolve_with(cbm, vm, vh).unwrap_or(0.0),
+                pad_end.resolve_with(cbm, vm, vh).unwrap_or(0.0),
             );
 
-            let cross_size = if let LayoutBoxes::Single(ref box_model) = child.layout_boxes {
-                axis.cross(&box_model.border_box)
-            } else {
-                0.0
-            };
+            let (border_start, border_end) = axis.border_main(&child.style.spacing);
+            main_border[i] = (
+                border_start.resolve_with(cbm, vm, vh).unwrap_or(0.0),
+                border_end.resolve_with(cbm, vm, vh).unwrap_or(0.0),
+            );
 
-            max_cross = max_cross.max(cross_size);
+            let mar_start = axis.margin_main_start(&child.style.spacing);
+            let mar_end = axis.margin_main_end(&child.style.spacing);
+            main_margin[i] = (
+                mar_start.resolve_with(cbm, vm, vh).unwrap_or(0.0),
+                mar_end.resolve_with(cbm, vm, vh).unwrap_or(0.0),
+            );
 
-            flex_items.push(FlexItem {
-                index: i,
-                base_size: clamp(base_size, min_main, max_main),
-                flex_grow: child.style.item_style.flex_grow,
-                flex_shrink: child.style.item_style.flex_shrink,
-                min_main,
-                max_main,
-                final_main_size: base_size,
-            });
-        }
+            let min_main = axis.min_main(&child.style.size).resolve_with(cbm, vm, vh);
+            let max_main = axis.max_main(&child.style.size).resolve_with(cbm, vm, vh);
+            main_min_max[i] = (min_main, max_main);
 
-        // Phase 2: Resolve flexible lengths (inlined version of resolve_flexible_lengths + grow/shrink)
-        if let Some(container_main_size) = container_main {
-            // Calculate initial free space
-            let total_base_sizes: f32 = flex_items.iter().map(|item| item.base_size).sum();
-            let initial_free_space = container_main_size - total_base_sizes;
+            let basis = child.style.item_style.flex_basis.resolve_with(cbm, vm, vh);
 
-            if initial_free_space > 0.0 {
-                // Grow items (inlined grow_flex_items)
-                let total_flex_grow: f32 = flex_items.iter().map(|item| item.flex_grow).sum();
-
-                if total_flex_grow == 0.0 {
-                    for item in flex_items.iter_mut() {
-                        item.final_main_size = item.base_size;
-                    }
-                } else {
-                    let mut remaining_free_space = initial_free_space;
-                    let mut remaining_flex_grow = total_flex_grow;
-
-                    for item in flex_items.iter_mut() {
-                        if item.flex_grow == 0.0 {
-                            item.final_main_size = item.base_size;
-                            continue;
-                        }
-
-                        let flex_share =
-                            remaining_free_space * (item.flex_grow / remaining_flex_grow);
-                        let target_size = item.base_size + flex_share;
-
-                        // Apply min/max constraints
-                        let constrained_size = clamp(target_size, item.min_main, item.max_main);
-                        item.final_main_size = constrained_size;
-
-                        // Update remaining values for fair distribution
-                        let actual_growth = constrained_size - item.base_size;
-                        remaining_free_space -= actual_growth;
-                        remaining_flex_grow -= item.flex_grow;
-                    }
-                }
-            } else if initial_free_space < 0.0 {
-                // Shrink items (inlined shrink_flex_items)
-                let mut remaining_deficit = -initial_free_space;
-
-                // Calculate total scaled flex shrink factor
-                let total_scaled_shrink: f32 = flex_items
-                    .iter()
-                    .map(|item| item.base_size * item.flex_shrink)
-                    .sum();
-
-                if total_scaled_shrink == 0.0 {
-                    for item in flex_items.iter_mut() {
-                        item.final_main_size = item.base_size;
-                    }
-                } else {
-                    // First pass: calculate shrink amounts and track violations
-                    let mut violations = vec![false; flex_items.len()];
-                    let mut has_violations = true;
-
-                    while has_violations && remaining_deficit > 0.001 {
-                        has_violations = false;
-                        let mut total_scaled = 0.0f32;
-
-                        // Recalculate total scaled shrink without violated items
-                        for (i, item) in flex_items.iter().enumerate() {
-                            if !violations[i] && item.flex_shrink > 0.0 {
-                                total_scaled += item.base_size * item.flex_shrink;
-                            }
-                        }
-
-                        if total_scaled < 0.001 {
-                            // All items have been reduced to minimum
-                            break;
-                        }
-
-                        // Apply shrink to non-violated items
-                        for (i, item) in flex_items.iter_mut().enumerate() {
-                            if violations[i] {
-                                continue;
-                            }
-
-                            if item.flex_shrink == 0.0 {
-                                item.final_main_size = item.base_size;
-                                continue;
-                            }
-
-                            let scaled_shrink = item.base_size * item.flex_shrink;
-                            let shrink_ratio = scaled_shrink / total_scaled;
-                            let shrink_amount = remaining_deficit * shrink_ratio;
-                            let target_size = item.base_size - shrink_amount;
-
-                            // Apply min constraint
-                            if let Some(min) = item.min_main {
-                                if target_size < min {
-                                    item.final_main_size = min;
-                                    remaining_deficit -= item.base_size - min;
-                                    violations[i] = true;
-                                    has_violations = true;
-                                } else {
-                                    item.final_main_size = target_size;
-                                }
-                            } else {
-                                item.final_main_size = target_size.max(0.0);
-                            }
-                        }
-                    }
-
-                    // Ensure all items have final sizes set
-                    for (i, item) in flex_items.iter_mut().enumerate() {
-                        if !violations[i] || item.final_main_size == 0.0 {
-                            item.final_main_size =
-                                item.final_main_size.max(item.min_main.unwrap_or(0.0));
-                        }
-                    }
-                }
-            } else {
-                // Exactly zero free space
-                for item in flex_items.iter_mut() {
-                    item.final_main_size = item.base_size;
-                }
-            }
-        }
-
-        // Phase 3: Layout children with resolved sizes (same as before)
-        for flex_item in &flex_items {
-            let child = &mut node.children[flex_item.index];
-
-            let (new_width, new_height) = match axis {
-                Axis::Horizontal => (Some(flex_item.final_main_size), content_height_hint),
-                Axis::Vertical => (content_width_hint, Some(flex_item.final_main_size)),
-            };
-
-            let flex_ctx = LayoutContext {
-                containing_block_width: new_width,
-                containing_block_height: new_height,
-                viewport_width: ctx.viewport_width,
-                viewport_height: ctx.viewport_height,
-                parent_assigned_border_width: new_width,
-                parent_assigned_border_height: new_height,
-            };
-
-            self.layout_node(child, false, (0.0, 0.0), 0.0, &flex_ctx);
-
-            // Enforce the resolved final main size onto the child's box model
-            if let LayoutBoxes::Single(ref mut box_model) = child.layout_boxes {
-                match axis {
-                    Axis::Horizontal => {
-                        let target = flex_item.final_main_size;
-                        let delta = target - box_model.border_box.width;
-                        box_model.border_box.width = target;
-                        box_model.padding_box.width =
-                            (box_model.padding_box.width + delta).max(0.0);
-                        box_model.content_box.width =
-                            (box_model.content_box.width + delta).max(0.0);
-                        box_model.children_box.width =
-                            (box_model.children_box.width + delta).max(0.0);
-                    }
-                    Axis::Vertical => {
-                        let target = flex_item.final_main_size;
-                        let delta = target - box_model.border_box.height;
-                        box_model.border_box.height = target;
-                        box_model.padding_box.height =
-                            (box_model.padding_box.height + delta).max(0.0);
-                        box_model.content_box.height =
-                            (box_model.content_box.height + delta).max(0.0);
-                        box_model.children_box.height =
-                            (box_model.children_box.height + delta).max(0.0);
-                    }
-                }
-            }
-        }
-
-        // Phase 4: Handle cross-axis alignment (stretch) - inlined (previously handle_cross_axis_alignment)
-        {
-            let container_cross_size = container_cross.unwrap_or(max_cross);
-            for child in &mut node.children {
-                let align = child
-                    .style
-                    .item_style
-                    .align_self
-                    .unwrap_or(node.style.align_items);
-
-                if align == crate::AlignItems::Stretch {
-                    // Check if the child has an explicit cross-axis size
-                    let should_stretch = match axis {
-                        Axis::Horizontal => child.style.size.height == Length::Auto,
-                        Axis::Vertical => child.style.size.width == Length::Auto,
+            let base_content_main = match basis {
+                Some(v) => v,
+                None => {
+                    let explicit = match axis {
+                        Axis::Horizontal => child.style.size.width.resolve_with(cbm, vm, vh),
+                        Axis::Vertical => child.style.size.height.resolve_with(cbm, vm, vh),
                     };
 
-                    if should_stretch {
-                        // Get current main size
-                        let current_main =
-                            if let LayoutBoxes::Single(ref box_model) = child.layout_boxes {
-                                axis.main(&box_model.border_box)
-                            } else {
-                                0.0
+                    match explicit {
+                        None => {
+                            // intrinsic measurement
+                            let intrinsic_ctx = LayoutContext {
+                                containing_block_width: cbm,
+                                containing_block_height: cbc,
+                                viewport_width: vm,
+                                viewport_height: vh,
+                                parent_assigned_border_width: None,
+                                parent_assigned_border_height: None,
                             };
 
-                        // Stretch cross dimension
-                        let (stretch_width, stretch_height) = match axis {
-                            Axis::Horizontal => (Some(current_main), Some(container_cross_size)),
-                            Axis::Vertical => (Some(container_cross_size), Some(current_main)),
-                        };
+                            self.layout_node(child, true, (0.0, 0.0), 0.0, &intrinsic_ctx);
 
-                        let stretch_ctx = LayoutContext {
-                            containing_block_width: stretch_width,
-                            containing_block_height: stretch_height,
-                            viewport_width: ctx.viewport_width,
-                            viewport_height: ctx.viewport_height,
-                            parent_assigned_border_width: stretch_width,
-                            parent_assigned_border_height: stretch_height,
-                        };
-
-                        self.layout_node(child, false, (0.0, 0.0), 0.0, &stretch_ctx);
+                            if let LayoutBoxes::Single(ref box_model) = child.layout_boxes {
+                                axis.main(&box_model.content_box)
+                            } else {
+                                0.0
+                            }
+                        }
+                        Some(v) => {
+                            frozen[i] = true;
+                            v
+                        }
                     }
+                }
+            };
+
+            if !frozen[i] {
+                total_grow += child.style.item_style.flex_grow;
+                if child.style.item_style.flex_grow == 0.0 {
+                    frozen[i] = true;
+                }
+            }
+
+            main_sizes[i] = base_content_main;
+        }
+
+        let total_base_main: f32 = main_sizes.iter().sum();
+        let total_main_padding: f32 = main_padding.iter().map(|(s, e)| s + e).sum();
+        let total_main_border: f32 = main_border.iter().map(|(s, e)| s + e).sum();
+        let total_main_margin: f32 = main_margin.iter().map(|(s, e)| s + e).sum();
+        let gaps = gap * count.saturating_sub(1) as f32;
+
+        // signed remaining: positive => free space (grow), negative => deficit (shrink)
+        let remaining_signed = cbm
+            .map(|m| {
+                m - (total_base_main
+                    + gaps
+                    + total_main_padding
+                    + total_main_border
+                    + total_main_margin)
+            })
+            .unwrap_or(0.0);
+
+        /* ---------- redistribute: grow or shrink ---------- */
+
+        if remaining_signed > 0.0 {
+            // grow path (same as before, using remaining = remaining_signed)
+            let mut remaining = remaining_signed;
+            loop {
+                if total_grow == 0.0 {
+                    break;
+                }
+
+                let mut used = 0.0;
+
+                for (i, child) in node.children.iter().enumerate() {
+                    if frozen[i] {
+                        continue;
+                    }
+
+                    let grow = child.style.item_style.flex_grow;
+                    if grow == 0.0 {
+                        // should already be frozen but guard anyway
+                        frozen[i] = true;
+                        total_grow -= grow;
+                        continue;
+                    }
+
+                    let delta = remaining * (grow / total_grow);
+
+                    let (min_main, max_main) = main_min_max[i];
+
+                    let proposed = main_sizes[i] + delta;
+
+                    let clamped = match child.style.box_sizing {
+                        BoxSizing::ContentBox => clamp(proposed, min_main, max_main),
+                        BoxSizing::BorderBox => {
+                            let pb = main_padding[i].0
+                                + main_padding[i].1
+                                + main_border[i].0
+                                + main_border[i].1;
+
+                            let proposed_border = proposed + pb;
+                            let clamped_border = clamp(proposed_border, min_main, max_main);
+
+                            (clamped_border - pb).max(0.0)
+                        }
+                    };
+
+                    let actual = clamped - main_sizes[i];
+                    main_sizes[i] = clamped;
+                    used += actual;
+
+                    if (proposed - clamped).abs() > f32::EPSILON {
+                        // hit min/max, freeze this item for further distribution
+                        frozen[i] = true;
+                        total_grow -= grow;
+                    }
+                }
+
+                remaining -= used;
+
+                if used.abs() < 0.0001 {
+                    break;
+                }
+            }
+        } else if remaining_signed < 0.0 {
+            // shrink path
+            let mut deficit = -remaining_signed;
+
+            // Use iterative algorithm similar to the "violation" loop:
+            let mut violations = vec![false; count];
+
+            // We'll loop until deficit is small or no more shrinkable items
+            while deficit > 0.001 {
+                // compute total scaled shrink for non-violated items
+                let mut total_scaled = 0.0f32;
+                for (i, child) in node.children.iter().enumerate() {
+                    if violations[i] {
+                        continue;
+                    }
+                    let shrink = child.style.item_style.flex_shrink;
+                    if shrink <= 0.0 {
+                        continue;
+                    }
+                    // Use current main_sizes as the basis (matches algorithm where base_size is used)
+                    total_scaled += main_sizes[i] * shrink;
+                }
+
+                if total_scaled < 0.000001 {
+                    // nothing left we can shrink (either shrink factors 0 or all violated)
+                    break;
+                }
+
+                let mut any_change = false;
+                let mut used_total = 0.0f32;
+
+                for (i, child) in node.children.iter_mut().enumerate() {
+                    if violations[i] {
+                        continue;
+                    }
+                    let shrink = child.style.item_style.flex_shrink;
+                    if shrink <= 0.0 {
+                        continue;
+                    }
+
+                    let scaled = main_sizes[i] * shrink;
+                    let ratio = scaled / total_scaled;
+                    let shrink_amount = deficit * ratio;
+                    let old = main_sizes[i];
+                    let target = old - shrink_amount;
+
+                    if let Some(min) = main_min_max[i].0 {
+                        if target < min {
+                            // hit min -> set to min, mark violation
+                            let actual_reduction = (old - min).max(0.0);
+                            main_sizes[i] = min;
+                            violations[i] = true;
+                            used_total += actual_reduction;
+                            any_change = true;
+                            // adjust deficit by the actual reduction (we removed this much from content)
+                        } else {
+                            // normal shrink within limits
+                            let actual_reduction = (old - target).max(0.0);
+                            main_sizes[i] = target;
+                            used_total += actual_reduction;
+                            any_change = true;
+                        }
+                    } else {
+                        // no min constraint: allow shrink down to 0
+                        let new_val = target.max(0.0);
+                        let actual_reduction = (old - new_val).max(0.0);
+                        main_sizes[i] = new_val;
+                        used_total += actual_reduction;
+                        any_change = true;
+                    }
+                }
+
+                if !any_change {
+                    // nothing changed in this pass => break to avoid infinite loop
+                    break;
+                }
+
+                // subtract how much content-space we actually removed from deficit
+                deficit = (deficit - used_total).max(0.0);
+
+                // If used_total is extremely small, break
+                if used_total.abs() < 0.0001 {
+                    break;
                 }
             }
         }
 
-        // Calculate total main axis size including gaps
-        let children_main_total: f32 = node
-            .children
-            .iter()
-            .map(|child| {
-                if let LayoutBoxes::Single(ref box_model) = child.layout_boxes {
-                    axis.main(&box_model.border_box)
-                } else {
-                    0.0
-                }
-            })
-            .sum();
+        /* ---------- final layout (apply main sizes + cross/stretch handling) ---------- */
 
-        let gap_total = if node.children.len() > 1 {
-            let vw = ctx.viewport_width;
-            let vh = ctx.viewport_height;
-            let gap = axis
-                .gap(&node.style)
-                .resolve_with(container_main, vw, vh)
+        let mut total_border_size_main = 0.0;
+        let mut children_max_cross: f32 = 0.0;
+
+        for (i, child) in node.children.iter_mut().enumerate() {
+            let align = child
+                .style
+                .item_style
+                .align_self
+                .unwrap_or(node.style.align_items);
+
+            let is_auto_cross = match axis {
+                Axis::Horizontal => child.style.size.height == Length::Auto,
+                Axis::Vertical => child.style.size.width == Length::Auto,
+            };
+
+            let stretched_cross = if matches!(align, AlignItems::Stretch) && is_auto_cross {
+                cbc.map(|v| {
+                    v - axis
+                        .margin_cross_start(&child.style.spacing)
+                        .resolve_with(cbc, vm, vh)
+                        .unwrap_or(0.0)
+                        - axis
+                            .margin_cross_end(&child.style.spacing)
+                            .resolve_with(cbc, vm, vh)
+                            .unwrap_or(0.0)
+                })
+            } else {
+                None
+            };
+
+            let main_box = main_sizes[i]
+                + main_padding[i].0
+                + main_padding[i].1
+                + main_border[i].0
+                + main_border[i].1;
+
+            let (forced_w, forced_h) = match axis {
+                Axis::Horizontal => (Some(main_box), stretched_cross),
+                Axis::Vertical => (stretched_cross, Some(main_box)),
+            };
+
+            let child_ctx = LayoutContext {
+                containing_block_width: ctx.containing_block_width,
+                containing_block_height: ctx.containing_block_height,
+                viewport_width: vm,
+                viewport_height: vh,
+                parent_assigned_border_width: forced_w,
+                parent_assigned_border_height: forced_h,
+            };
+
+            self.layout_node(child, self_only, (0.0, 0.0), 0.0, &child_ctx);
+
+            let mcs = axis
+                .margin_cross_start(&child.style.spacing)
+                .resolve_with(cbc, vm, vh)
                 .unwrap_or(0.0);
-            gap * (node.children.len() as f32 - 1.0)
-        } else {
-            0.0
-        };
+            let mce = axis
+                .margin_cross_end(&child.style.spacing)
+                .resolve_with(cbc, vm, vh)
+                .unwrap_or(0.0);
 
-        let total_main_size = children_main_total + gap_total;
+            if let LayoutBoxes::Single(ref box_model) = child.layout_boxes {
+                total_border_size_main += axis.main(&box_model.border_box);
+                children_max_cross =
+                    children_max_cross.max(axis.cross(&box_model.border_box) + mcs + mce);
+            }
+        }
 
-        (total_main_size, max_cross)
+        let children_main = total_border_size_main + gaps;
+
+        (children_main, children_max_cross)
     }
 }
 
