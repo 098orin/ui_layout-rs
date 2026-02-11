@@ -112,7 +112,7 @@ This implementation follows CSS3 specifications with current focus on:
 
 See [CHANGELOG.md](CHANGELOG.md) for a detailed list of changes.
 
-* Version: **0.8.3**
+* Version: **0.9.0**
 * API is evolving but now includes full Flexbox-like alignment and gaps
 * **Phase 1 improvements**: Enhanced margin collapsing, improved flex item min-size semantics, comprehensive specification references
 
