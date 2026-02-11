@@ -214,6 +214,11 @@ impl Axis {
     }
 }
 
+use std::sync::Mutex;
+
+static LAYOUT_PASS: Mutex<u32> = Mutex::new(0);
+static LAYOUT_INITIAL_PASS: Mutex<u32> = Mutex::new(0);
+
 pub struct LayoutEngine;
 
 impl LayoutEngine {
@@ -235,8 +240,17 @@ impl LayoutEngine {
             parent_assigned_border_height: Some(height),
         };
 
+        *LAYOUT_PASS.lock().unwrap() = 0;
+        *LAYOUT_INITIAL_PASS.lock().unwrap() = 0;
+
         let engine = LayoutEngine;
         engine.layout_node(root, false, (0.0, 0.0), 0.0, &ctx);
+
+        println!("LAYOUT_PASS        : {}", LAYOUT_PASS.lock().unwrap());
+        println!(
+            "LAYOUT_INITIAL_PASS: {}",
+            LAYOUT_INITIAL_PASS.lock().unwrap()
+        );
     }
 
     /// Layouts a single node and its descendants.
@@ -249,12 +263,23 @@ impl LayoutEngine {
         incoming_line_height: f32,
         ctx: &LayoutContext,
     ) -> ((f32, f32), f32) {
+        *LAYOUT_PASS.lock().unwrap() += 1;
+
         if intrinsic_pass {
             let (key, (layout_boxes, out)) = &node.layout_boxes_cache;
             if *key == crate::cache::make_layout_key(ctx) {
                 node.layout_boxes = layout_boxes.clone();
                 return *out;
             }
+            if *key == 0 {
+                *LAYOUT_INITIAL_PASS.lock().unwrap() += 1;
+            } else {
+                println!(
+                    "Miss: key: {:?}, ctx_key: {:?}",
+                    key,
+                    crate::cache::make_layout_key(ctx)
+                )
+            };
         }
 
         let out = match node.style.display {
@@ -1282,41 +1307,95 @@ impl LayoutEngine {
         // ---------- redistribute loop ----------
 
         loop {
-            if total_grow <= 0.0 {
-                break;
-            }
-
-            let mut used = 0.0;
-
-            for i in 0..count {
-                if frozen[i] {
-                    continue;
+            if remaining > 0.0 {
+                if total_grow <= 0.0 {
+                    break;
                 }
 
-                let child = &node.children[i];
-                let grow = child.style.item_style.flex_grow;
+                let mut used = 0.0;
 
-                let delta = remaining * (grow / total_grow);
-                let new_size = main_sizes[i] + delta;
+                for i in 0..count {
+                    if frozen[i] {
+                        continue;
+                    }
 
-                let min = axis.min_main(&child.style.size).resolve_with(cbm, vw, vh);
-                let max = axis.max_main(&child.style.size).resolve_with(cbm, vw, vh);
+                    let child = &node.children[i];
+                    let grow = child.style.item_style.flex_grow;
 
-                let clamped = clamp(new_size, min, max);
+                    let delta = remaining * (grow / total_grow);
+                    let new_size = main_sizes[i] + delta;
 
-                used += clamped - main_sizes[i];
-                main_sizes[i] = clamped;
+                    let min = main_min_max[i].0;
+                    let max = main_min_max[i].1;
 
-                if (clamped - new_size).abs() > 0.001 {
-                    frozen[i] = true;
-                    total_grow -= grow;
+                    let clamped = clamp(new_size, min, max);
+
+                    used += clamped - main_sizes[i];
+                    main_sizes[i] = clamped;
+
+                    if (clamped - new_size).abs() > 0.001 {
+                        frozen[i] = true;
+                        total_grow -= grow;
+                    }
                 }
-            }
 
-            remaining -= used;
+                remaining -= used;
 
-            if used.abs() < 0.001 {
-                break;
+                if used.abs() < 0.001 {
+                    break;
+                }
+            } else {
+                // negative remaining = overflow
+                let mut total_shrink_factor = 0.0;
+
+                for (i, child) in node.children.iter().enumerate() {
+                    if frozen[i] {
+                        continue;
+                    }
+
+                    let shrink = child.style.item_style.flex_shrink;
+                    total_shrink_factor += shrink * main_sizes[i];
+                }
+
+                if total_shrink_factor <= 0.0 {
+                    break;
+                }
+
+                let mut used = 0.0;
+
+                for i in 0..count {
+                    if frozen[i] {
+                        continue;
+                    }
+
+                    let child = &node.children[i];
+
+                    let shrink = child.style.item_style.flex_shrink;
+                    let basis = main_sizes[i];
+
+                    let ratio = (shrink * basis) / total_shrink_factor;
+
+                    let delta = remaining * ratio; // remaining is negative
+                    let new_size = main_sizes[i] + delta;
+
+                    let min = main_min_max[i].0;
+                    let max = main_min_max[i].1;
+
+                    let clamped = clamp(new_size, min, max);
+
+                    used += clamped - main_sizes[i];
+                    main_sizes[i] = clamped;
+
+                    if (clamped - new_size).abs() > 0.001 {
+                        frozen[i] = true;
+                    }
+                }
+
+                remaining -= used;
+
+                if used.abs() < 0.001 {
+                    break;
+                }
             }
         }
 
