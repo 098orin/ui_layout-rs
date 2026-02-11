@@ -108,4 +108,72 @@ impl LayoutBoxes {
             LayoutBoxes::Multiple(v) => v.len(),
         }
     }
+
+    /// Returns an iterator over references to the contained [`BoxModel`]s.
+    ///
+    /// The iteration order is:
+    /// - empty for [`LayoutBoxes::None`]
+    /// - a single element for [`LayoutBoxes::Single`]
+    /// - the order of elements in the inner vector for [`LayoutBoxes::Multiple`]
+    ///
+    /// This method provides a convenient way to iterate over all boxes
+    /// regardless of the internal representation.
+    pub fn iter(&self) -> impl Iterator<Item = &BoxModel> {
+        self.into_iter()
+    }
+
+    /// Returns an iterator over mutable references to the contained [`BoxModel`]s.
+    ///
+    /// The iteration order is:
+    /// - empty for [`LayoutBoxes::None`]
+    /// - a single element for [`LayoutBoxes::Single`]
+    /// - the order of elements in the inner vector for [`LayoutBoxes::Multiple`]
+    ///
+    /// This allows in-place modification of all boxes in a uniform way.
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut BoxModel> {
+        self.into_iter()
+    }
+}
+
+// =============================================
+//   Implementing IntoIterator for LayoutBoxes
+// =============================================
+
+impl<'a> IntoIterator for &'a LayoutBoxes {
+    type Item = &'a BoxModel;
+    type IntoIter = std::slice::Iter<'a, BoxModel>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        match self {
+            LayoutBoxes::None => [].iter(),
+            LayoutBoxes::Single(b) => std::slice::from_ref(b).iter(),
+            LayoutBoxes::Multiple(list) => list.iter(),
+        }
+    }
+}
+
+impl<'a> IntoIterator for &'a mut LayoutBoxes {
+    type Item = &'a mut BoxModel;
+    type IntoIter = std::slice::IterMut<'a, BoxModel>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        match self {
+            LayoutBoxes::None => [].iter_mut(),
+            LayoutBoxes::Single(b) => std::slice::from_mut(b).iter_mut(),
+            LayoutBoxes::Multiple(list) => list.iter_mut(),
+        }
+    }
+}
+
+impl IntoIterator for LayoutBoxes {
+    type Item = BoxModel;
+    type IntoIter = std::vec::IntoIter<BoxModel>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        match self {
+            LayoutBoxes::None => Vec::new().into_iter(),
+            LayoutBoxes::Single(b) => vec![b].into_iter(),
+            LayoutBoxes::Multiple(list) => list.into_iter(),
+        }
+    }
 }
