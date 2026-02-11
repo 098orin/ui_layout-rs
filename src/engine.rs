@@ -366,136 +366,40 @@ impl LayoutEngine {
         }
 
         // Step 3b: Re-layout children if main size changed due to min/max constraints
-        if !intrinsic_pass && main_size_was_auto && final_content_main != children_main {
-            self.layout_flex_children(
-                node,
-                axis,
-                false,
-                Some(final_content_main),
-                Some(final_content_cross),
-                ctx,
-            );
-        }
-
-        // Step 4: Create box model (inlined from previous helper)
-        {
-            // Compute children aggregate sizes (main and cross) including gaps
-            let (children_width, children_height) = if node.children.is_empty() {
-                (0.0, 0.0)
+        let (children_width, children_height) =
+            if !intrinsic_pass && main_size_was_auto && final_content_main != children_main {
+                self.layout_flex_children(
+                    node,
+                    axis,
+                    false,
+                    Some(final_content_main),
+                    Some(final_content_cross),
+                    ctx,
+                )
             } else {
-                // Calculate total size of children (main axis)
-                let children_main_total: f32 = node
-                    .children
-                    .iter()
-                    .map(|child| {
-                        if let LayoutBoxes::Single(ref box_model) = child.layout_boxes {
-                            axis.main(&box_model.border_box)
-                        } else {
-                            0.0
-                        }
-                    })
-                    .sum();
-
-                // Calculate gaps
-                let gap_total = if node.children.len() > 1 {
-                    let vw = ctx.viewport_width;
-                    let vh = ctx.viewport_height;
-                    let gap = axis
-                        .gap(&node.style)
-                        .resolve_with(ctx.containing_block_main(axis), vw, vh)
-                        .unwrap_or(0.0);
-                    gap * (node.children.len() as f32 - 1.0)
-                } else {
-                    0.0
-                };
-
-                let total_children_main = children_main_total + gap_total;
-
-                let children_cross_max: f32 = node
-                    .children
-                    .iter()
-                    .map(|child| {
-                        if let LayoutBoxes::Single(ref box_model) = child.layout_boxes {
-                            axis.cross(&box_model.border_box)
-                        } else {
-                            0.0
-                        }
-                    })
-                    .fold(0.0, f32::max);
-
-                match axis {
-                    Axis::Horizontal => (total_children_main, children_cross_max),
-                    Axis::Vertical => (children_cross_max, total_children_main),
-                }
+                (0.0, 0.0)
             };
 
-            node.layout_boxes = {
-                let (content_width, content_height) = match axis {
-                    Axis::Horizontal => (final_content_main, final_content_cross),
-                    Axis::Vertical => (final_content_cross, final_content_main),
-                };
-                LayoutBoxes::Single(create_box_model(
-                    content_width,
-                    content_height,
-                    children_width,
-                    children_height,
-                    padding,
-                    border,
-                ))
+        // Step 4: Create box model
+        node.layout_boxes = {
+            let (content_width, content_height) = match axis {
+                Axis::Horizontal => (final_content_main, final_content_cross),
+                Axis::Vertical => (final_content_cross, final_content_main),
             };
+            LayoutBoxes::Single(create_box_model(
+                content_width,
+                content_height,
+                children_width,
+                children_height,
+                padding,
+                border,
+            ))
+        };
 
-            if let LayoutBoxes::Single(ref mut box_model) = node.layout_boxes {
-                let (pl, pt, _, _) = padding;
-                let (bl, bt, _, _) = border;
-                set_position(box_model, origin, (pl, pt), (bl, bt));
-            }
-        }
-
-        // Step 4.5: Re-apply cross-axis alignment with final container size (inlined)
-        if !intrinsic_pass {
-            let container_cross_size = final_content_cross;
-            for child in &mut node.children {
-                let align = child
-                    .style
-                    .item_style
-                    .align_self
-                    .unwrap_or(node.style.align_items);
-
-                if align == crate::AlignItems::Stretch {
-                    // Check if the child has an explicit cross-axis size
-                    let should_stretch = match axis {
-                        Axis::Horizontal => child.style.size.height == Length::Auto,
-                        Axis::Vertical => child.style.size.width == Length::Auto,
-                    };
-
-                    if should_stretch {
-                        // Get current main size
-                        let current_main =
-                            if let LayoutBoxes::Single(ref box_model) = child.layout_boxes {
-                                axis.main(&box_model.border_box)
-                            } else {
-                                0.0
-                            };
-
-                        // Stretch cross dimension
-                        let (stretch_width, stretch_height) = match axis {
-                            Axis::Horizontal => (Some(current_main), Some(container_cross_size)),
-                            Axis::Vertical => (Some(container_cross_size), Some(current_main)),
-                        };
-
-                        let stretch_ctx = LayoutContext {
-                            containing_block_width: stretch_width,
-                            containing_block_height: stretch_height,
-                            viewport_width: ctx.viewport_width,
-                            viewport_height: ctx.viewport_height,
-                            parent_assigned_border_width: stretch_width,
-                            parent_assigned_border_height: stretch_height,
-                        };
-
-                        self.layout_node(child, false, (0.0, 0.0), 0.0, &stretch_ctx);
-                    }
-                }
-            }
+        if let LayoutBoxes::Single(ref mut box_model) = node.layout_boxes {
+            let (pl, pt, _, _) = padding;
+            let (bl, bt, _, _) = border;
+            set_position(box_model, origin, (pl, pt), (bl, bt));
         }
 
         // Step 5: Set child positions (positioning logic inlined)
@@ -720,81 +624,83 @@ impl LayoutEngine {
                 .parent_assigned_border_height
                 .map(|b| b - border.1 - border.3 - padding.1 - padding.3));
 
-        // Step 2: Resolve all children's margins (parent resolves children's margins)
+        // Step 2: Resolve children's margins only when actually needed
         let containing_width = content_width_opt.unwrap_or(0.0);
-        let mut children_margins = Vec::with_capacity(node.children.len());
-        let mut previous_margin_bottom = 0.0;
+        let mut children_margins = Vec::new();
 
-        for (i, child) in node.children.iter().enumerate() {
-            let is_block_level =
-                matches!(child.style.display, Display::Block | Display::Flex { .. });
+        let skip_children_layout =
+            intrinsic_pass && content_width_opt.is_some() && content_height_opt.is_some();
 
-            // Resolve all four margins
-            let raw_margins = (
-                child
-                    .style
-                    .spacing
-                    .margin_left
-                    .resolve_with(Some(containing_width), vw, vh)
-                    .unwrap_or(0.0),
-                child
-                    .style
-                    .spacing
-                    .margin_top
-                    .resolve_with(Some(containing_width), vw, vh)
-                    .unwrap_or(0.0),
-                child
-                    .style
-                    .spacing
-                    .margin_right
-                    .resolve_with(Some(containing_width), vw, vh)
-                    .unwrap_or(0.0),
-                child
-                    .style
-                    .spacing
-                    .margin_bottom
-                    .resolve_with(Some(containing_width), vw, vh)
-                    .unwrap_or(0.0),
-            );
+        if !skip_children_layout {
+            children_margins = Vec::with_capacity(node.children.len());
+            let mut previous_margin_bottom = 0.0;
 
-            // Apply sibling margin collapsing for block-level children
-            let collapsed_margin_top = if is_block_level && i > 0 {
-                // Take max of current top and previous sibling's bottom
-                raw_margins.1.max(previous_margin_bottom)
-            } else {
-                raw_margins.1
-            };
+            for (i, child) in node.children.iter().enumerate() {
+                let is_block_level =
+                    matches!(child.style.display, Display::Block | Display::Flex { .. });
 
-            let collapsed_margins = (
-                raw_margins.0,
-                collapsed_margin_top,
-                raw_margins.2,
-                raw_margins.3,
-            );
-            children_margins.push(collapsed_margins);
+                let raw_margins = (
+                    child
+                        .style
+                        .spacing
+                        .margin_left
+                        .resolve_with(Some(containing_width), vw, vh)
+                        .unwrap_or(0.0),
+                    child
+                        .style
+                        .spacing
+                        .margin_top
+                        .resolve_with(Some(containing_width), vw, vh)
+                        .unwrap_or(0.0),
+                    child
+                        .style
+                        .spacing
+                        .margin_right
+                        .resolve_with(Some(containing_width), vw, vh)
+                        .unwrap_or(0.0),
+                    child
+                        .style
+                        .spacing
+                        .margin_bottom
+                        .resolve_with(Some(containing_width), vw, vh)
+                        .unwrap_or(0.0),
+                );
 
-            // Update previous margin for next iteration
-            if is_block_level {
-                previous_margin_bottom = raw_margins.3;
+                let collapsed_margin_top = if is_block_level && i > 0 {
+                    raw_margins.1.max(previous_margin_bottom)
+                } else {
+                    raw_margins.1
+                };
+
+                children_margins.push((
+                    raw_margins.0,
+                    collapsed_margin_top,
+                    raw_margins.2,
+                    raw_margins.3,
+                ));
+
+                if is_block_level {
+                    previous_margin_bottom = raw_margins.3;
+                }
             }
         }
 
-        // Step 2b: First pass - layout children to determine sizes
-        for child in node.children.iter_mut() {
-            let child_ctx = LayoutContext {
-                containing_block_width: content_width_opt,
-                containing_block_height: content_height_opt,
-                parent_assigned_border_width: None,
-                parent_assigned_border_height: None,
-                ..*ctx
-            };
+        // Step 2b: Layout children only when required
+        if !skip_children_layout {
+            for child in node.children.iter_mut() {
+                let child_ctx = LayoutContext {
+                    containing_block_width: content_width_opt,
+                    containing_block_height: content_height_opt,
+                    parent_assigned_border_width: None,
+                    parent_assigned_border_height: None,
+                    ..*ctx
+                };
 
-            // Layout child at origin (0,0) for intrinsic sizing
-            let ((_, child_end_y), _) =
-                self.layout_node(child, intrinsic_pass, (0.0, 0.0), 0.0, &child_ctx);
+                let ((_, child_end_y), _) =
+                    self.layout_node(child, intrinsic_pass, (0.0, 0.0), 0.0, &child_ctx);
 
-            // Track vertical layout progression
-            cursor_y = child_end_y;
+                cursor_y = child_end_y;
+            }
         }
 
         // Step 3: Apply min/max constraints to content width
@@ -862,7 +768,7 @@ impl LayoutEngine {
             );
 
             // Step 7: Position children using parent-resolved margins
-            if !intrinsic_pass {
+            if !intrinsic_pass && !children_margins.is_empty() {
                 let mut child_y_offset = 0.0;
 
                 for (i, child) in node.children.iter_mut().enumerate() {
@@ -912,6 +818,8 @@ impl LayoutEngine {
                     }
                 }
             }
+        } else {
+            unreachable!("layout_boxes always should be Single")
         }
 
         let total_width = final_content_width
@@ -1242,20 +1150,27 @@ impl LayoutEngine {
         ctx: &LayoutContext,
     ) -> (f32, f32) {
         let count = node.children.len();
+        if count == 0 {
+            return (0.0, 0.0);
+        }
 
-        let vm = ctx.viewport_width;
+        let cbm = ctx.containing_block_main(axis);
+        let cbc = ctx.containing_block_cross(axis);
+        let vw = ctx.viewport_width;
         let vh = ctx.viewport_height;
-
-        let cbm = container_main;
-        let cbc = container_cross;
 
         let gap = axis
             .gap(&node.style)
-            .resolve_with(cbm, vm, vh)
+            .resolve_with(cbm, vw, vh)
             .unwrap_or(0.0)
             .max(0.0);
 
-        /* ---------- intrinsic pass / base sizes ---------- */
+        let (child_cbw, child_cbh) = match axis {
+            Axis::Horizontal => (container_main, container_cross),
+            Axis::Vertical => (container_cross, container_main),
+        };
+
+        // ---------- Intrinsic pass ----------
 
         let mut frozen = vec![false; count];
         let mut total_grow = 0.0;
@@ -1269,35 +1184,35 @@ impl LayoutEngine {
         for (i, child) in node.children.iter_mut().enumerate() {
             let (pad_start, pad_end) = axis.padding_main(&child.style.spacing);
             main_padding[i] = (
-                pad_start.resolve_with(cbm, vm, vh).unwrap_or(0.0),
-                pad_end.resolve_with(cbm, vm, vh).unwrap_or(0.0),
+                pad_start.resolve_with(cbm, vw, vh).unwrap_or(0.0),
+                pad_end.resolve_with(cbm, vw, vh).unwrap_or(0.0),
             );
 
             let (border_start, border_end) = axis.border_main(&child.style.spacing);
             main_border[i] = (
-                border_start.resolve_with(cbm, vm, vh).unwrap_or(0.0),
-                border_end.resolve_with(cbm, vm, vh).unwrap_or(0.0),
+                border_start.resolve_with(cbm, vw, vh).unwrap_or(0.0),
+                border_end.resolve_with(cbm, vw, vh).unwrap_or(0.0),
             );
 
             let mar_start = axis.margin_main_start(&child.style.spacing);
             let mar_end = axis.margin_main_end(&child.style.spacing);
             main_margin[i] = (
-                mar_start.resolve_with(cbm, vm, vh).unwrap_or(0.0),
-                mar_end.resolve_with(cbm, vm, vh).unwrap_or(0.0),
+                mar_start.resolve_with(cbm, vw, vh).unwrap_or(0.0),
+                mar_end.resolve_with(cbm, vw, vh).unwrap_or(0.0),
             );
 
-            let min_main = axis.min_main(&child.style.size).resolve_with(cbm, vm, vh);
-            let max_main = axis.max_main(&child.style.size).resolve_with(cbm, vm, vh);
+            let min_main = axis.min_main(&child.style.size).resolve_with(cbm, vw, vh);
+            let max_main = axis.max_main(&child.style.size).resolve_with(cbm, vw, vh);
             main_min_max[i] = (min_main, max_main);
 
-            let basis = child.style.item_style.flex_basis.resolve_with(cbm, vm, vh);
+            let basis = child.style.item_style.flex_basis.resolve_with(cbm, vw, vh);
 
             let base_content_main = match basis {
                 Some(v) => v,
                 None => {
                     let explicit = axis
                         .size_main(&child.style.size)
-                        .resolve_with(cbm, vm, vh)
+                        .resolve_with(cbm, vw, vh)
                         .map(|s| {
                             resolve_content_size_with_box_sizing(
                                 child,
@@ -1313,9 +1228,9 @@ impl LayoutEngine {
                             // Set containing block size to none
                             // to prevent the child from expanding out of the parent's size
                             let intrinsic_ctx = LayoutContext {
-                                containing_block_width: None,
-                                containing_block_height: None,
-                                viewport_width: vm,
+                                containing_block_width: child_cbw,
+                                containing_block_height: child_cbh,
+                                viewport_width: vw,
                                 viewport_height: vh,
                                 parent_assigned_border_width: None,
                                 parent_assigned_border_height: None,
@@ -1348,71 +1263,34 @@ impl LayoutEngine {
         }
 
         let total_base_main: f32 = main_sizes.iter().sum();
-        let total_main_padding: f32 = main_padding.iter().map(|(s, e)| s + e).sum();
-        let total_main_border: f32 = main_border.iter().map(|(s, e)| s + e).sum();
-        let total_main_margin: f32 = main_margin.iter().map(|(s, e)| s + e).sum();
+        let total_main_padding: f32 = main_padding.iter().map(|(start, end)| start + end).sum();
+        let total_main_border: f32 = main_border.iter().map(|(start, end)| start + end).sum();
+        let total_main_margin: f32 = main_margin.iter().map(|(start, end)| start + end).sum();
         let gaps = gap * count.saturating_sub(1) as f32;
 
-        // signed remaining: positive => free space (grow), negative => deficit (shrink)
-        let remaining_signed = cbm
+        let mut remaining = cbm
             .map(|m| {
-                m - (total_base_main
+                (m - (total_base_main
                     + gaps
                     + total_main_padding
                     + total_main_border
-                    + total_main_margin)
+                    + total_main_margin))
+                    .max(0.0)
             })
             .unwrap_or(0.0);
 
-        /* ---------- redistribute: grow or shrink ---------- */
+        // ---------- redistribute loop ----------
 
-        if remaining_signed > 0.0 {
-            // grow path (same as before, using remaining = remaining_signed)
-            let mut remaining = remaining_signed;
-            loop {
-                if total_grow == 0.0 {
-                    break;
-                }
+        loop {
+            if total_grow <= 0.0 {
+                break;
+            }
 
-                let mut used = 0.0;
+            let mut used = 0.0;
 
-                for (i, child) in node.children.iter().enumerate() {
-                    if frozen[i] {
-                        continue;
-                    }
-
-                    let grow = child.style.item_style.flex_grow;
-
-                    let delta = remaining * (grow / total_grow);
-
-                    let (min_main, max_main) = main_min_max[i];
-
-                    let proposed = main_sizes[i] + delta;
-
-                    let clamped = match child.style.box_sizing {
-                        BoxSizing::ContentBox => clamp(proposed, min_main, max_main),
-                        BoxSizing::BorderBox => {
-                            let pb = main_padding[i].0
-                                + main_padding[i].1
-                                + main_border[i].0
-                                + main_border[i].1;
-
-                            let proposed_border = proposed + pb;
-                            let clamped_border = clamp(proposed_border, min_main, max_main);
-
-                            (clamped_border - pb).max(0.0)
-                        }
-                    };
-
-                    let actual = clamped - main_sizes[i];
-                    main_sizes[i] = clamped;
-                    used += actual;
-
-                    if (proposed - clamped).abs() > f32::EPSILON {
-                        // hit min/max, freeze this item for further distribution
-                        frozen[i] = true;
-                        total_grow -= grow;
-                    }
+            for i in 0..count {
+                if frozen[i] {
+                    continue;
                 }
 
                 remaining -= used;
@@ -1444,74 +1322,34 @@ impl LayoutEngine {
                     total_scaled += main_sizes[i] * shrink;
                 }
 
-                if total_scaled < 0.000001 {
-                    // nothing left we can shrink (either shrink factors 0 or all violated)
-                    break;
+                let delta = remaining * (grow / total_grow);
+                let new_size = main_sizes[i] + delta;
+
+                let min = axis.min_main(&child.style.size).resolve_with(cbm, vw, vh);
+                let max = axis.max_main(&child.style.size).resolve_with(cbm, vw, vh);
+
+                let clamped = clamp(new_size, min, max);
+
+                used += clamped - main_sizes[i];
+                main_sizes[i] = clamped;
+
+                if (clamped - new_size).abs() > 0.001 {
+                    frozen[i] = true;
+                    total_grow -= grow;
                 }
+            }
 
-                let mut any_change = false;
-                let mut used_total = 0.0f32;
+            remaining -= used;
 
-                for (i, child) in node.children.iter_mut().enumerate() {
-                    if violations[i] {
-                        continue;
-                    }
-                    let shrink = child.style.item_style.flex_shrink;
-                    if shrink <= 0.0 {
-                        continue;
-                    }
-
-                    let scaled = main_sizes[i] * shrink;
-                    let ratio = scaled / total_scaled;
-                    let shrink_amount = deficit * ratio;
-                    let old = main_sizes[i];
-                    let target = old - shrink_amount;
-
-                    if let Some(min) = main_min_max[i].0 {
-                        if target < min {
-                            // hit min -> set to min, mark violation
-                            let actual_reduction = (old - min).max(0.0);
-                            main_sizes[i] = min;
-                            violations[i] = true;
-                            used_total += actual_reduction;
-                            any_change = true;
-                            // adjust deficit by the actual reduction (we removed this much from content)
-                        } else {
-                            // normal shrink within limits
-                            let actual_reduction = (old - target).max(0.0);
-                            main_sizes[i] = target;
-                            used_total += actual_reduction;
-                            any_change = true;
-                        }
-                    } else {
-                        // no min constraint: allow shrink down to 0
-                        let new_val = target.max(0.0);
-                        let actual_reduction = (old - new_val).max(0.0);
-                        main_sizes[i] = new_val;
-                        used_total += actual_reduction;
-                        any_change = true;
-                    }
-                }
-
-                if !any_change {
-                    // nothing changed in this pass => break to avoid infinite loop
-                    break;
-                }
-
-                // subtract how much content-space we actually removed from deficit
-                deficit = (deficit - used_total).max(0.0);
-
-                // If used_total is extremely small, break
-                if used_total.abs() < 0.0001 {
-                    break;
-                }
+            if used.abs() < 0.001 {
+                break;
             }
         }
 
-        /* ---------- final layout (apply main sizes + cross/stretch handling) ---------- */
+        // ---------- final layout ----------
 
-        let mut total_border_size_main = 0.0;
-        let mut children_max_cross: f32 = 0.0;
+        let mut total_main = 0.0;
+        let mut max_cross: f32 = 0.0;
 
         for (i, child) in node.children.iter_mut().enumerate() {
             let align = child
@@ -1520,67 +1358,53 @@ impl LayoutEngine {
                 .align_self
                 .unwrap_or(node.style.align_items);
 
-            let is_auto_cross = match axis {
-                Axis::Horizontal => child.style.size.height == Length::Auto,
-                Axis::Vertical => child.style.size.width == Length::Auto,
-            };
+            let is_auto_cross = axis.size_cross(&child.style.size) == &Length::Auto;
 
             let stretched_cross = if matches!(align, AlignItems::Stretch) && is_auto_cross {
                 cbc.map(|v| {
                     v - axis
                         .margin_cross_start(&child.style.spacing)
-                        .resolve_with(cbc, vm, vh)
+                        .resolve_with(cbc, vw, vh)
                         .unwrap_or(0.0)
                         - axis
                             .margin_cross_end(&child.style.spacing)
-                            .resolve_with(cbc, vm, vh)
+                            .resolve_with(cbc, vw, vh)
                             .unwrap_or(0.0)
                 })
             } else {
                 None
             };
 
-            let main_box = main_sizes[i]
-                + main_padding[i].0
-                + main_padding[i].1
-                + main_border[i].0
-                + main_border[i].1;
-
-            let (forced_w, forced_h) = match axis {
-                Axis::Horizontal => (Some(main_box), stretched_cross),
-                Axis::Vertical => (stretched_cross, Some(main_box)),
+            let (parent_assigned_border_width, parent_assigned_border_height) = {
+                let main_bargin_box = main_sizes[i]
+                    + main_padding[i].0
+                    + main_padding[i].1
+                    + main_border[i].0
+                    + main_border[i].1;
+                match axis {
+                    Axis::Horizontal => (Some(main_bargin_box), stretched_cross),
+                    Axis::Vertical => (stretched_cross, Some(main_bargin_box)),
+                }
             };
 
             let child_ctx = LayoutContext {
-                containing_block_width: ctx.containing_block_width,
-                containing_block_height: ctx.containing_block_height,
-                viewport_width: vm,
+                containing_block_width: child_cbw,
+                containing_block_height: child_cbh,
+                viewport_width: vw,
                 viewport_height: vh,
-                parent_assigned_border_width: forced_w,
-                parent_assigned_border_height: forced_h,
+                parent_assigned_border_width,
+                parent_assigned_border_height,
             };
 
             self.layout_node(child, intrinsic_pass, (0.0, 0.0), 0.0, &child_ctx);
 
-            let mcs = axis
-                .margin_cross_start(&child.style.spacing)
-                .resolve_with(cbc, vm, vh)
-                .unwrap_or(0.0);
-            let mce = axis
-                .margin_cross_end(&child.style.spacing)
-                .resolve_with(cbc, vm, vh)
-                .unwrap_or(0.0);
-
-            if let LayoutBoxes::Single(ref box_model) = child.layout_boxes {
-                total_border_size_main += axis.main(&box_model.border_box);
-                children_max_cross =
-                    children_max_cross.max(axis.cross(&box_model.border_box) + mcs + mce);
+            if let LayoutBoxes::Single(box_model) = &child.layout_boxes {
+                total_main += axis.main(&box_model.border_box);
+                max_cross = max_cross.max(axis.cross(&box_model.border_box));
             }
         }
 
-        let children_main = total_border_size_main + gaps;
-
-        (children_main, children_max_cross)
+        (total_main, max_cross)
     }
 }
 
