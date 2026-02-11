@@ -1290,7 +1290,17 @@ impl LayoutEngine {
             let base_content_main = match basis {
                 Some(v) => v,
                 None => {
-                    let explicit = axis.size_main(&child.style.size).resolve_with(cbm, vm, vh);
+                    let explicit = axis
+                        .size_main(&child.style.size)
+                        .resolve_with(cbm, vm, vh)
+                        .map(|s| {
+                            resolve_content_size_with_box_sizing(
+                                child,
+                                s,
+                                main_padding[i],
+                                main_border[i],
+                            )
+                        });
 
                     match explicit {
                         None => {
