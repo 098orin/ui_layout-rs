@@ -1290,10 +1290,7 @@ impl LayoutEngine {
             let base_content_main = match basis {
                 Some(v) => v,
                 None => {
-                    let explicit = match axis {
-                        Axis::Horizontal => child.style.size.width.resolve_with(cbm, vm, vh),
-                        Axis::Vertical => child.style.size.height.resolve_with(cbm, vm, vh),
-                    };
+                    let explicit = axis.size_main(&child.style.size).resolve_with(cbm, vm, vh);
 
                     match explicit {
                         None => {
@@ -1340,15 +1337,16 @@ impl LayoutEngine {
         let gaps = gap * count.saturating_sub(1) as f32;
 
         // signed remaining: positive => free space (grow), negative => deficit (shrink)
-        let remaining_signed = cbm
-            .map(|m| {
+        let remaining_signed = dbg!(
+            cbm.map(|m| {
                 m - (total_base_main
                     + gaps
                     + total_main_padding
                     + total_main_border
                     + total_main_margin)
             })
-            .unwrap_or(0.0);
+            .unwrap_or(0.0)
+        );
 
         /* ---------- redistribute: grow or shrink ---------- */
 
