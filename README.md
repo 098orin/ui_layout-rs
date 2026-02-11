@@ -126,7 +126,7 @@ Future versions may add:
 * Display: inline-block explicit support
 * Complete parent-child margin collapsing
 * Content-based minimum sizing for flex items
-
+* Correct flex-basis priority over width/height in flex item sizing
 
 ## License
 
