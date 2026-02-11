@@ -1231,14 +1231,11 @@ impl LayoutEngine {
         &self,
         node: &mut LayoutNode,
         axis: Axis,
-        _intrinsic_pass: bool,
+        intrinsic_pass: bool,
         container_main: Option<f32>,
         container_cross: Option<f32>,
         ctx: &LayoutContext,
     ) -> (f32, f32) {
-        // map intrinsic flag to the "self_only" behavior used in child layouts
-        let self_only = _intrinsic_pass;
-
         let count = node.children.len();
 
         let vm = ctx.viewport_width;
@@ -1555,7 +1552,7 @@ impl LayoutEngine {
                 parent_assigned_border_height: forced_h,
             };
 
-            self.layout_node(child, self_only, (0.0, 0.0), 0.0, &child_ctx);
+            self.layout_node(child, intrinsic_pass, (0.0, 0.0), 0.0, &child_ctx);
 
             let mcs = axis
                 .margin_cross_start(&child.style.spacing)
