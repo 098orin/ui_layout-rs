@@ -1293,34 +1293,8 @@ impl LayoutEngine {
                     continue;
                 }
 
-                remaining -= used;
-
-                if used.abs() < 0.0001 {
-                    break;
-                }
-            }
-        } else if remaining_signed < 0.0 {
-            // shrink path
-            let mut deficit = -remaining_signed;
-
-            // Use iterative algorithm similar to the "violation" loop:
-            let mut violations = vec![false; count];
-
-            // We'll loop until deficit is small or no more shrinkable items
-            while deficit > 0.001 {
-                // compute total scaled shrink for non-violated items
-                let mut total_scaled = 0.0f32;
-                for (i, child) in node.children.iter().enumerate() {
-                    if violations[i] {
-                        continue;
-                    }
-                    let shrink = child.style.item_style.flex_shrink;
-                    if shrink <= 0.0 {
-                        continue;
-                    }
-                    // Use current main_sizes as the basis (matches algorithm where base_size is used)
-                    total_scaled += main_sizes[i] * shrink;
-                }
+                let child = &node.children[i];
+                let grow = child.style.item_style.flex_grow;
 
                 let delta = remaining * (grow / total_grow);
                 let new_size = main_sizes[i] + delta;
