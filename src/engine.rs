@@ -1396,12 +1396,28 @@ impl LayoutEngine {
                     let min = main_min_max[i].0;
                     let max = main_min_max[i].1;
 
-                    let clamped = clamp(new_size, min, max);
+                    let proposed_content = main_sizes[i] + delta;
+                    let clamped_content = match child.style.box_sizing {
+                        BoxSizing::ContentBox => clamp(proposed_content, min, max),
+                        BoxSizing::BorderBox => {
+                            let padding_border_main = main_padding[i].0
+                                + main_padding[i].1
+                                + main_border[i].0
+                                + main_border[i].1;
+                            let proposed_border = proposed_content + padding_border_main;
 
-                    used += clamped - main_sizes[i];
-                    main_sizes[i] = clamped;
+                            let clamped_border = clamp(proposed_border, min, max);
 
-                    if (clamped - new_size).abs() > 0.001 {
+                            (clamped_border - padding_border_main).max(0.0)
+                        }
+                    };
+
+                    let actual = clamped_content - main_sizes[i];
+
+                    main_sizes[i] = clamped_content;
+                    used += actual;
+
+                    if (clamped_content - new_size).abs() > 0.001 {
                         frozen[i] = true;
                     }
                 }
