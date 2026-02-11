@@ -219,6 +219,11 @@ pub struct LayoutEngine;
 impl LayoutEngine {
     /// Main layout entry point.
     /// Initiates layout computation from the root node with specified viewport dimensions.
+    ///
+    /// # TODO
+    /// - Implement CSS-correct flex-basis precedence.
+    ///   - flex-basis should override width/height on the main axis,
+    ///     but the current algorithm does not guarantee this.
     pub fn layout(root: &mut LayoutNode, width: f32, height: f32) {
         let ctx = LayoutContext {
             containing_block_width: Some(width),
