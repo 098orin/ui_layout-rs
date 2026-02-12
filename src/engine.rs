@@ -214,11 +214,6 @@ impl Axis {
     }
 }
 
-use std::sync::Mutex;
-
-static LAYOUT_PASS: Mutex<u32> = Mutex::new(0);
-static LAYOUT_INITIAL_PASS: Mutex<u32> = Mutex::new(0);
-
 pub struct LayoutEngine;
 
 impl LayoutEngine {
@@ -240,17 +235,8 @@ impl LayoutEngine {
             parent_assigned_border_height: Some(height),
         };
 
-        *LAYOUT_PASS.lock().unwrap() = 0;
-        *LAYOUT_INITIAL_PASS.lock().unwrap() = 0;
-
         let engine = LayoutEngine;
         engine.layout_node(root, false, (0.0, 0.0), 0.0, &ctx);
-
-        println!("LAYOUT_PASS        : {}", LAYOUT_PASS.lock().unwrap());
-        println!(
-            "LAYOUT_INITIAL_PASS: {}",
-            LAYOUT_INITIAL_PASS.lock().unwrap()
-        );
     }
 
     /// Layouts a single node and its descendants.
@@ -263,23 +249,12 @@ impl LayoutEngine {
         incoming_line_height: f32,
         ctx: &LayoutContext,
     ) -> ((f32, f32), f32) {
-        *LAYOUT_PASS.lock().unwrap() += 1;
-
         if intrinsic_pass {
             let (key, (layout_boxes, out)) = &node.layout_boxes_cache;
             if *key == crate::cache::make_layout_key(ctx) {
                 node.layout_boxes = layout_boxes.clone();
                 return *out;
             }
-            if *key == 0 {
-                *LAYOUT_INITIAL_PASS.lock().unwrap() += 1;
-            } else {
-                println!(
-                    "Miss: key: {:?}, ctx_key: {:?}",
-                    key,
-                    crate::cache::make_layout_key(ctx)
-                )
-            };
         }
 
         let out = match node.style.display {
