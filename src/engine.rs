@@ -356,14 +356,24 @@ impl LayoutEngine {
             self.resolve_container_sizes(node, axis, ctx);
 
         // Step 2: Execute layout for child elements
-        let (children_main, children_cross) = if !intrinsic_pass
-            || content_main.is_none()
-            || content_cross.is_none()
-        {
-            self.layout_flex_children(node, axis, intrinsic_pass, content_main, content_cross, ctx)
-        } else {
-            (0.0, 0.0)
-        };
+        let (mut children_main, mut children_cross) =
+            if !intrinsic_pass || content_main.is_none() || content_cross.is_none() {
+                let (content_width, content_height) = match axis {
+                    Axis::Horizontal => (content_main, content_cross),
+                    Axis::Vertical => (content_cross, content_main),
+                };
+                let children_ctx = LayoutContext {
+                    containing_block_width: content_width,
+                    containing_block_height: content_height,
+                    viewport_width: ctx.viewport_width,
+                    viewport_height: ctx.viewport_height,
+                    parent_assigned_border_width: None,
+                    parent_assigned_border_height: None,
+                };
+                self.layout_flex_children(node, axis, intrinsic_pass, &children_ctx)
+            } else {
+                (0.0, 0.0)
+            };
 
         // Step 3: Determine final container size
         let mut final_content_main = content_main.unwrap_or(children_main);
@@ -391,25 +401,25 @@ impl LayoutEngine {
         }
 
         // Step 3b: Re-layout children if main size changed due to min/max constraints
-        let (children_width, children_height) =
-            if !intrinsic_pass && main_size_was_auto && final_content_main != children_main {
-                self.layout_flex_children(
-                    node,
-                    axis,
-                    false,
-                    Some(final_content_main),
-                    Some(final_content_cross),
-                    ctx,
-                )
-            } else {
-                (0.0, 0.0)
+        if !intrinsic_pass && main_size_was_auto && final_content_main != children_main {
+            let child_ctx = LayoutContext {
+                containing_block_width: Some(final_content_main),
+                containing_block_height: Some(final_content_cross),
+                ..*ctx
             };
+            (children_main, children_cross) =
+                self.layout_flex_children(node, axis, false, &child_ctx);
+        }
 
         // Step 4: Create box model
         node.layout_boxes = {
             let (content_width, content_height) = match axis {
                 Axis::Horizontal => (final_content_main, final_content_cross),
                 Axis::Vertical => (final_content_cross, final_content_main),
+            };
+            let (children_width, children_height) = match axis {
+                Axis::Horizontal => (children_main, children_cross),
+                Axis::Vertical => (children_cross, children_main),
             };
             LayoutBoxes::Single(create_box_model(
                 content_width,
@@ -1170,30 +1180,23 @@ impl LayoutEngine {
         node: &mut LayoutNode,
         axis: Axis,
         intrinsic_pass: bool,
-        container_main: Option<f32>,
-        container_cross: Option<f32>,
-        ctx: &LayoutContext,
+        child_ctx: &LayoutContext,
     ) -> (f32, f32) {
         let count = node.children.len();
         if count == 0 {
             return (0.0, 0.0);
         }
 
-        let cbm = ctx.containing_block_main(axis);
-        let cbc = ctx.containing_block_cross(axis);
-        let vw = ctx.viewport_width;
-        let vh = ctx.viewport_height;
+        let cbm = child_ctx.containing_block_main(axis);
+        let cbc = child_ctx.containing_block_cross(axis);
+        let vw = child_ctx.viewport_width;
+        let vh = child_ctx.viewport_height;
 
         let gap = axis
             .gap(&node.style)
             .resolve_with(cbm, vw, vh)
             .unwrap_or(0.0)
             .max(0.0);
-
-        let (child_cbw, child_cbh) = match axis {
-            Axis::Horizontal => (container_main, container_cross),
-            Axis::Vertical => (container_cross, container_main),
-        };
 
         // ---------- Intrinsic pass ----------
 
@@ -1253,8 +1256,8 @@ impl LayoutEngine {
                             // Set containing block size to none
                             // to prevent the child from expanding out of the parent's size
                             let intrinsic_ctx = LayoutContext {
-                                containing_block_width: child_cbw,
-                                containing_block_height: child_cbh,
+                                containing_block_width: None,
+                                containing_block_height: None,
                                 viewport_width: vw,
                                 viewport_height: vh,
                                 parent_assigned_border_width: None,
@@ -1472,12 +1475,9 @@ impl LayoutEngine {
             };
 
             let child_ctx = LayoutContext {
-                containing_block_width: child_cbw,
-                containing_block_height: child_cbh,
-                viewport_width: vw,
-                viewport_height: vh,
                 parent_assigned_border_width,
                 parent_assigned_border_height,
+                ..*child_ctx
             };
 
             self.layout_node(child, intrinsic_pass, (0.0, 0.0), 0.0, &child_ctx);
