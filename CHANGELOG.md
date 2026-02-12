@@ -7,6 +7,16 @@ and this project loosely follows Semantic Versioning.
 
 ---
 
+## [0.9.2] - 2026-02-12
+
+### Fixed
+- Fixed example code of README.md.
+
+### Improved
+- Improved performance across core layout processes, resulting in significantly faster execution.
+
+---
+
 ## [0.9.1] - 2026-02-11
 
 ### Added
