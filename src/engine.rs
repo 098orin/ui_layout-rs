@@ -1200,7 +1200,8 @@ impl LayoutEngine {
 
         // ---------- Intrinsic pass ----------
 
-        let mut frozen = vec![false; count];
+        let mut frozen_grow = vec![false; count];
+        let mut frozen_shrink = vec![false; count];
         let mut total_grow = 0.0;
 
         let mut main_sizes = vec![0.0; count]; // content-box main size (base or current)
@@ -1273,18 +1274,23 @@ impl LayoutEngine {
                             }
                         }
                         Some(v) => {
-                            frozen[i] = true;
+                            frozen_grow[i] = true;
+                            frozen_shrink[i] = true;
                             v
                         }
                     }
                 }
             };
 
-            if !frozen[i] {
+            if !frozen_grow[i] {
                 total_grow += child.style.item_style.flex_grow;
                 if child.style.item_style.flex_grow == 0.0 {
-                    frozen[i] = true;
+                    frozen_grow[i] = true;
                 }
+            }
+
+            if child.style.item_style.flex_shrink == 0.0 {
+                frozen_shrink[i] = true;
             }
 
             main_sizes[i] = base_content_main;
@@ -1298,12 +1304,11 @@ impl LayoutEngine {
 
         let mut remaining = cbm
             .map(|m| {
-                (m - (total_base_main
+                m - (total_base_main
                     + gaps
                     + total_main_padding
                     + total_main_border
-                    + total_main_margin))
-                    .max(0.0)
+                    + total_main_margin)
             })
             .unwrap_or(0.0);
 
@@ -1318,7 +1323,7 @@ impl LayoutEngine {
                 let mut used = 0.0;
 
                 for i in 0..count {
-                    if frozen[i] {
+                    if frozen_grow[i] {
                         continue;
                     }
 
@@ -1352,7 +1357,7 @@ impl LayoutEngine {
                     used += actual;
 
                     if proposed_content != clamped_content {
-                        frozen[i] = true;
+                        frozen_grow[i] = true;
                         total_grow -= grow;
                     }
                 }
@@ -1367,7 +1372,7 @@ impl LayoutEngine {
                 let mut total_shrink_factor = 0.0;
 
                 for (i, child) in node.children.iter().enumerate() {
-                    if frozen[i] {
+                    if frozen_shrink[i] {
                         continue;
                     }
 
@@ -1382,7 +1387,7 @@ impl LayoutEngine {
                 let mut used = 0.0;
 
                 for i in 0..count {
-                    if frozen[i] {
+                    if frozen_shrink[i] {
                         continue;
                     }
 
@@ -1421,7 +1426,7 @@ impl LayoutEngine {
                     used += actual;
 
                     if (clamped_content - new_size).abs() > 0.001 {
-                        frozen[i] = true;
+                        frozen_shrink[i] = true;
                     }
                 }
 
