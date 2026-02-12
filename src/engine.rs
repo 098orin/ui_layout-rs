@@ -1435,7 +1435,7 @@ impl LayoutEngine {
 
         // ---------- final layout ----------
 
-        let mut total_main = 0.0;
+        let mut total_border_main: f32 = 0.0;
         let mut max_cross: f32 = 0.0;
 
         for (i, child) in node.children.iter_mut().enumerate() {
@@ -1483,12 +1483,14 @@ impl LayoutEngine {
             self.layout_node(child, intrinsic_pass, (0.0, 0.0), 0.0, &child_ctx);
 
             if let LayoutBoxes::Single(box_model) = &child.layout_boxes {
-                total_main += axis.main(&box_model.border_box);
+                total_border_main += axis.main(&box_model.border_box);
                 max_cross = max_cross.max(axis.cross(&box_model.border_box));
             }
         }
 
-        (total_main, max_cross)
+        let children_main = total_border_main + gaps;
+
+        (children_main, max_cross)
     }
 }
 

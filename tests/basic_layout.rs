@@ -120,8 +120,22 @@ fn flex_row_grow() {
 
 #[test]
 fn flex_gap_affects_children_box() {
-    let child1 = LayoutNode::new(Style::default());
-    let child2 = LayoutNode::new(Style::default());
+    let child1 = LayoutNode::new(Style {
+        size: SizeStyle {
+            width: Length::Px(15.0),
+            height: Length::Px(50.0),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+    let child2 = LayoutNode::new(Style {
+        size: SizeStyle {
+            width: Length::Px(10.0),
+            height: Length::Px(30.0),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
 
     let mut root = LayoutNode::with_children(
         Style {
@@ -156,7 +170,7 @@ fn flex_gap_affects_children_box() {
         _ => panic!("Expected single box model"),
     };
 
-    assert_eq!(root_box.children_box.width, 20.0);
+    assert_eq!(root_box.children_box.width, 15.0 + 10.0 + 20.0);
     assert_eq!(child1_box.border_box.x, child0_box.border_box.width + 20.0);
 }
 
