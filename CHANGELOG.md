@@ -7,6 +7,23 @@ and this project loosely follows Semantic Versioning.
 
 ---
 
+## [0.9.3] - 2026-02-15
+
+### Fixed
+
+* Fixed block `auto` sizing
+* Fixed incorrect distribution of `auto` margins on the main axis in Flexbox layout.
+  Previously, remaining free space was assigned to the first encountered `auto` margin.
+  It is now evenly distributed across all `auto` margins on the main axis, in accordance with the Flexbox specification.
+* Fixed handling of negative free space when main-axis `auto` margins are present.
+  Free space is now clamped to zero only when `auto` margins are involved, matching spec behavior.
+* Fixed cross-axis `auto` margin behavior in Flexbox layout.
+  `auto` margins on the cross axis now correctly override `align-items` / `align-self` and absorb available free space per item:
+  - If only one side is `auto`, it absorbs all available free space.
+  - If both sides are `auto`, free space is split evenly between them.
+
+---
+
 ## [0.9.2] - 2026-02-12
 
 ### Fixed
