@@ -38,11 +38,15 @@ struct FragmentLayoutContext {
 ///
 /// Fields:
 /// - `containing_block_*`: Size of the containing block (None if auto)
+/// - `available_block_*`: Size of the available space within the containing block (None if auto)
 /// - `viewport_*`: Absolute viewport dimensions for percentage resolution
 /// - `parent_assigned_border_*`: Border-box sizes assigned by parent (for stretch)
+#[allow(dead_code)]
 pub(crate) struct LayoutContext {
     pub(crate) containing_block_width: Option<f32>,
     pub(crate) containing_block_height: Option<f32>,
+    pub(crate) available_block_width: Option<f32>,
+    pub(crate) available_block_height: Option<f32>,
     pub(crate) viewport_width: f32,
     pub(crate) viewport_height: f32,
     pub(crate) parent_assigned_border_width: Option<f32>,
@@ -228,6 +232,8 @@ impl LayoutEngine {
         let ctx = LayoutContext {
             containing_block_width: Some(width),
             containing_block_height: Some(height),
+            available_block_width: Some(width),
+            available_block_height: Some(height),
             viewport_width: width,
             viewport_height: height,
             // Root has no parent; assign viewport dimensions for layout calculations
@@ -340,6 +346,8 @@ impl LayoutEngine {
                 let children_ctx = LayoutContext {
                     containing_block_width: content_width,
                     containing_block_height: content_height,
+                    available_block_width: None,
+                    available_block_height: None,
                     viewport_width: ctx.viewport_width,
                     viewport_height: ctx.viewport_height,
                     parent_assigned_border_width: None,
@@ -380,6 +388,8 @@ impl LayoutEngine {
             let child_ctx = LayoutContext {
                 containing_block_width: Some(final_content_main),
                 containing_block_height: Some(final_content_cross),
+                available_block_width: None,
+                available_block_height: None,
                 ..*ctx
             };
             (children_main, children_cross) =
@@ -664,7 +674,7 @@ impl LayoutEngine {
                 .parent_assigned_border_width
                 .map(|b| b - border.0 - border.2 - padding.0 - padding.2))
             .or(ctx
-                .containing_block_width
+                .available_block_width
                 .map(|cbw| cbw - border.0 - border.2 - padding.0 - padding.2));
 
         let content_height_opt = node
@@ -744,10 +754,14 @@ impl LayoutEngine {
 
         // Step 2b: Layout children only when required
         if !skip_children_layout {
-            for child in node.children.iter_mut() {
+            for (i, child) in node.children.iter_mut().enumerate() {
                 let child_ctx = LayoutContext {
                     containing_block_width: content_width_opt,
                     containing_block_height: content_height_opt,
+                    available_block_width: content_width_opt
+                        .map(|v| v - children_margins[i].0 - children_margins[i].2),
+                    available_block_height: content_height_opt
+                        .map(|v| v - children_margins[i].1 - children_margins[i].3),
                     parent_assigned_border_width: None,
                     parent_assigned_border_height: None,
                     ..*ctx
@@ -1279,8 +1293,10 @@ impl LayoutEngine {
                             // Set containing block size to none
                             // to prevent the child from expanding out of the parent's size
                             let intrinsic_ctx = LayoutContext {
-                                containing_block_width: None,
-                                containing_block_height: None,
+                                containing_block_width: child_ctx.containing_block_width,
+                                containing_block_height: child_ctx.containing_block_height,
+                                available_block_width: None,
+                                available_block_height: None,
                                 viewport_width: vw,
                                 viewport_height: vh,
                                 parent_assigned_border_width: None,
