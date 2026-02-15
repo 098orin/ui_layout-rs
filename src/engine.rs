@@ -460,16 +460,43 @@ impl LayoutEngine {
                 let remaining_space = axis.main(content_box) - children_main_total - gaps_total;
 
                 // Check if any child has auto margins on main axis
-                let has_auto_margins = node.children.iter().any(|child| match axis {
-                    Axis::Horizontal => {
-                        child.style.spacing.margin_left == Length::Auto
-                            || child.style.spacing.margin_right == Length::Auto
+                let mut auto_margin_count = 0u32;
+
+                for child in &node.children {
+                    match axis {
+                        Axis::Horizontal => {
+                            if child.style.spacing.margin_left == Length::Auto {
+                                auto_margin_count += 1;
+                            }
+                            if child.style.spacing.margin_right == Length::Auto {
+                                auto_margin_count += 1;
+                            }
+                        }
+                        Axis::Vertical => {
+                            if child.style.spacing.margin_top == Length::Auto {
+                                auto_margin_count += 1;
+                            }
+                            if child.style.spacing.margin_bottom == Length::Auto {
+                                auto_margin_count += 1;
+                            }
+                        }
                     }
-                    Axis::Vertical => {
-                        child.style.spacing.margin_top == Length::Auto
-                            || child.style.spacing.margin_bottom == Length::Auto
-                    }
-                });
+                }
+
+                let has_auto_margins = auto_margin_count > 0;
+
+                // auto margin がある場合のみ負値を 0 に丸める
+                let remaining_space_for_auto = if has_auto_margins {
+                    remaining_space.max(0.0)
+                } else {
+                    remaining_space
+                };
+
+                let auto_unit = if has_auto_margins && auto_margin_count > 0 {
+                    remaining_space_for_auto / auto_margin_count as f32
+                } else {
+                    0.0
+                };
 
                 // Auto margins take precedence over justify-content
                 let (start_offset, gap_between) = if has_auto_margins {
@@ -484,7 +511,6 @@ impl LayoutEngine {
 
                 // Position each flex child
                 let mut cursor_main = start_offset;
-                let mut remaining_auto_space = remaining_space.max(0.0);
 
                 for child in &mut node.children {
                     // Detect auto margins on main axis
@@ -503,21 +529,11 @@ impl LayoutEngine {
                     let mut margin_start = 0.0;
                     let mut margin_end = 0.0;
 
-                    if has_auto_margins && remaining_auto_space > 0.0 {
-                        if margin_start_auto && margin_end_auto {
-                            // Both auto: split remaining space equally
-                            margin_start = remaining_auto_space / 2.0;
-                            margin_end = remaining_auto_space / 2.0;
-                            remaining_auto_space = 0.0;
-                        } else if margin_start_auto {
-                            // Only start margin is auto
-                            margin_start = remaining_auto_space;
-                            remaining_auto_space = 0.0;
-                        } else if margin_end_auto {
-                            // Only end margin is auto
-                            margin_end = remaining_auto_space;
-                            remaining_auto_space = 0.0;
-                        }
+                    if margin_start_auto {
+                        margin_start = auto_unit;
+                    }
+                    if margin_end_auto {
+                        margin_end = auto_unit;
                     }
 
                     cursor_main += margin_start;
@@ -536,15 +552,46 @@ impl LayoutEngine {
                             0.0
                         };
                     let available_cross = axis.cross(content_box);
-                    let cross_offset = resolve_align_position(
-                        child
-                            .style
-                            .item_style
-                            .align_self
-                            .unwrap_or(node.style.align_items),
-                        child_cross_size,
-                        available_cross,
-                    );
+
+                    // --- Cross-axis auto margin handling ---
+
+                    let (margin_cross_start_auto, margin_cross_end_auto) = match axis {
+                        Axis::Horizontal => (
+                            child.style.spacing.margin_top == Length::Auto,
+                            child.style.spacing.margin_bottom == Length::Auto,
+                        ),
+                        Axis::Vertical => (
+                            child.style.spacing.margin_left == Length::Auto,
+                            child.style.spacing.margin_right == Length::Auto,
+                        ),
+                    };
+
+                    let cross_offset;
+
+                    if margin_cross_start_auto || margin_cross_end_auto {
+                        let free_cross_space = (available_cross - child_cross_size).max(0.0);
+
+                        if margin_cross_start_auto && margin_cross_end_auto {
+                            margin_start = free_cross_space / 2.0;
+                        } else if margin_cross_start_auto {
+                            margin_start = free_cross_space;
+                        } else {
+                            margin_start = 0.0;
+                        }
+
+                        cross_offset = margin_start;
+                    } else {
+                        // fallback to align-self / align-items
+                        cross_offset = resolve_align_position(
+                            child
+                                .style
+                                .item_style
+                                .align_self
+                                .unwrap_or(node.style.align_items),
+                            child_cross_size,
+                            available_cross,
+                        );
+                    }
 
                     let child_cross_pos = match axis {
                         Axis::Horizontal => content_box.y + cross_offset,
@@ -1419,6 +1466,15 @@ impl LayoutEngine {
         let mut max_cross: f32 = 0.0;
 
         for (i, child) in node.children.iter_mut().enumerate() {
+            let is_auto_margin = axis
+                .margin_cross_start(&child.style.spacing)
+                .resolve_with(cbc, vw, vh)
+                == None
+                || axis
+                    .margin_cross_end(&child.style.spacing)
+                    .resolve_with(cbc, vw, vh)
+                    == None;
+
             let align = child
                 .style
                 .item_style
@@ -1427,20 +1483,21 @@ impl LayoutEngine {
 
             let is_auto_cross = axis.size_cross(&child.style.size) == &Length::Auto;
 
-            let stretched_cross = if matches!(align, AlignItems::Stretch) && is_auto_cross {
-                cbc.map(|v| {
-                    v - axis
-                        .margin_cross_start(&child.style.spacing)
-                        .resolve_with(cbc, vw, vh)
-                        .unwrap_or(0.0)
-                        - axis
-                            .margin_cross_end(&child.style.spacing)
+            let stretched_cross =
+                if !is_auto_margin && matches!(align, AlignItems::Stretch) && is_auto_cross {
+                    cbc.map(|v| {
+                        v - axis
+                            .margin_cross_start(&child.style.spacing)
                             .resolve_with(cbc, vw, vh)
                             .unwrap_or(0.0)
-                })
-            } else {
-                None
-            };
+                            - axis
+                                .margin_cross_end(&child.style.spacing)
+                                .resolve_with(cbc, vw, vh)
+                                .unwrap_or(0.0)
+                    })
+                } else {
+                    None
+                };
 
             let (parent_assigned_border_width, parent_assigned_border_height) = {
                 let main_bargin_box = main_sizes[i]
