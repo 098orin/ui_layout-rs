@@ -390,6 +390,8 @@ impl LayoutEngine {
                 containing_block_height: Some(final_content_cross),
                 available_block_width: None,
                 available_block_height: None,
+                parent_assigned_border_width: None,
+                parent_assigned_border_height: None,
                 ..*ctx
             };
             (children_main, children_cross) =
