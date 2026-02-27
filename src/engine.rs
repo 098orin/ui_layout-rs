@@ -652,9 +652,6 @@ impl LayoutEngine {
         _incoming_line_height: f32,
         ctx: &LayoutContext,
     ) -> ((f32, f32), f32) {
-        let mut cursor_y = origin.1;
-        let mut cursor_x = 0.0;
-
         let padding = resolve_padding(&node.style.spacing, ctx);
         let border = resolve_border(&node.style.spacing, ctx);
 
@@ -709,6 +706,9 @@ impl LayoutEngine {
                 parent_assigned_border_height: None,
                 ..*ctx
             };
+
+            let mut cursor_y = 0.0;
+            let mut cursor_x = 0.0;
 
             let mut max_width: f32 = 0.0;
             let mut previous_margin_bottom: f32 = 0.0;
@@ -810,10 +810,12 @@ impl LayoutEngine {
             apply_size_constraints(content_width, &node.style.size, ctx, true)
         };
 
+        let content_height = content_height_opt.unwrap_or(children_height);
+
         // Step 3: Create box model
         let mut box_model = create_box_model(
             content_width,
-            content_height_opt.unwrap_or(children_height),
+            content_height,
             children_width,
             children_height,
             padding,
@@ -827,7 +829,7 @@ impl LayoutEngine {
 
         node.layout_boxes = LayoutBoxes::Single(box_model);
 
-        (((0.0), (cursor_y)), (0.0))
+        (((0.0), (origin.1 + content_height)), (0.0))
     }
 
     /// Layouts an inline container as flow layout.
