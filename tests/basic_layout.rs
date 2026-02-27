@@ -246,6 +246,5 @@ fn block_margin_auto_centering() {
         _ => panic!("Expected single box model"),
     };
 
-    let x = child_box.border_box.x;
-    assert_eq!(x, 100.0); // (300 - 100) / 2
+    assert_eq!(child_box.border_box.x, 100.0); // (300 - 100) / 2
 }
