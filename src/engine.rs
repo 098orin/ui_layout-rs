@@ -759,6 +759,10 @@ impl LayoutEngine {
                     incoming_line_height = 0.0;
                 }
 
+                cursor_y += mt.max(previous_margin_bottom);
+
+                previous_margin_bottom = mb;
+
                 ((cursor_x, cursor_y), incoming_line_height) = self.layout_node(
                     child,
                     intrinsic_pass,
@@ -766,10 +770,6 @@ impl LayoutEngine {
                     incoming_line_height,
                     &child_ctx,
                 );
-
-                cursor_y += mb.max(previous_margin_bottom);
-
-                previous_margin_bottom = mb;
 
                 if is_block_level {
                     // Resolve auto margins for block-level children (horizontal auto margins are ignored for blocks)
