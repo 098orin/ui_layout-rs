@@ -714,11 +714,14 @@ impl LayoutEngine {
             let mut previous_margin_bottom: f32 = 0.0;
             let mut incoming_line_height = 0.0;
 
+            // Layout each child and position vertically with collapsing margins
             for child in node.children.iter_mut() {
                 let is_block_level =
                     matches!(child.style.display, Display::Block | Display::Flex { .. });
 
+                // Resolve margins for child to calculate available space and position
                 let (_, mt, _, mb) = resolve_margins(&child.style.spacing, &child_ctx);
+
                 let (ml_opt, mr_opt) = (
                     child
                         .style
@@ -732,8 +735,10 @@ impl LayoutEngine {
                         .resolve_with(content_width_opt, vw, vh),
                 );
 
+                // Check if either horizontal margin is auto for block-level children
                 let has_side_auto_margin = ml_opt.is_none() || mr_opt.is_none();
 
+                // Culculate available width for child content (auto margins reduce available space)
                 let child_availavle_width = if has_side_auto_margin {
                     None
                 } else {
@@ -742,6 +747,7 @@ impl LayoutEngine {
 
                 let child_available_height = content_height_opt.map(|h| h - mt - mb);
 
+                // Create child layout context with available space
                 let child_ctx = LayoutContext {
                     available_block_width: child_availavle_width,
                     available_block_height: child_available_height,
@@ -765,9 +771,9 @@ impl LayoutEngine {
 
                 previous_margin_bottom = mb;
 
-                // Resolve auto margins for block-level children (horizontal auto margins are ignored for blocks)
-                // and shift child position accordingly
                 if is_block_level {
+                    // Resolve auto margins for block-level children (horizontal auto margins are ignored for blocks)
+                    // and shift child position accordingly
                     let (ml, mr) = match (ml_opt, mr_opt, content_width_opt) {
                         (None, None, Some(cw)) => {
                             let auto_margin = (cw - child.layout_boxes.width()) / 2.0;
@@ -785,6 +791,9 @@ impl LayoutEngine {
                     };
 
                     child.layout_boxes.shift(ml, 0.0);
+
+                    // Update cursor_y for next child
+                    cursor_y += child.layout_boxes.height();
 
                     // Update max width for block-level children
                     let child_total_width = child.layout_boxes.width() + ml + mr;
