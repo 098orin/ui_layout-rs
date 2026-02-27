@@ -642,9 +642,8 @@ impl LayoutEngine {
     ///
     /// Process:
     /// 1. Resolve element's own size and spacing
-    /// 2. Layout children in block flow with margin collapsing
-    /// 3. Position children with proper margin collapsing semantics
-    /// 4. Create box model
+    /// 2. Layout children
+    /// 3. Create box model
     fn layout_block_flow(
         &self,
         node: &mut LayoutNode,
@@ -654,6 +653,7 @@ impl LayoutEngine {
         ctx: &LayoutContext,
     ) -> ((f32, f32), f32) {
         let mut cursor_y = origin.1;
+        let mut cursor_x = 0.0;
 
         let padding = resolve_padding(&node.style.spacing, ctx);
         let border = resolve_border(&node.style.spacing, ctx);
@@ -693,227 +693,132 @@ impl LayoutEngine {
                 .parent_assigned_border_height
                 .map(|b| b - border.1 - border.3 - padding.1 - padding.3));
 
-        // Step 2: Resolve children's margins only when actually needed
-        let containing_width = content_width_opt.unwrap_or(0.0);
-        let mut children_margins = Vec::new();
-
+        // Step 2: Layout children
         let skip_children_layout =
             intrinsic_pass && content_width_opt.is_some() && content_height_opt.is_some();
+        let mut children_width = 0.0;
+        let mut children_height = 0.0;
 
         if !skip_children_layout {
-            children_margins = Vec::with_capacity(node.children.len());
-            let mut previous_margin_bottom = 0.0;
+            let child_ctx = LayoutContext {
+                containing_block_width: content_width_opt,
+                containing_block_height: content_height_opt,
+                available_block_width: None,
+                available_block_height: None,
+                parent_assigned_border_width: None,
+                parent_assigned_border_height: None,
+                ..*ctx
+            };
 
-            for (i, child) in node.children.iter().enumerate() {
+            let mut max_width: f32 = 0.0;
+            let mut previous_margin_bottom: f32 = 0.0;
+            let mut incoming_line_height = 0.0;
+
+            for child in node.children.iter_mut() {
                 let is_block_level =
                     matches!(child.style.display, Display::Block | Display::Flex { .. });
 
-                let raw_margins = (
+                let (_, mt, _, mb) = resolve_margins(&child.style.spacing, &child_ctx);
+                let (ml_opt, mr_opt) = (
                     child
                         .style
                         .spacing
                         .margin_left
-                        .resolve_with(Some(containing_width), vw, vh)
-                        .unwrap_or(0.0),
-                    child
-                        .style
-                        .spacing
-                        .margin_top
-                        .resolve_with(Some(containing_width), vw, vh)
-                        .unwrap_or(0.0),
+                        .resolve_with(content_width_opt, vw, vh),
                     child
                         .style
                         .spacing
                         .margin_right
-                        .resolve_with(Some(containing_width), vw, vh)
-                        .unwrap_or(0.0),
-                    child
-                        .style
-                        .spacing
-                        .margin_bottom
-                        .resolve_with(Some(containing_width), vw, vh)
-                        .unwrap_or(0.0),
+                        .resolve_with(content_width_opt, vw, vh),
                 );
 
-                let collapsed_margin_top = if is_block_level && i > 0 {
-                    raw_margins.1.max(previous_margin_bottom)
+                let has_side_auto_margin = ml_opt.is_none() || mr_opt.is_none();
+
+                let child_availavle_width = if has_side_auto_margin {
+                    None
                 } else {
-                    raw_margins.1
+                    content_width_opt.map(|w| w - ml_opt.unwrap() - mr_opt.unwrap())
                 };
 
-                children_margins.push((
-                    raw_margins.0,
-                    collapsed_margin_top,
-                    raw_margins.2,
-                    raw_margins.3,
-                ));
+                let child_available_height = content_height_opt.map(|h| h - mt - mb);
+
+                let child_ctx = LayoutContext {
+                    available_block_width: child_availavle_width,
+                    available_block_height: child_available_height,
+                    ..child_ctx
+                };
 
                 if is_block_level {
-                    previous_margin_bottom = raw_margins.3;
+                    cursor_y += incoming_line_height;
+                    incoming_line_height = 0.0;
                 }
-            }
-        }
 
-        // Step 2b: Layout children only when required
-        if !skip_children_layout {
-            for (i, child) in node.children.iter_mut().enumerate() {
-                let child_ctx = LayoutContext {
-                    containing_block_width: content_width_opt,
-                    containing_block_height: content_height_opt,
-                    available_block_width: content_width_opt
-                        .map(|v| v - children_margins[i].0 - children_margins[i].2),
-                    available_block_height: content_height_opt
-                        .map(|v| v - children_margins[i].1 - children_margins[i].3),
-                    parent_assigned_border_width: None,
-                    parent_assigned_border_height: None,
-                    ..*ctx
-                };
+                ((cursor_x, cursor_y), incoming_line_height) = self.layout_node(
+                    child,
+                    intrinsic_pass,
+                    (cursor_x, cursor_y),
+                    incoming_line_height,
+                    &child_ctx,
+                );
 
-                let ((_, child_end_y), _) =
-                    self.layout_node(child, intrinsic_pass, (0.0, 0.0), 0.0, &child_ctx);
+                cursor_y += mb.max(previous_margin_bottom);
 
-                cursor_y = child_end_y;
-            }
-        }
+                previous_margin_bottom = mb;
 
-        // Step 3: Apply min/max constraints to content width
-        let mut final_content_width = content_width_opt.unwrap_or(0.0);
-        final_content_width = apply_size_constraints(
-            final_content_width,
-            &node.style.size,
-            ctx,
-            true, // is_width
-        );
-
-        // Step 4: Determine final block height
-        let mut final_content_height = if let Some(h) = content_height_opt {
-            h
-        } else {
-            // Auto height: use content based on children
-            let child_based_height = cursor_y - origin.1;
-
-            // For stretched children, parent-assigned height may be larger
-            if let Some(assigned_h) = ctx.parent_assigned_border_height {
-                let stretch_height = match node.style.box_sizing {
-                    BoxSizing::ContentBox => assigned_h,
-                    BoxSizing::BorderBox => {
-                        (assigned_h - padding.1 - padding.3 - border.1 - border.3).max(0.0)
-                    }
-                };
-                if stretch_height > child_based_height {
-                    stretch_height
-                } else {
-                    child_based_height
-                }
-            } else {
-                child_based_height
-            }
-        };
-        final_content_height = apply_size_constraints(
-            final_content_height,
-            &node.style.size,
-            ctx,
-            false, // is_height
-        );
-
-        // Step 5: Resolve block's margins
-        let (margins, _) =
-            resolve_margins_with_collapsing_enhanced(&node.style.spacing, ctx, true, 0.0);
-
-        // Step 6: Create box model
-        node.layout_boxes = LayoutBoxes::Single(create_box_model(
-            final_content_width,
-            final_content_height,
-            final_content_width,
-            final_content_height,
-            padding,
-            border,
-        ));
-
-        if let LayoutBoxes::Single(ref mut box_model) = node.layout_boxes {
-            let pos_x = origin.0 + margins.0;
-            let pos_y = origin.1 + margins.1;
-            set_position(
-                box_model,
-                (pos_x, pos_y),
-                (padding.0, padding.1),
-                (border.0, border.1),
-            );
-
-            // Step 7: Position children using parent-resolved margins
-            if !intrinsic_pass && !children_margins.is_empty() {
-                let mut child_y_offset = 0.0;
-
-                for (i, child) in node.children.iter_mut().enumerate() {
-                    // Use parent-resolved margins for this child
-                    let (margin_left, margin_top, _margin_right, _) = children_margins
-                        .get(i)
-                        .copied()
-                        .unwrap_or((0.0, 0.0, 0.0, 0.0));
-
-                    // Handle auto margins for horizontal center alignment
-                    let margin_left_auto = child.style.spacing.margin_left == Length::Auto;
-                    let margin_right_auto = child.style.spacing.margin_right == Length::Auto;
-
-                    let child_x = if margin_left_auto && margin_right_auto {
-                        // Center child horizontally when both margins are auto
-                        let child_width =
-                            if let LayoutBoxes::Single(ref box_model) = child.layout_boxes {
-                                box_model.border_box.width
-                            } else {
-                                0.0
-                            };
-                        (final_content_width - child_width) / 2.0
-                    } else {
-                        margin_left
+                // Resolve auto margins for block-level children (horizontal auto margins are ignored for blocks)
+                // and shift child position accordingly
+                if is_block_level {
+                    let (ml, mr) = match (ml_opt, mr_opt, content_width_opt) {
+                        (None, None, Some(cw)) => {
+                            let auto_margin = (cw - child.layout_boxes.width()) / 2.0;
+                            (auto_margin, auto_margin)
+                        }
+                        (None, Some(mr), Some(cw)) => {
+                            let auto_margin = cw - child.layout_boxes.width() - mr;
+                            (auto_margin, mr)
+                        }
+                        (Some(ml), None, Some(cw)) => {
+                            let auto_margin = cw - child.layout_boxes.width() - ml;
+                            (ml, auto_margin)
+                        }
+                        _ => (ml_opt.unwrap_or(0.0), mr_opt.unwrap_or(0.0)),
                     };
 
-                    // Apply parent-resolved margin (includes collapsing with previous sibling)
-                    child_y_offset += margin_top;
+                    child.layout_boxes.shift(ml, 0.0);
 
-                    // Position child relative to parent content box
-                    let (child_current_left, child_current_top) =
-                        if let LayoutBoxes::Single(ref box_model) = child.layout_boxes {
-                            (box_model.border_box.x, box_model.border_box.y)
-                        } else {
-                            (0.0, 0.0)
-                        };
-
-                    let shift_x = child_x - child_current_left;
-                    let shift_y = child_y_offset - child_current_top;
-
-                    child.layout_boxes.shift(shift_x, shift_y);
-
-                    // Update offset for next child (only add child height, not margins)
-                    // Next child's margin_top already includes proper collapsing via parent resolution
-                    if let LayoutBoxes::Single(ref box_model) = child.layout_boxes {
-                        child_y_offset += box_model.border_box.height;
-                    }
+                    // Update max width for block-level children
+                    let child_total_width = child.layout_boxes.width() + ml + mr;
+                    max_width = max_width.max(child_total_width);
                 }
             }
-        } else {
-            unreachable!("layout_boxes always should be Single")
+
+            children_width = max_width;
+            children_height = cursor_y - origin.1;
         }
 
-        let total_width = final_content_width
-            + padding.0
-            + padding.2
-            + border.0
-            + border.2
-            + margins.0
-            + margins.2;
-        let total_height = final_content_height
-            + padding.1
-            + padding.3
-            + border.1
-            + border.3
-            + margins.1
-            + margins.3;
+        let content_width = {
+            let content_width = content_width_opt.unwrap_or(children_width);
+            apply_size_constraints(content_width, &node.style.size, ctx, true)
+        };
 
-        (
-            (origin.0 + total_width, origin.1 + total_height),
-            total_height,
-        )
+        // Step 3: Create box model
+        let mut box_model = create_box_model(
+            content_width,
+            content_height_opt.unwrap_or(children_height),
+            children_width,
+            children_height,
+            padding,
+            border,
+        );
+
+        let padding_edge = (padding.0, padding.1);
+        let border_edge = (border.0, border.1);
+
+        set_position(&mut box_model, origin, padding_edge, border_edge);
+
+        node.layout_boxes = LayoutBoxes::Single(box_model);
+
+        (((0.0), (cursor_y)), (0.0))
     }
 
     /// Layouts an inline container as flow layout.
@@ -940,12 +845,7 @@ impl LayoutEngine {
         };
         let padding = resolve_padding(&node.style.spacing, &ctx_for_inline);
         let border = resolve_border(&node.style.spacing, &ctx_for_inline);
-        let (margins, _) = resolve_margins_with_collapsing_enhanced(
-            &node.style.spacing,
-            &ctx_for_inline,
-            false,
-            0.0,
-        );
+        let margins = resolve_margins(&node.style.spacing, &ctx_for_inline);
 
         if !intrinsic_pass {
             node.placements.clear();
@@ -1624,6 +1524,12 @@ fn create_box_model(
 }
 
 /// Sets the position of a box model at given border-box coordinates.
+///
+/// # Arguments
+/// * `box_model` - The box model to position
+/// * `border_pos` - (x, y) position for the border box
+/// * `padding_edge` - (padding left, padding top)
+/// * `border_edge` - (border left, border top)
 fn set_position(
     box_model: &mut BoxModel,
     border_pos: (f32, f32),
@@ -1713,40 +1619,6 @@ fn resolve_margins(spacing: &Spacing, ctx: &LayoutContext) -> (f32, f32, f32, f3
     )
 }
 
-/// Resolves margins with support for margin collapsing.
-///
-/// Handles parent-child and sibling margin collapsing for block-level elements.
-///
-/// # Arguments
-/// - `spacing`: The spacing style of the element
-/// - `ctx`: The layout context
-/// - `is_block`: Whether this is block-level (affects collapsing)
-/// - `previous_margin_bottom`: The previous sibling's bottom margin
-///
-/// # Returns
-/// - `resolved_margins`: (margin_left, margin_top, margin_right, margin_bottom)
-/// - `margin_after`: The bottom margin for next sibling collapsing
-fn resolve_margins_with_collapsing_enhanced(
-    spacing: &Spacing,
-    ctx: &LayoutContext,
-    is_block: bool,
-    previous_margin_bottom: f32,
-) -> ((f32, f32, f32, f32), f32) {
-    let margins = resolve_margins(spacing, ctx);
-
-    // Apply vertical margin collapsing for block-level elements
-    let collapsed_margin_top = if is_block {
-        margins.1.max(previous_margin_bottom)
-    } else {
-        margins.1
-    };
-
-    (
-        (margins.0, collapsed_margin_top, margins.2, margins.3),
-        margins.3,
-    )
-}
-
 /// Computes justify-content offset and gap spacing.
 /// Returns: (start_offset, gap_between_items)
 fn resolve_justify_content(justify: JustifyContent, remaining: f32, count: usize) -> (f32, f32) {
@@ -1793,6 +1665,9 @@ fn resolve_align_position(align: AlignItems, size: f32, container: f32) -> f32 {
 
 /// Resolves padding values.
 /// Percentage values resolve relative to the containing block's width.
+///
+/// # Returns
+/// - (padding_left, padding_top, padding_right, padding_bottom)
 fn resolve_padding(spacing: &Spacing, ctx: &LayoutContext) -> (f32, f32, f32, f32) {
     let containing_width = ctx.containing_block_width.unwrap_or(ctx.viewport_width);
     let vw = ctx.viewport_width;
@@ -1820,6 +1695,9 @@ fn resolve_padding(spacing: &Spacing, ctx: &LayoutContext) -> (f32, f32, f32, f3
 
 /// Resolves border values.
 /// Percentage values resolve relative to the containing block's width.
+///
+/// # Returns
+/// - (border_left, border_top, border_right, border_bottom)
 fn resolve_border(spacing: &Spacing, ctx: &LayoutContext) -> (f32, f32, f32, f32) {
     let containing_width = ctx.containing_block_width.unwrap_or(ctx.viewport_width);
     let vw = ctx.viewport_width;
