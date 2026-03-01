@@ -409,7 +409,6 @@ fn inline_percentage_spacing() {
 
 #[test]
 fn mixed_inline_and_block_children() {
-    // Create inline content
     let fragment1 = ItemFragment::Fragment(Fragment {
         width: 40.0,
         height: 15.0,
@@ -456,7 +455,7 @@ fn mixed_inline_and_block_children() {
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
-    // Check that inline elements flow horizontally
+    // First inline: first line
     match &root.children[0].layout_boxes {
         LayoutBoxes::Single(box_model) => {
             assert_eq!(box_model.border_box.x, 0.0);
@@ -465,20 +464,20 @@ fn mixed_inline_and_block_children() {
         _ => panic!("Expected single box model"),
     }
 
-    // Block element should force a line break
+    // Block: new line after first inline line (height = 15)
     match &root.children[1].layout_boxes {
         LayoutBoxes::Single(box_model) => {
             assert_eq!(box_model.border_box.x, 0.0);
-            assert!(box_model.border_box.y > 0.0); // Should be below the first inline element
+            assert_eq!(box_model.border_box.y, 15.0);
         }
         _ => panic!("Expected single box model"),
     }
 
-    // Second inline element should be after the block
+    // Second inline: new line after block (15 + 25 = 40)
     match &root.children[2].layout_boxes {
         LayoutBoxes::Single(box_model) => {
             assert_eq!(box_model.border_box.x, 0.0);
-            assert!(box_model.border_box.y > root.children[1].layout_boxes.height()); // Should be below block
+            assert_eq!(box_model.border_box.y, 40.0);
         }
         _ => panic!("Expected single box model"),
     }
