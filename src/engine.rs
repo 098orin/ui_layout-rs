@@ -792,9 +792,6 @@ impl LayoutEngine {
 
                     child.layout_boxes.shift(ml, 0.0);
 
-                    // Update cursor_y for next child
-                    cursor_y += child.layout_boxes.height();
-
                     // Update max width for block-level children
                     let child_total_width = child.layout_boxes.width() + ml + mr;
                     max_width = max_width.max(child_total_width);
