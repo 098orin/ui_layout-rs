@@ -593,9 +593,9 @@ fn auto_height_multiple_children() {
 
     match &root.children[0].layout_boxes {
         LayoutBoxes::Single(box_model) => {
-            // Parent with Auto height should adopt the largest child's height
+            // Parent with Auto height should adopt the total height of its children
             assert_eq!(box_model.content_box.width, 200.0);
-            assert_eq!(box_model.content_box.height, 90.0);
+            assert_eq!(box_model.content_box.height, 150.0);
         }
         _ => panic!("Expected single box model"),
     }
