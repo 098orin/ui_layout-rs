@@ -82,6 +82,90 @@ fn border_box_sizing() {
 }
 
 #[test]
+fn nested_border_box_sizing() {
+    let def_style = Style {
+        spacing: Spacing {
+            margin_top: Length::Px(10.0),
+            margin_bottom: Length::Px(10.0),
+            margin_left: Length::Px(10.0),
+            margin_right: Length::Px(10.0),
+            ..Default::default()
+        },
+        size: SizeStyle {
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let mut root = LayoutNode::new(def_style.clone());
+
+    fn push_child(parent: &mut LayoutNode, style: Style, max: usize, current: usize) {
+        if current + 1 < max {
+            parent.children.push(LayoutNode::new(style.clone()));
+            push_child(&mut parent.children[0], style.clone(), max, current + 1);
+        } else {
+            parent.children.push(LayoutNode::new(Style {
+                size: SizeStyle {
+                    height: Length::Px(50.0),
+                    ..Default::default()
+                },
+                ..style
+            }));
+        }
+    }
+
+    root.children.push(LayoutNode::new(def_style.clone()));
+    push_child(&mut root.children[0], def_style.clone(), 3, 0);
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    // level 0
+    let child0 = &root.children[0];
+    match &child0.layout_boxes {
+        LayoutBoxes::Single(box_model) => {
+            assert_eq!(box_model.border_box.y, 10.0);
+            assert_eq!(box_model.border_box.width, 780.0);
+            assert_eq!(box_model.border_box.height, 110.0);
+        }
+        _ => panic!("Expected single box model"),
+    }
+
+    // level 1
+    let child1 = &child0.children[0];
+    match &child1.layout_boxes {
+        LayoutBoxes::Single(box_model) => {
+            assert_eq!(box_model.border_box.y, 10.0);
+            assert_eq!(box_model.border_box.width, 760.0);
+            assert_eq!(box_model.border_box.height, 90.0);
+        }
+        _ => panic!("Expected single box model"),
+    }
+
+    // level 2
+    let child2 = &child1.children[0];
+    match &child2.layout_boxes {
+        LayoutBoxes::Single(box_model) => {
+            assert_eq!(box_model.border_box.y, 10.0);
+            assert_eq!(box_model.border_box.width, 740.0);
+            assert_eq!(box_model.border_box.height, 70.0);
+        }
+        _ => panic!("Expected single box model"),
+    }
+
+    // leaf
+    let leaf = &child2.children[0];
+    match &leaf.layout_boxes {
+        LayoutBoxes::Single(box_model) => {
+            assert_eq!(box_model.border_box.y, 10.0);
+            assert_eq!(box_model.border_box.width, 720.0);
+            assert_eq!(box_model.content_box.height, 50.0);
+            assert_eq!(box_model.border_box.height, 50.0);
+        }
+        _ => panic!("Expected single box model"),
+    }
+}
+
+#[test]
 fn margins_affect_positioning() {
     let child = LayoutNode::new(Style {
         size: SizeStyle {
