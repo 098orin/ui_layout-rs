@@ -7,6 +7,20 @@ and this project loosely follows Semantic Versioning.
 
 ---
 
+## [0.9.4] - 2026-03-01
+
+### Fixed
+
+* Fixed incorrect handling of `auto` margins in block layout.
+  - Block-level elements with `margin: auto` now correctly center themselves within their containing block when the available space is larger than the element's size, following CSS specifications.
+  - When the available space is smaller than the element's size, `auto` margins are treated as zero, allowing the element to overflow as expected without centering.
+
+### Improved
+* Improved `Inline` layout (Not yet fully compliant with CSS inline formatting model, but basic support added):
+  - Implemented initial inline layout logic.
+
+---
+
 ## [0.9.3] - 2026-02-15
 
 ### Fixed
