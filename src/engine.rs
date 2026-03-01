@@ -757,11 +757,15 @@ impl LayoutEngine {
                 if is_block_level {
                     cursor_y += incoming_line_height;
                     incoming_line_height = 0.0;
+
+                    cursor_y += mt.max(previous_margin_bottom);
+                    previous_margin_bottom = mb;
+                } else {
+                    // For inline children, margins do not collapse and are applied directly
+                    cursor_x += ml_opt.unwrap_or(0.0);
+
+                    previous_margin_bottom = 0.0;
                 }
-
-                cursor_y += mt.max(previous_margin_bottom);
-
-                previous_margin_bottom = mb;
 
                 ((cursor_x, cursor_y), incoming_line_height) = self.layout_node(
                     child,
@@ -853,7 +857,6 @@ impl LayoutEngine {
         };
         let padding = resolve_padding(&node.style.spacing, &ctx_for_inline);
         let border = resolve_border(&node.style.spacing, &ctx_for_inline);
-        let margins = resolve_margins(&node.style.spacing, &ctx_for_inline);
 
         if !intrinsic_pass {
             node.placements.clear();
@@ -862,8 +865,8 @@ impl LayoutEngine {
         // Layout inline fragments (text runs and inline content)
         if !node.self_fragments.is_empty() {
             // Calculate content area boundaries for fragments
-            let content_start_x = cursor_x + margins.0 + border.0 + padding.0;
-            let content_start_y = cursor_y + margins.1 + border.1 + padding.1;
+            let content_start_x = cursor_x + border.0 + padding.0;
+            let content_start_y = cursor_y + border.1 + padding.1;
             let content_cursor_x = content_start_x;
             let content_cursor_y = content_start_y;
 
@@ -922,8 +925,8 @@ impl LayoutEngine {
 
             // Position the box model
             if let LayoutBoxes::Single(ref mut box_model) = node.layout_boxes {
-                let pos_x = origin.0 + margins.0;
-                let pos_y = origin.1 + margins.1;
+                let pos_x = origin.0;
+                let pos_y = origin.1;
                 set_position(
                     box_model,
                     (pos_x, pos_y),
@@ -932,15 +935,8 @@ impl LayoutEngine {
                 );
             }
 
-            let total_width =
-                content_width + padding.0 + padding.2 + border.0 + border.2 + margins.0 + margins.2;
-            let total_height = content_height
-                + padding.1
-                + padding.3
-                + border.1
-                + border.3
-                + margins.1
-                + margins.3;
+            let total_width = content_width + padding.0 + padding.2 + border.0 + border.2;
+            let total_height = content_height + padding.1 + padding.3 + border.1 + border.3;
 
             return (
                 (origin.0 + total_width, origin.1 + total_height),
@@ -962,8 +958,8 @@ impl LayoutEngine {
         ));
 
         if let LayoutBoxes::Single(ref mut box_model) = node.layout_boxes {
-            let pos_x = origin.0 + margins.0;
-            let pos_y = origin.1 + margins.1;
+            let pos_x = origin.0;
+            let pos_y = origin.1;
             set_position(
                 box_model,
                 (pos_x, pos_y),
@@ -972,10 +968,8 @@ impl LayoutEngine {
             );
         }
 
-        let total_width =
-            content_width + padding.0 + padding.2 + border.0 + border.2 + margins.0 + margins.2;
-        let total_height =
-            content_height + padding.1 + padding.3 + border.1 + border.3 + margins.1 + margins.3;
+        let total_width = content_width + padding.0 + padding.2 + border.0 + border.2;
+        let total_height = content_height + padding.1 + padding.3 + border.1 + border.3;
 
         (
             (origin.0 + total_width, origin.1 + total_height),
