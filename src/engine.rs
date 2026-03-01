@@ -806,7 +806,7 @@ impl LayoutEngine {
             cursor_y += incoming_line_height;
 
             children_width = max_width;
-            children_height = cursor_y - origin.1;
+            children_height = cursor_y;
         }
 
         let content_width = {
