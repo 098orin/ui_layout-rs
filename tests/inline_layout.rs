@@ -190,8 +190,8 @@ fn inline_with_margins() {
         spacing: Spacing {
             margin_left: Length::Px(10.0),
             margin_right: Length::Px(15.0),
-            margin_top: Length::Px(5.0),
-            margin_bottom: Length::Px(8.0),
+            margin_top: Length::Px(5.0),    // ignored
+            margin_bottom: Length::Px(8.0), // ignored
             ..Default::default()
         },
         ..Default::default()
@@ -214,25 +214,26 @@ fn inline_with_margins() {
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
-    // Check that inline element is positioned with margins
+    // Inline element layout
     match &root.children[0].children[0].layout_boxes {
         LayoutBoxes::Single(box_model) => {
-            // Border box should be positioned with margins
-            assert_eq!(box_model.border_box.x, 10.0); // margin_left
-            assert_eq!(box_model.border_box.y, 5.0); // margin_top
+            // Horizontal margins affect x-position
+            assert_eq!(box_model.border_box.x, 10.0);
 
-            // Content should be same as border (no padding/border yet)
+            // Vertical margins do NOT affect inline positioning
+            assert_eq!(box_model.border_box.y, 0.0);
+
             assert_eq!(box_model.content_box.width, 50.0);
             assert_eq!(box_model.content_box.height, 20.0);
         }
         _ => panic!("Expected single box model"),
     }
 
-    // Root should account for inline element margins in its dimensions
+    // Parent height calculation
     match &root.children[0].layout_boxes {
         LayoutBoxes::Single(box_model) => {
-            // Height should include top and bottom margins
-            assert_eq!(box_model.content_box.height, 33.0); // 5 + 20 + 8
+            // Inline margins (top/bottom) do not contribute
+            assert_eq!(box_model.content_box.height, 20.0);
         }
         _ => panic!("Expected single box model"),
     }
