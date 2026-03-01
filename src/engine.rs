@@ -814,7 +814,10 @@ impl LayoutEngine {
             apply_size_constraints(content_width, &node.style.size, ctx, true)
         };
 
-        let content_height = content_height_opt.unwrap_or(children_height);
+        let content_height = {
+            let content_height = content_height_opt.unwrap_or(children_height);
+            apply_size_constraints(content_height, &node.style.size, ctx, false)
+        };
 
         // Step 3: Create box model
         let mut box_model = create_box_model(
