@@ -567,7 +567,7 @@ fn inline_viewport_relative_spacing() {
         LayoutBoxes::Single(box_model) => {
             // Position should use viewport-relative margins
             assert_eq!(box_model.border_box.x, 16.0); // 2% of 800px
-            assert_eq!(box_model.border_box.y, 9.0); // 1.5% of 600px
+            assert_eq!(box_model.border_box.y, 0.0); // 1.5% of 600px is **ignored** for vertical margin on inline
 
             // Content size should be fragment size
             assert_eq!(box_model.content_box.width, 25.0);
