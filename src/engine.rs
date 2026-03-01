@@ -802,6 +802,7 @@ impl LayoutEngine {
                     max_width = max_width.max(child_total_width);
                 }
             }
+            cursor_y += incoming_line_height;
 
             children_width = max_width;
             children_height = cursor_y - origin.1;
