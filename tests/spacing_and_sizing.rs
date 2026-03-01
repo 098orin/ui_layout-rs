@@ -310,7 +310,7 @@ fn viewport_relative_sizing() {
 
 #[test]
 fn complex_spacing_calculation() {
-    let mut root = LayoutNode::new(Style {
+    let inner = LayoutNode::new(Style {
         size: SizeStyle {
             width: Length::Px(300.0),
             height: Length::Px(200.0),
@@ -336,9 +336,11 @@ fn complex_spacing_calculation() {
         ..Default::default()
     });
 
+    let mut root = LayoutNode::with_children(Style::default(), vec![inner]);
+
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
-    match &root.layout_boxes {
+    match &root.children[0].layout_boxes {
         LayoutBoxes::Single(box_model) => {
             // Content box should be specified size
             assert_eq!(box_model.content_box.width, 300.0);
