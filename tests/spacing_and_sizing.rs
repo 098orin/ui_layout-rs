@@ -272,37 +272,43 @@ fn percentage_padding() {
 
 #[test]
 fn viewport_relative_sizing() {
-    let mut root = LayoutNode::new(Style {
+    let inner = LayoutNode::new(Style {
         size: SizeStyle {
-            width: Length::Vw(50.0),  // 50% of 800px = 400px
-            height: Length::Vh(25.0), // 25% of 600px = 150px
+            width: Length::Vw(50.0),  // 400
+            height: Length::Vh(25.0), // 150
             ..Default::default()
         },
         spacing: Spacing {
-            margin_left: Length::Vw(5.0),  // 5% of 800px = 40px
-            margin_top: Length::Vh(10.0),  // 10% of 600px = 60px
-            padding_left: Length::Vw(2.5), // 2.5% of 800px = 20px
-            padding_top: Length::Vw(2.5),  // 2.5% of 800px = 20px
+            margin_left: Length::Vw(5.0),  // 40
+            margin_top: Length::Vh(10.0),  // 60
+            padding_left: Length::Vw(2.5), // 20
+            padding_top: Length::Vw(2.5),  // 20
             ..Default::default()
         },
         ..Default::default()
     });
 
+    let mut root = LayoutNode::with_children(Style::default(), vec![inner]);
+
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
-    match &root.layout_boxes {
+    match &root.children[0].layout_boxes {
         LayoutBoxes::Single(box_model) => {
-            // Content size should be viewport-relative
+            // Content box
             assert_eq!(box_model.content_box.width, 400.0);
             assert_eq!(box_model.content_box.height, 150.0);
 
-            // Position should account for viewport-relative margins
+            // Border box position (margin applies)
             assert_eq!(box_model.border_box.x, 40.0);
             assert_eq!(box_model.border_box.y, 60.0);
 
-            // Padding should be viewport-relative
+            // Padding box size
             assert_eq!(box_model.padding_box.width, 420.0); // 400 + 20
             assert_eq!(box_model.padding_box.height, 170.0); // 150 + 20
+
+            // Border box size (no border specified)
+            assert_eq!(box_model.border_box.width, 420.0);
+            assert_eq!(box_model.border_box.height, 170.0);
         }
         _ => panic!("Expected single box model"),
     }
