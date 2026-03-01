@@ -46,6 +46,7 @@ fn flex_column_layout() {
     match &root.children[0].layout_boxes {
         LayoutBoxes::Single(box_model) => {
             assert_eq!(box_model.content_box.height, 40.0);
+            assert_eq!(box_model.content_box.width, 200.0);
         }
         _ => panic!("Expected single box model"),
     }
@@ -53,6 +54,7 @@ fn flex_column_layout() {
     match &root.children[1].layout_boxes {
         LayoutBoxes::Single(box_model) => {
             assert_eq!(box_model.content_box.height, 80.0); // 150 - 40 - 30 = 80
+            assert_eq!(box_model.content_box.width, 200.0);
         }
         _ => panic!("Expected single box model"),
     }
@@ -60,6 +62,7 @@ fn flex_column_layout() {
     match &root.children[2].layout_boxes {
         LayoutBoxes::Single(box_model) => {
             assert_eq!(box_model.content_box.height, 30.0);
+            assert_eq!(box_model.content_box.width, 200.0);
         }
         _ => panic!("Expected single box model"),
     }
