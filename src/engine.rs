@@ -758,6 +758,7 @@ impl LayoutEngine {
                     cursor_y += incoming_line_height;
                     incoming_line_height = 0.0;
 
+                    cursor_x = 0.0;
                     cursor_y += mt.max(previous_margin_bottom);
                     previous_margin_bottom = mb;
                 } else {
@@ -935,16 +936,24 @@ impl LayoutEngine {
                 );
             }
 
-            let total_width = content_width + padding.0 + padding.2 + border.0 + border.2;
-            let total_height = content_height + padding.1 + padding.3 + border.1 + border.3;
-
-            return (
-                (origin.0 + total_width, origin.1 + total_height),
-                total_height,
-            );
+            return ((cursor_x, cursor_y), line_height);
         }
 
         // Empty inline element - still create box model with spacing
+        if !node.children.is_empty() {
+            let mut cursor_x = origin.0 + border.0 + padding.0;
+            let mut cursor_y = origin.1 + border.1 + padding.1;
+            let mut incoming_line_height = incoming_line_height.max(0.0);
+            for child in node.children.iter_mut() {
+                ((cursor_x, cursor_y), incoming_line_height) = self.layout_node(
+                    child,
+                    intrinsic_pass,
+                    (cursor_x, cursor_y),
+                    incoming_line_height,
+                    ctx,
+                );
+            }
+        }
         let content_width = 0.0;
         let content_height = 0.0;
 
