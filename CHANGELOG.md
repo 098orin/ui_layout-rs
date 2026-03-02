@@ -7,6 +7,13 @@ and this project loosely follows Semantic Versioning.
 
 ---
 
+## [0.9.5] - 2026-03-02
+
+### Fixed
+* Fixed incorrect line calculation in `flex` layout.
+
+---
+
 ## [0.9.4] - 2026-03-01
 
 ### Fixed
