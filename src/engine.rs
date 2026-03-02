@@ -836,7 +836,7 @@ impl LayoutEngine {
 
         node.layout_boxes = LayoutBoxes::Single(box_model);
 
-        (((0.0), (origin.1 + content_height)), (0.0))
+        (((0.0), (origin.1 + node.layout_boxes.height())), (0.0))
     }
 
     /// Layouts an inline container as flow layout.
