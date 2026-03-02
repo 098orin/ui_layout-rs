@@ -635,7 +635,7 @@ impl LayoutEngine {
 
         let end_x = origin.0 + node.layout_boxes.width();
         let end_y = origin.1 + node.layout_boxes.height();
-        ((end_x, end_y), node.layout_boxes.height())
+        ((end_x, end_y), 0.0)
     }
 
     /// Layouts a block container.
