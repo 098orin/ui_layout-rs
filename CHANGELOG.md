@@ -7,6 +7,14 @@ and this project loosely follows Semantic Versioning.
 
 ---
 
+## [0.9.6] - 2026-03-02
+
+### Fixed
+* Fixed incorrect line calculation in `block` layout.
+  - Line height is now correctly calculated from `border_box.height` instead of `content_box.height`, ensuring proper spacing and alignment of block-level elements according to CSS specifications.
+
+---
+
 ## [0.9.5] - 2026-03-02
 
 ### Fixed
