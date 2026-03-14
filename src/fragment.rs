@@ -15,6 +15,29 @@ pub enum ItemFragment {
     LineBreak,
 }
 
+impl ItemFragment {
+    /// Returns the width of the fragment, or 0 for line breaks.
+    pub fn width(&self) -> f32 {
+        match self {
+            ItemFragment::Fragment(frag) => frag.width,
+            ItemFragment::LineBreak => 0.0,
+        }
+    }
+
+    /// Returns the height of the fragment, or 0 for line breaks.
+    pub fn height(&self) -> f32 {
+        match self {
+            ItemFragment::Fragment(frag) => frag.height,
+            ItemFragment::LineBreak => 0.0,
+        }
+    }
+
+    /// Checks if the fragment is a line break.
+    pub fn is_line_break(&self) -> bool {
+        matches!(self, ItemFragment::LineBreak)
+    }
+}
+
 /// A splittable fragment of inline content.
 ///
 /// Fragments are the smallest logical units for inline layout.
