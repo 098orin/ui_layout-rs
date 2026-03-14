@@ -7,6 +7,13 @@ and this project loosely follows Semantic Versioning.
 
 ---
 
+## [0.9.7] - 2026-03-14
+
+### Added 
+* Add new API `width()`, `height()` and `is_line_break()` to `ItemFragment`
+
+---
+
 ## [0.9.6] - 2026-03-02
 
 ### Fixed
