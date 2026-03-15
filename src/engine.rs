@@ -29,7 +29,7 @@ struct FragmentLayoutContext {
     cursor_x: f32,
     cursor_y: f32,
     line_height: f32,
-    max_width: f32,
+    max_wrap_width: f32,
     line_index: usize,
     origin: (f32, f32),
 }
@@ -853,7 +853,7 @@ impl LayoutEngine {
         let mut line_height = incoming_line_height;
         let mut line_index = 0;
 
-        let max_width = ctx.containing_block_width.unwrap_or(ctx.viewport_width);
+        let max_wrap_width = ctx.containing_block_width.unwrap_or(ctx.viewport_width);
 
         // Resolve inline container's spacing
         let ctx_for_inline = LayoutContext {
@@ -876,6 +876,8 @@ impl LayoutEngine {
             let content_cursor_x = content_start_x;
             let content_cursor_y = content_start_y;
 
+            let mut max_width: f32 = 0.0;
+
             cursor_x = content_cursor_x;
             cursor_y = content_cursor_y;
 
@@ -883,13 +885,15 @@ impl LayoutEngine {
                 if intrinsic_pass {
                     match frag {
                         crate::ItemFragment::LineBreak => {
+                            max_width = max_width.max(cursor_x - content_start_x);
                             cursor_x = content_start_x;
                             cursor_y += line_height;
                             line_height = 0.0;
                             line_index += 1;
                         }
                         crate::ItemFragment::Fragment(f) => {
-                            if cursor_x + f.width > max_width && cursor_x > content_start_x {
+                            if cursor_x + f.width > max_wrap_width && cursor_x > content_start_x {
+                                max_width = max_width.max(cursor_x + f.width - content_start_x);
                                 cursor_x = content_start_x;
                                 cursor_y += line_height;
                                 line_height = 0.0;
@@ -904,11 +908,11 @@ impl LayoutEngine {
                         cursor_x,
                         cursor_y,
                         line_height,
-                        max_width,
+                        max_wrap_width,
                         line_index,
                         origin: (content_start_x, content_start_y),
                     };
-                    self.layout_fragment(frag, &mut ctx, &mut node.placements);
+                    max_width = self.layout_fragment(frag, &mut ctx, &mut node.placements);
                     cursor_x = ctx.cursor_x;
                     cursor_y = ctx.cursor_y;
                     line_height = ctx.line_height;
@@ -916,7 +920,9 @@ impl LayoutEngine {
                 }
             }
 
-            let content_width = cursor_x - content_start_x;
+            max_width = max_width.max(cursor_x - content_start_x);
+
+            let content_width = max_width;
             let content_height = cursor_y - content_start_y + line_height;
 
             // Create box model with spacing
@@ -991,14 +997,20 @@ impl LayoutEngine {
         )
     }
 
+    /// Layouts a single inline fragment and updates the layout context.
+    ///
+    /// Returns the maximum width of the line after placing the fragment.
     fn layout_fragment(
         &self,
         frag: &ItemFragment,
         ctx: &mut FragmentLayoutContext,
         placements: &mut Vec<FragmentPlacement>,
-    ) {
+    ) -> f32 {
+        let mut max_width: f32 = 0.0;
         match frag {
             ItemFragment::LineBreak => {
+                max_width = max_width.max(ctx.cursor_x - ctx.origin.0);
+
                 ctx.cursor_x = ctx.origin.0;
                 ctx.cursor_y += ctx.line_height;
                 ctx.line_height = 0.0;
@@ -1011,7 +1023,9 @@ impl LayoutEngine {
             }
             ItemFragment::Fragment(f) => {
                 // Check for line wrapping
-                if ctx.cursor_x + f.width > ctx.max_width && ctx.cursor_x > ctx.origin.0 {
+                if ctx.cursor_x + f.width > ctx.max_wrap_width && ctx.cursor_x > ctx.origin.0 {
+                    max_width = max_width.max(ctx.cursor_x + f.width - ctx.origin.0);
+
                     ctx.cursor_x = ctx.origin.0;
                     ctx.cursor_y += ctx.line_height;
                     ctx.line_height = 0.0;
@@ -1027,6 +1041,10 @@ impl LayoutEngine {
                 ctx.line_height = ctx.line_height.max(f.height);
             }
         }
+
+        max_width = max_width.max(ctx.cursor_x - ctx.origin.0);
+
+        max_width
     }
 
     /// Resolve Flex container sizes
