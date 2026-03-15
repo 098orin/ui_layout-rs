@@ -7,6 +7,14 @@ and this project loosely follows Semantic Versioning.
 
 ---
 
+## [0.9.7] - 2026-03-15
+
+### Fixed
+* Fixed incorrect width calculation for `Inline` layout box.
+  - The width of an `Inline` layout box is now correctly calculated as the maximum width of its child lines, rather than the last line width.
+
+---
+
 ## [0.9.7] - 2026-03-14
 
 ### Added 
