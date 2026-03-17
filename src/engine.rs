@@ -870,8 +870,11 @@ impl LayoutEngine {
                 match frag {
                     crate::ItemFragment::LineBreak => {
                         if !intrinsic_pass {
+                            let (pos_x, pos_y) =
+                                (cursor_x + content_start_x, cursor_y + content_start_y);
+
                             node.placements.push(FragmentPlacement {
-                                offset: (cursor_x, cursor_y),
+                                offset: (pos_x, pos_y),
                                 line_index,
                             });
                         }
@@ -883,7 +886,7 @@ impl LayoutEngine {
                         line_index += 1;
                     }
                     crate::ItemFragment::Fragment(f) => {
-                        if cursor_x + f.width > max_wrap_width && cursor_x > 0.0 {
+                        if cursor_x + f.width > max_wrap_width && cursor_x != 0.0 {
                             max_width = max_width.max(cursor_x + f.width);
                             cursor_x = 0.0;
                             cursor_y += line_height;
