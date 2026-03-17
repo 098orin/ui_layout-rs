@@ -76,6 +76,7 @@ impl LayoutBoxes {
     }
 
     /// Returns the maximum width among all boxes.
+    /// See [`BoxModel::width`].
     pub fn width(&self) -> f32 {
         match self {
             LayoutBoxes::None => 0.0,
@@ -85,6 +86,7 @@ impl LayoutBoxes {
     }
 
     /// Returns the total height (sum of all boxes).
+    /// See [`BoxModel::height`].
     pub fn height(&self) -> f32 {
         match self {
             LayoutBoxes::None => 0.0,
