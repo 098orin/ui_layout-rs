@@ -5,8 +5,8 @@
 // and positions children for block, inline and flex layout modes.
 
 use crate::{
-    AlignItems, BoxModel, BoxSizing, Display, FlexDirection, FragmentPlacement, ItemFragment,
-    JustifyContent, LayoutBoxes, LayoutNode, Length, Rect, Spacing, Style,
+    AlignItems, BoxModel, BoxSizing, Display, FlexDirection, FragmentPlacement, JustifyContent,
+    LayoutBoxes, LayoutNode, Length, Rect, Spacing, Style,
 };
 
 /// Container dimensions for flex layout.
@@ -22,17 +22,6 @@ type ContainerSizes = (
     (f32, f32, f32, f32),
     (f32, f32, f32, f32),
 );
-
-/// Context for laying out inline fragments (text runs, inline content, line breaks).
-/// Maintains mutable state for cursor position and line metrics during layout.
-struct FragmentLayoutContext {
-    cursor_x: f32,
-    cursor_y: f32,
-    line_height: f32,
-    max_wrap_width: f32,
-    line_index: usize,
-    origin: (f32, f32),
-}
 
 /// Layout context carrying resolved sizing information down the tree.
 ///
@@ -849,11 +838,7 @@ impl LayoutEngine {
         incoming_line_height: f32,
         ctx: &LayoutContext,
     ) -> ((f32, f32), f32) {
-        let (mut cursor_x, mut cursor_y) = origin;
-        let mut line_height = incoming_line_height;
-        let mut line_index = 0;
-
-        let max_wrap_width = ctx.containing_block_width.unwrap_or(ctx.viewport_width);
+        let container_width = ctx.containing_block_width.unwrap_or(ctx.viewport_width);
 
         // Resolve inline container's spacing
         let ctx_for_inline = LayoutContext {
@@ -870,60 +855,62 @@ impl LayoutEngine {
 
         // Layout inline fragments (text runs and inline content)
         if !node.self_fragments.is_empty() {
-            // Calculate content area boundaries for fragments
-            let content_start_x = cursor_x + border.0 + padding.0;
-            let content_start_y = cursor_y + border.1 + padding.1;
-            let content_cursor_x = content_start_x;
-            let content_cursor_y = content_start_y;
+            let max_wrap_width = container_width - border.0 - border.2 - padding.0 - padding.2;
 
+            let content_start_x = border.0 + padding.0;
+            let content_start_y = border.1 + padding.1;
+
+            let mut cursor_x = 0.0;
+            let mut cursor_y = 0.0;
+            let mut line_height = incoming_line_height;
+            let mut line_index = 0;
             let mut max_width: f32 = 0.0;
 
-            cursor_x = content_cursor_x;
-            cursor_y = content_cursor_y;
-
             for frag in &node.self_fragments {
-                if intrinsic_pass {
-                    match frag {
-                        crate::ItemFragment::LineBreak => {
-                            max_width = max_width.max(cursor_x - content_start_x);
-                            cursor_x = content_start_x;
+                match frag {
+                    crate::ItemFragment::LineBreak => {
+                        if !intrinsic_pass {
+                            node.placements.push(FragmentPlacement {
+                                offset: (cursor_x, cursor_y),
+                                line_index,
+                            });
+                        }
+
+                        max_width = max_width.max(cursor_x);
+                        cursor_x = 0.0;
+                        cursor_y += line_height;
+                        line_height = 0.0;
+                        line_index += 1;
+                    }
+                    crate::ItemFragment::Fragment(f) => {
+                        if cursor_x + f.width > max_wrap_width && cursor_x > 0.0 {
+                            max_width = max_width.max(cursor_x + f.width);
+                            cursor_x = 0.0;
                             cursor_y += line_height;
                             line_height = 0.0;
                             line_index += 1;
                         }
-                        crate::ItemFragment::Fragment(f) => {
-                            if cursor_x + f.width > max_wrap_width && cursor_x > content_start_x {
-                                max_width = max_width.max(cursor_x + f.width - content_start_x);
-                                cursor_x = content_start_x;
-                                cursor_y += line_height;
-                                line_height = 0.0;
-                                line_index += 1;
-                            }
-                            cursor_x += f.width;
-                            line_height = line_height.max(f.height);
+
+                        if !intrinsic_pass {
+                            let (pos_x, pos_y) =
+                                (cursor_x + content_start_x, cursor_y + content_start_y);
+
+                            node.placements.push(FragmentPlacement {
+                                offset: (pos_x, pos_y),
+                                line_index,
+                            });
                         }
+
+                        cursor_x += f.width;
+                        line_height = line_height.max(f.height);
                     }
-                } else {
-                    let mut ctx = FragmentLayoutContext {
-                        cursor_x,
-                        cursor_y,
-                        line_height,
-                        max_wrap_width,
-                        line_index,
-                        origin: (content_start_x, content_start_y),
-                    };
-                    max_width = self.layout_fragment(frag, &mut ctx, &mut node.placements);
-                    cursor_x = ctx.cursor_x;
-                    cursor_y = ctx.cursor_y;
-                    line_height = ctx.line_height;
-                    line_index = ctx.line_index;
                 }
             }
 
-            max_width = max_width.max(cursor_x - content_start_x);
+            max_width = max_width.max(cursor_x);
 
             let content_width = max_width;
-            let content_height = cursor_y - content_start_y + line_height;
+            let content_height = cursor_y + line_height;
 
             // Create box model with spacing
             node.layout_boxes = LayoutBoxes::Single(create_box_model(
@@ -950,7 +937,8 @@ impl LayoutEngine {
             return ((cursor_x, cursor_y), line_height);
         }
 
-        // Empty inline element - still create box model with spacing
+        // self_fragment.is_empty && children exist
+        // -> Inline container. Layout children in flow layout and size container to fit children.
         if !node.children.is_empty() {
             let mut cursor_x = origin.0 + border.0 + padding.0;
             let mut cursor_y = origin.1 + border.1 + padding.1;
@@ -995,56 +983,6 @@ impl LayoutEngine {
             (origin.0 + total_width, origin.1 + total_height),
             total_height,
         )
-    }
-
-    /// Layouts a single inline fragment and updates the layout context.
-    ///
-    /// Returns the maximum width of the line after placing the fragment.
-    fn layout_fragment(
-        &self,
-        frag: &ItemFragment,
-        ctx: &mut FragmentLayoutContext,
-        placements: &mut Vec<FragmentPlacement>,
-    ) -> f32 {
-        let mut max_width: f32 = 0.0;
-        match frag {
-            ItemFragment::LineBreak => {
-                max_width = max_width.max(ctx.cursor_x - ctx.origin.0);
-
-                ctx.cursor_x = ctx.origin.0;
-                ctx.cursor_y += ctx.line_height;
-                ctx.line_height = 0.0;
-                ctx.line_index += 1;
-
-                placements.push(FragmentPlacement {
-                    offset: (ctx.cursor_x - ctx.origin.0, ctx.cursor_y - ctx.origin.1),
-                    line_index: ctx.line_index,
-                });
-            }
-            ItemFragment::Fragment(f) => {
-                // Check for line wrapping
-                if ctx.cursor_x + f.width > ctx.max_wrap_width && ctx.cursor_x > ctx.origin.0 {
-                    max_width = max_width.max(ctx.cursor_x + f.width - ctx.origin.0);
-
-                    ctx.cursor_x = ctx.origin.0;
-                    ctx.cursor_y += ctx.line_height;
-                    ctx.line_height = 0.0;
-                    ctx.line_index += 1;
-                }
-
-                placements.push(FragmentPlacement {
-                    offset: (ctx.cursor_x - ctx.origin.0, ctx.cursor_y - ctx.origin.1),
-                    line_index: ctx.line_index,
-                });
-
-                ctx.cursor_x += f.width;
-                ctx.line_height = ctx.line_height.max(f.height);
-            }
-        }
-
-        max_width = max_width.max(ctx.cursor_x - ctx.origin.0);
-
-        max_width
     }
 
     /// Resolve Flex container sizes
