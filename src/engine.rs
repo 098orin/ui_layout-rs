@@ -869,6 +869,12 @@ impl LayoutEngine {
             for frag in &node.self_fragments {
                 match frag {
                     crate::ItemFragment::LineBreak => {
+                        max_width = max_width.max(cursor_x);
+                        cursor_x = 0.0;
+                        cursor_y += line_height;
+                        line_height = 0.0;
+                        line_index += 1;
+
                         if !intrinsic_pass {
                             let (pos_x, pos_y) =
                                 (cursor_x + content_start_x, cursor_y + content_start_y);
@@ -878,12 +884,6 @@ impl LayoutEngine {
                                 line_index,
                             });
                         }
-
-                        max_width = max_width.max(cursor_x);
-                        cursor_x = 0.0;
-                        cursor_y += line_height;
-                        line_height = 0.0;
-                        line_index += 1;
                     }
                     crate::ItemFragment::Fragment(f) => {
                         if cursor_x + f.width > max_wrap_width && cursor_x != 0.0 {
