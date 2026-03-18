@@ -52,11 +52,14 @@ fn inline_basic_flow() {
 
     // Check that inline node has correct layout boxes
     match &root.children[0].layout_boxes {
-        LayoutBoxes::Single(box_model) => {
-            assert_eq!(box_model.content_box.width, 105.0); // Total width of fragments
-            assert_eq!(box_model.content_box.height, 25.0); // Max height of fragments
+        LayoutBoxes::Multiple(boxes) => {
+            assert_eq!(boxes.len(), 1);
+
+            let box_model = &boxes[0];
+            assert_eq!(box_model.content_box.width, 105.0);
+            assert_eq!(box_model.content_box.height, 25.0);
         }
-        _ => panic!("Expected single box model"),
+        _ => panic!("Expected multiple box model"),
     }
 }
 
@@ -114,10 +117,18 @@ fn inline_line_wrapping() {
 
     // Check total height accounts for multiple lines
     match &root.children[0].layout_boxes {
-        LayoutBoxes::Single(box_model) => {
-            assert_eq!(box_model.content_box.height, 60.0); // 20 + 25 + 15 (line heights)
+        LayoutBoxes::Multiple(boxes) => {
+            assert_eq!(boxes.len(), 3);
+
+            assert_eq!(boxes[0].content_box.height, 20.0);
+            assert_eq!(boxes[1].content_box.height, 25.0);
+            assert_eq!(boxes[2].content_box.height, 15.0);
+
+            assert_eq!(boxes[0].content_box.width, 80.0);
+            assert_eq!(boxes[1].content_box.width, 70.0);
+            assert_eq!(boxes[2].content_box.width, 60.0);
         }
-        _ => panic!("Expected single box model"),
+        _ => panic!("Expected multiple box model"),
     }
 }
 
