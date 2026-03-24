@@ -1448,11 +1448,11 @@ impl LayoutEngine {
             let is_auto_margin = axis
                 .margin_cross_start(&child.style.spacing)
                 .resolve_with(cbc, vw, vh)
-                == None
+                .is_none()
                 || axis
                     .margin_cross_end(&child.style.spacing)
                     .resolve_with(cbc, vw, vh)
-                    == None;
+                    .is_none();
 
             let align = child
                 .style
