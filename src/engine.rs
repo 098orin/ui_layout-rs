@@ -959,9 +959,6 @@ impl LayoutEngine {
             let max_wrap_width =
                 container_width - border.left - border.right - padding.left - padding.right;
 
-            let content_start_x = border.left + padding.left;
-            let content_start_y = border.top + padding.top;
-
             let mut cursor_x = 0.0;
             let mut cursor_y = 0.0;
             let mut line_height = incoming_line_height;
