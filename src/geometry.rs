@@ -18,8 +18,12 @@ pub struct BoxModel {
 #[derive(Debug, Clone, Default)]
 pub enum LayoutBoxes {
     #[default]
+    /// No layout boxes.
     None,
+    /// A single layout box.
     Single(BoxModel),
+    /// Multiple layout boxes split across lines.
+    /// Represents line fragments and may be empty.
     Multiple(Vec<BoxModel>),
 }
 
