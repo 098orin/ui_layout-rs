@@ -1047,11 +1047,12 @@ impl LayoutEngine {
             let mut cursor_y = origin.1 + border.top + padding.top;
             let mut incoming_line_height = incoming_line_height.max(0.0);
             for child in node.children.iter_mut() {
+                let child_resolved_margin_edge = resolve_margins(&child.style.spacing, ctx);
                 ((cursor_x, cursor_y), incoming_line_height) = self.layout_node(
                     child,
                     intrinsic_pass,
                     (cursor_x, cursor_y),
-                    resolved_margin_edge,
+                    child_resolved_margin_edge,
                     incoming_line_height,
                     ctx,
                 );
