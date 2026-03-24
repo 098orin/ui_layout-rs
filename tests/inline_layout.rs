@@ -182,10 +182,13 @@ fn inline_with_line_breaks() {
 
     // Check total height
     match &root.children[0].layout_boxes {
-        LayoutBoxes::Single(box_model) => {
-            assert_eq!(box_model.content_box.height, 45.0); // 20 + 25 (two line heights)
+        LayoutBoxes::Multiple(box_models) => {
+            assert_eq!(box_models.len(), 2);
+
+            assert_eq!(box_models[0].content_box.height, 20.0);
+            assert_eq!(box_models[1].content_box.height, 25.0);
         }
-        _ => panic!("Expected single box model"),
+        _ => panic!("Expected multiple box model"),
     }
 }
 
@@ -285,7 +288,11 @@ fn inline_with_padding() {
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
     match &root.children[0].layout_boxes {
-        LayoutBoxes::Single(box_model) => {
+        LayoutBoxes::Multiple(box_models) => {
+            assert_eq!(box_models.len(), 1);
+
+            let box_model = &box_models[0];
+
             // Content box should be the fragment size
             assert_eq!(box_model.content_box.width, 40.0);
             assert_eq!(box_model.content_box.height, 18.0);
@@ -298,7 +305,7 @@ fn inline_with_padding() {
             assert_eq!(box_model.border_box.width, 60.0);
             assert_eq!(box_model.border_box.height, 28.0);
         }
-        _ => panic!("Expected single box model"),
+        _ => panic!("Expected multiple box model"),
     }
 
     // Fragment should be positioned within padding
