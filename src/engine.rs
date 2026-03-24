@@ -902,22 +902,6 @@ impl LayoutEngine {
 
         // Layout inline fragments (text runs and inline content)
         if !node.self_fragments.is_empty() {
-            let max_wrap_width =
-                container_width - border.left - border.right - padding.left - padding.right;
-
-            let content_start_x = border.left + padding.left;
-            let content_start_y = border.top + padding.top;
-
-            let mut cursor_x = 0.0;
-            let mut cursor_y = 0.0;
-            let mut line_height = incoming_line_height;
-            let mut line_index = 0;
-
-            let mut layout_boxes_buf = Vec::new();
-
-            let padding_edge = resolve_padding(&node.style.spacing, ctx);
-            let border_edge = resolve_border(&node.style.spacing, ctx);
-
             // Line Break
             fn do_line_break(
                 cursor_x: &mut f32,
@@ -962,6 +946,22 @@ impl LayoutEngine {
 
                 (fragment_placement, box_model)
             }
+
+            let max_wrap_width =
+                container_width - border.left - border.right - padding.left - padding.right;
+
+            let content_start_x = border.left + padding.left;
+            let content_start_y = border.top + padding.top;
+
+            let mut cursor_x = 0.0;
+            let mut cursor_y = 0.0;
+            let mut line_height = incoming_line_height;
+            let mut line_index = 0;
+
+            let mut layout_boxes_buf = Vec::new();
+
+            let padding_edge = resolve_padding(&node.style.spacing, ctx);
+            let border_edge = resolve_border(&node.style.spacing, ctx);
 
             // Shift layout boxes at the end.
             for frag in &node.self_fragments {
