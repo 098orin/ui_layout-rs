@@ -16,12 +16,29 @@ use crate::{
 /// - Cross-axis content size (None if auto)
 /// - Padding edges (start, before, end, after)
 /// - Border edges (start, before, end, after)
-type ContainerSizes = (
-    Option<f32>,
-    Option<f32>,
-    (f32, f32, f32, f32),
-    (f32, f32, f32, f32),
-);
+type ContainerSizes = (Option<f32>, Option<f32>, Edge, Edge);
+
+#[derive(Clone, Copy)]
+struct Edge {
+    left: f32,
+    top: f32,
+    right: f32,
+    bottom: f32,
+}
+
+impl From<(f32, f32, f32, f32)> for Edge {
+    /// Arg valus: (f32, f32, f32, f32) should be:
+    /// (left, top, right, bottom)
+    fn from(value: (f32, f32, f32, f32)) -> Self {
+        let (left, top, right, bottom) = value;
+        Self {
+            left,
+            top,
+            right,
+            bottom,
+        }
+    }
+}
 
 /// Layout context carrying resolved sizing information down the tree.
 ///
@@ -298,9 +315,14 @@ impl LayoutEngine {
             Display::Block => {
                 self.layout_block_flow(node, intrinsic_pass, origin, incoming_line_height, ctx)
             }
-            Display::Inline => {
-                self.layout_inline_flow(node, intrinsic_pass, origin, incoming_line_height, ctx)
-            }
+            Display::Inline => self.layout_inline_flow(
+                node,
+                intrinsic_pass,
+                origin,
+                todo!(),
+                incoming_line_height,
+                ctx,
+            ),
             Display::None => unreachable!(),
         }
     }
@@ -408,8 +430,12 @@ impl LayoutEngine {
         };
 
         if let LayoutBoxes::Single(ref mut box_model) = node.layout_boxes {
-            let (pl, pt, _, _) = padding;
-            let (bl, bt, _, _) = border;
+            let Edge {
+                left: pl, top: pt, ..
+            } = padding;
+            let Edge {
+                left: bl, top: bt, ..
+            } = border;
             set_position(box_model, origin, (pl, pt), (bl, bt));
         }
 
@@ -654,16 +680,16 @@ impl LayoutEngine {
             .width
             .resolve_with(ctx.containing_block_width, vw, vh)
             .map(|width| {
-                let padding_edge = (padding.0, padding.2);
-                let border_edge = (border.0, border.2);
+                let padding_edge = (padding.left, padding.right);
+                let border_edge = (border.left, border.right);
                 resolve_content_size_with_box_sizing(node, width, padding_edge, border_edge)
             })
             .or(ctx
                 .parent_assigned_border_width
-                .map(|b| b - border.0 - border.2 - padding.0 - padding.2))
+                .map(|b| b - border.right - border.left - padding.right - padding.left))
             .or(ctx
                 .available_block_width
-                .map(|cbw| cbw - border.0 - border.2 - padding.0 - padding.2));
+                .map(|cbw| cbw - border.right - border.left - padding.right - padding.left));
 
         let content_height_opt = node
             .style
@@ -671,13 +697,13 @@ impl LayoutEngine {
             .height
             .resolve_with(ctx.containing_block_height, vw, vh)
             .map(|height| {
-                let padding_edge = (padding.1, padding.3);
-                let border_edge = (border.1, border.3);
+                let padding_edge = (padding.top, padding.bottom);
+                let border_edge = (border.top, border.bottom);
                 resolve_content_size_with_box_sizing(node, height, padding_edge, border_edge)
             })
             .or(ctx
                 .parent_assigned_border_height
-                .map(|b| b - border.1 - border.3 - padding.1 - padding.3));
+                .map(|b| b - border.top - border.bottom - padding.top - padding.bottom));
 
         // Step 2: Layout children
         let skip_children_layout =
@@ -709,7 +735,11 @@ impl LayoutEngine {
                     matches!(child.style.display, Display::Block | Display::Flex { .. });
 
                 // Resolve margins for child to calculate available space and position
-                let (_, mt, _, mb) = resolve_margins(&child.style.spacing, &child_ctx);
+                let Edge {
+                    top: mt,
+                    bottom: mb,
+                    ..
+                } = resolve_margins(&child.style.spacing, &child_ctx);
 
                 let (ml_opt, mr_opt) = (
                     child
@@ -818,8 +848,8 @@ impl LayoutEngine {
             border,
         );
 
-        let padding_edge = (padding.0, padding.1);
-        let border_edge = (border.0, border.1);
+        let padding_edge = (padding.right, padding.top);
+        let border_edge = (border.right, border.top);
 
         set_position(&mut box_model, origin, padding_edge, border_edge);
 
@@ -835,6 +865,7 @@ impl LayoutEngine {
         node: &mut LayoutNode,
         intrinsic_pass: bool,
         origin: (f32, f32),
+        resolved_margin_edge: Edge,
         incoming_line_height: f32,
         ctx: &LayoutContext,
     ) -> ((f32, f32), f32) {
@@ -855,53 +886,117 @@ impl LayoutEngine {
 
         // Layout inline fragments (text runs and inline content)
         if !node.self_fragments.is_empty() {
-            let max_wrap_width = container_width - border.0 - border.2 - padding.0 - padding.2;
+            let max_wrap_width =
+                container_width - border.left - border.right - padding.left - padding.right;
 
-            let content_start_x = border.0 + padding.0;
-            let content_start_y = border.1 + padding.1;
+            let content_start_x = border.left + padding.left;
+            let content_start_y = border.top + padding.top;
 
             let mut cursor_x = 0.0;
             let mut cursor_y = 0.0;
             let mut line_height = incoming_line_height;
             let mut line_index = 0;
-            let mut max_width: f32 = 0.0;
 
+            let mut layout_boxes_buf = Vec::new();
+
+            let padding_edge = resolve_padding(&node.style.spacing, ctx);
+            let border_edge = resolve_border(&node.style.spacing, ctx);
+
+            // Line Break
+            fn do_line_break(
+                cursor_x: &mut f32,
+                cursor_y: &mut f32,
+                line_height: &mut f32,
+                line_index: &mut usize,
+            ) {
+                *cursor_x = 0.0;
+                *cursor_y += *line_height;
+                *line_height = 0.0;
+                *line_index += 1;
+            }
+
+            // Place
+            #[must_use]
+            fn place_fragment(
+                cursor_x: f32,
+                cursor_y: f32,
+                content_start_x: f32,
+                content_start_y: f32,
+                line_index: usize,
+                padding_edge: Edge,
+                border_edge: Edge,
+                line_height: f32,
+            ) -> (FragmentPlacement, BoxModel) {
+                let (pos_x, pos_y) = (cursor_x + content_start_x, cursor_y + content_start_y);
+
+                let fragment_placement = FragmentPlacement {
+                    offset: (pos_x, pos_y),
+                    line_index,
+                };
+
+                let box_model = create_box_model(
+                    cursor_x,
+                    line_height,
+                    cursor_x,
+                    line_height,
+                    padding_edge,
+                    border_edge,
+                );
+
+                (fragment_placement, box_model)
+            }
+
+            // Shift layout boxes at the end.
             for frag in &node.self_fragments {
                 match frag {
                     crate::ItemFragment::LineBreak => {
-                        max_width = max_width.max(cursor_x);
-                        cursor_x = 0.0;
-                        cursor_y += line_height;
-                        line_height = 0.0;
-                        line_index += 1;
-
+                        do_line_break(
+                            &mut cursor_x,
+                            &mut cursor_y,
+                            &mut line_height,
+                            &mut line_index,
+                        );
                         if !intrinsic_pass {
-                            let (pos_x, pos_y) =
-                                (cursor_x + content_start_x, cursor_y + content_start_y);
-
-                            node.placements.push(FragmentPlacement {
-                                offset: (pos_x, pos_y),
+                            let (fragment_placement, box_model) = place_fragment(
+                                cursor_x,
+                                cursor_y,
+                                content_start_x,
+                                content_start_y,
                                 line_index,
-                            });
+                                padding_edge,
+                                border_edge,
+                                line_height,
+                            );
+
+                            node.placements.push(fragment_placement);
+                            layout_boxes_buf.push(box_model);
                         }
                     }
+
                     crate::ItemFragment::Fragment(f) => {
                         if cursor_x + f.width > max_wrap_width && cursor_x != 0.0 {
-                            max_width = max_width.max(cursor_x + f.width);
-                            cursor_x = 0.0;
-                            cursor_y += line_height;
-                            line_height = 0.0;
-                            line_index += 1;
+                            do_line_break(
+                                &mut cursor_x,
+                                &mut cursor_y,
+                                &mut line_height,
+                                &mut line_index,
+                            );
                         }
 
                         if !intrinsic_pass {
-                            let (pos_x, pos_y) =
-                                (cursor_x + content_start_x, cursor_y + content_start_y);
-
-                            node.placements.push(FragmentPlacement {
-                                offset: (pos_x, pos_y),
+                            let (fragment_placement, box_model) = place_fragment(
+                                cursor_x,
+                                cursor_y,
+                                content_start_x,
+                                content_start_y,
                                 line_index,
-                            });
+                                padding_edge,
+                                border_edge,
+                                line_height,
+                            );
+
+                            node.placements.push(fragment_placement);
+                            layout_boxes_buf.push(box_model);
                         }
 
                         cursor_x += f.width;
@@ -910,20 +1005,8 @@ impl LayoutEngine {
                 }
             }
 
-            max_width = max_width.max(cursor_x);
-
-            let content_width = max_width;
-            let content_height = cursor_y + line_height;
-
             // Create box model with spacing
-            node.layout_boxes = LayoutBoxes::Single(create_box_model(
-                content_width,
-                content_height,
-                content_width,
-                content_height,
-                padding,
-                border,
-            ));
+            node.layout_boxes = LayoutBoxes::Multiple(layout_boxes_buf);
 
             // Position the box model
             if let LayoutBoxes::Single(ref mut box_model) = node.layout_boxes {
@@ -932,8 +1015,8 @@ impl LayoutEngine {
                 set_position(
                     box_model,
                     (pos_x, pos_y),
-                    (padding.0, padding.1),
-                    (border.0, border.1),
+                    (padding.left, padding.top),
+                    (border.left, border.top),
                 );
             }
 
@@ -943,8 +1026,8 @@ impl LayoutEngine {
         // self_fragment.is_empty && children exist
         // -> Inline container. Layout children in flow layout and size container to fit children.
         if !node.children.is_empty() {
-            let mut cursor_x = origin.0 + border.0 + padding.0;
-            let mut cursor_y = origin.1 + border.1 + padding.1;
+            let mut cursor_x = origin.0 + border.right + padding.right;
+            let mut cursor_y = origin.1 + border.top + padding.top;
             let mut incoming_line_height = incoming_line_height.max(0.0);
             for child in node.children.iter_mut() {
                 ((cursor_x, cursor_y), incoming_line_height) = self.layout_node(
@@ -974,13 +1057,14 @@ impl LayoutEngine {
             set_position(
                 box_model,
                 (pos_x, pos_y),
-                (padding.0, padding.1),
-                (border.0, border.1),
+                (padding.right, padding.top),
+                (border.right, border.top),
             );
         }
 
-        let total_width = content_width + padding.0 + padding.2 + border.0 + border.2;
-        let total_height = content_height + padding.1 + padding.3 + border.1 + border.3;
+        let total_width = content_width + padding.right + padding.left + border.right + border.left;
+        let total_height =
+            content_height + padding.top + padding.bottom + border.top + border.bottom;
 
         (
             (origin.0 + total_width, origin.1 + total_height),
@@ -1073,12 +1157,14 @@ impl LayoutEngine {
         let padding = match axis {
             Axis::Horizontal => (pms, pcs, pme, pce),
             Axis::Vertical => (pcs, pms, pce, pme),
-        };
+        }
+        .into();
 
         let border = match axis {
             Axis::Horizontal => (bms, bcs, bme, bce),
             Axis::Vertical => (bcs, bms, bce, bme),
-        };
+        }
+        .into();
 
         (content_main, content_cross, padding, border)
     }
@@ -1456,11 +1542,21 @@ fn create_box_model(
     content_height: f32,
     children_width: f32,
     children_height: f32,
-    padding_edge: (f32, f32, f32, f32),
-    border_edge: (f32, f32, f32, f32),
+    padding_edge: Edge,
+    border_edge: Edge,
 ) -> BoxModel {
-    let (pl, pt, pr, pb) = padding_edge;
-    let (bl, bt, br, bb) = border_edge;
+    let Edge {
+        left: pl,
+        top: pt,
+        right: pr,
+        bottom: pb,
+    } = padding_edge;
+    let Edge {
+        left: bl,
+        top: bt,
+        right: br,
+        bottom: bb,
+    } = border_edge;
 
     let border_box = Rect {
         x: 0.0,
@@ -1568,7 +1664,7 @@ fn apply_size_constraints(
     clamp(value, min_constraint, max_constraint)
 }
 
-fn resolve_margins(spacing: &Spacing, ctx: &LayoutContext) -> (f32, f32, f32, f32) {
+fn resolve_margins(spacing: &Spacing, ctx: &LayoutContext) -> Edge {
     // Percentage margins resolve against containing block width
     let containing_width = ctx.containing_block_width.unwrap_or(ctx.viewport_width);
     let vw = ctx.viewport_width;
@@ -1592,6 +1688,7 @@ fn resolve_margins(spacing: &Spacing, ctx: &LayoutContext) -> (f32, f32, f32, f3
             .resolve_with(Some(containing_width), vw, vh)
             .unwrap_or(0.0),
     )
+        .into()
 }
 
 /// Computes justify-content offset and gap spacing.
@@ -1643,7 +1740,7 @@ fn resolve_align_position(align: AlignItems, size: f32, container: f32) -> f32 {
 ///
 /// # Returns
 /// - (padding_left, padding_top, padding_right, padding_bottom)
-fn resolve_padding(spacing: &Spacing, ctx: &LayoutContext) -> (f32, f32, f32, f32) {
+fn resolve_padding(spacing: &Spacing, ctx: &LayoutContext) -> Edge {
     let containing_width = ctx.containing_block_width.unwrap_or(ctx.viewport_width);
     let vw = ctx.viewport_width;
     let vh = ctx.viewport_height;
@@ -1666,6 +1763,7 @@ fn resolve_padding(spacing: &Spacing, ctx: &LayoutContext) -> (f32, f32, f32, f3
             .resolve_with(Some(containing_width), vw, vh)
             .unwrap_or(0.0),
     )
+        .into()
 }
 
 /// Resolves border values.
@@ -1673,7 +1771,7 @@ fn resolve_padding(spacing: &Spacing, ctx: &LayoutContext) -> (f32, f32, f32, f3
 ///
 /// # Returns
 /// - (border_left, border_top, border_right, border_bottom)
-fn resolve_border(spacing: &Spacing, ctx: &LayoutContext) -> (f32, f32, f32, f32) {
+fn resolve_border(spacing: &Spacing, ctx: &LayoutContext) -> Edge {
     let containing_width = ctx.containing_block_width.unwrap_or(ctx.viewport_width);
     let vw = ctx.viewport_width;
     let vh = ctx.viewport_height;
@@ -1696,4 +1794,5 @@ fn resolve_border(spacing: &Spacing, ctx: &LayoutContext) -> (f32, f32, f32, f32
             .resolve_with(Some(containing_width), vw, vh)
             .unwrap_or(0.0),
     )
+        .into()
 }
