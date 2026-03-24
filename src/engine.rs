@@ -908,11 +908,24 @@ impl LayoutEngine {
                 cursor_y: &mut f32,
                 line_height: &mut f32,
                 line_index: &mut usize,
-            ) {
+                padding_edge: Edge,
+                border_edge: Edge,
+            ) -> BoxModel {
+                let box_model = create_box_model(
+                    *cursor_x,
+                    *line_height,
+                    *cursor_x,
+                    *line_height,
+                    padding_edge,
+                    border_edge,
+                );
+
                 *cursor_x = 0.0;
                 *cursor_y += *line_height;
                 *line_height = 0.0;
                 *line_index += 1;
+
+                box_model
             }
 
             // Place
@@ -924,27 +937,13 @@ impl LayoutEngine {
                 content_start_x: f32,
                 content_start_y: f32,
                 line_index: usize,
-                padding_edge: Edge,
-                border_edge: Edge,
-                line_height: f32,
-            ) -> (FragmentPlacement, BoxModel) {
+            ) -> FragmentPlacement {
                 let (pos_x, pos_y) = (cursor_x + content_start_x, cursor_y + content_start_y);
 
-                let fragment_placement = FragmentPlacement {
+                FragmentPlacement {
                     offset: (pos_x, pos_y),
                     line_index,
-                };
-
-                let box_model = create_box_model(
-                    cursor_x,
-                    line_height,
-                    cursor_x,
-                    line_height,
-                    padding_edge,
-                    border_edge,
-                );
-
-                (fragment_placement, box_model)
+                }
             }
 
             let max_wrap_width =
@@ -966,58 +965,65 @@ impl LayoutEngine {
 
             let padding_edge = resolve_padding(&node.style.spacing, ctx);
             let border_edge = resolve_border(&node.style.spacing, ctx);
+            let Edge {
+                left: first_margin,
+                right: last_margin,
+                ..
+            } = resolved_margin_edge;
+
+            cursor_x += first_margin;
 
             // Shift layout boxes at the end.
             for frag in &node.self_fragments {
                 match frag {
                     crate::ItemFragment::LineBreak => {
-                        do_line_break(
+                        let box_model = do_line_break(
                             &mut cursor_x,
                             &mut cursor_y,
                             &mut line_height,
                             &mut line_index,
+                            padding_edge,
+                            border_edge,
                         );
+
+                        layout_boxes_buf.push(box_model);
                         if !intrinsic_pass {
-                            let (fragment_placement, box_model) = place_fragment(
+                            let fragment_placement = place_fragment(
                                 cursor_x,
                                 cursor_y,
                                 content_start_x,
                                 content_start_y,
                                 line_index,
-                                padding_edge,
-                                border_edge,
-                                line_height,
                             );
 
                             node.placements.push(fragment_placement);
-                            layout_boxes_buf.push(box_model);
                         }
                     }
 
                     crate::ItemFragment::Fragment(f) => {
                         if cursor_x + f.width > max_wrap_width && cursor_x != 0.0 {
-                            do_line_break(
+                            let box_model = do_line_break(
                                 &mut cursor_x,
                                 &mut cursor_y,
                                 &mut line_height,
                                 &mut line_index,
+                                padding_edge,
+                                border_edge,
                             );
+
+                            layout_boxes_buf.push(box_model);
                         }
 
                         if !intrinsic_pass {
-                            let (fragment_placement, box_model) = place_fragment(
+                            let fragment_placement = place_fragment(
                                 cursor_x,
                                 cursor_y,
                                 content_start_x,
                                 content_start_y,
                                 line_index,
-                                padding_edge,
-                                border_edge,
-                                line_height,
                             );
 
                             node.placements.push(fragment_placement);
-                            layout_boxes_buf.push(box_model);
                         }
 
                         cursor_x += f.width;
@@ -1028,18 +1034,6 @@ impl LayoutEngine {
 
             // Create box model with spacing
             node.layout_boxes = LayoutBoxes::Multiple(layout_boxes_buf);
-
-            // Position the box model
-            if let LayoutBoxes::Single(ref mut box_model) = node.layout_boxes {
-                let pos_x = origin.0;
-                let pos_y = origin.1;
-                set_position(
-                    box_model,
-                    (pos_x, pos_y),
-                    (padding.left, padding.top),
-                    (border.left, border.top),
-                );
-            }
 
             return ((cursor_x, cursor_y), line_height);
         }
