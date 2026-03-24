@@ -472,11 +472,15 @@ fn mixed_inline_and_block_children() {
 
     // First inline: first line
     match &root.children[0].layout_boxes {
-        LayoutBoxes::Single(box_model) => {
+        LayoutBoxes::Multiple(box_models) => {
+            assert_eq!(box_models.len(), 1);
+
+            let box_model = &box_models[0];
+
             assert_eq!(box_model.border_box.x, 0.0);
             assert_eq!(box_model.border_box.y, 0.0);
         }
-        _ => panic!("Expected single box model"),
+        _ => panic!("Expected multiple box model"),
     }
 
     // Block: new line after first inline line (height = 15)
@@ -490,11 +494,15 @@ fn mixed_inline_and_block_children() {
 
     // Second inline: new line after block (15 + 25 = 40)
     match &root.children[2].layout_boxes {
-        LayoutBoxes::Single(box_model) => {
+        LayoutBoxes::Multiple(box_models) => {
+            assert_eq!(box_models.len(), 1);
+
+            let box_model = &box_models[0];
+
             assert_eq!(box_model.border_box.x, 0.0);
             assert_eq!(box_model.border_box.y, 40.0);
         }
-        _ => panic!("Expected single box model"),
+        _ => panic!("Expected multiple box model"),
     }
 }
 
