@@ -908,13 +908,20 @@ impl LayoutEngine {
                 cursor_y: &mut f32,
                 line_height: &mut f32,
                 line_index: &mut usize,
+                first_margin: f32,
                 padding_edge: Edge,
                 border_edge: Edge,
             ) -> BoxModel {
+                let width = if *line_index == 0 {
+                    *cursor_x - first_margin
+                } else {
+                    *cursor_x
+                };
+
                 let box_model = create_box_model(
-                    *cursor_x,
+                    width,
                     *line_height,
-                    *cursor_x,
+                    width,
                     *line_height,
                     padding_edge,
                     border_edge,
@@ -982,6 +989,7 @@ impl LayoutEngine {
                             &mut cursor_y,
                             &mut line_height,
                             &mut line_index,
+                            first_margin,
                             padding_edge,
                             border_edge,
                         );
@@ -1007,6 +1015,7 @@ impl LayoutEngine {
                                 &mut cursor_y,
                                 &mut line_height,
                                 &mut line_index,
+                                first_margin,
                                 padding_edge,
                                 border_edge,
                             );
@@ -1038,6 +1047,7 @@ impl LayoutEngine {
                     &mut cursor_y,
                     &mut line_height,
                     &mut line_index,
+                    first_margin,
                     padding_edge,
                     border_edge,
                 );
