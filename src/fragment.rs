@@ -58,6 +58,6 @@ pub struct Fragment {
 pub struct FragmentPlacement {
     /// Offset position (x, y) relative to the container
     pub offset: (f32, f32),
-    /// Line index where this fragment is placed
+    /// 0-indexed line index where this fragment is placed
     pub line_index: usize,
 }
