@@ -1048,6 +1048,8 @@ impl LayoutEngine {
             // Create box model with spacing
             node.layout_boxes = LayoutBoxes::Multiple(layout_boxes_buf);
 
+            node.layout_boxes.shift(origin.0, origin.1);
+
             return ((cursor_x, cursor_y), line_height);
         }
 
