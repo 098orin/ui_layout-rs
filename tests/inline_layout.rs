@@ -404,7 +404,7 @@ fn inline_percentage_spacing() {
         LayoutBoxes::Multiple(box_models) => {
             assert_eq!(box_models.len(), 1);
 
-            let box_model = &box_models[1];
+            let box_model = &box_models[0];
 
             // Content box should be fragment size
             assert_eq!(box_model.content_box.width, 30.0);
