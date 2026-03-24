@@ -1032,6 +1032,19 @@ impl LayoutEngine {
                 }
             }
 
+            if cursor_x != 0.0 {
+                let box_model = do_line_break(
+                    &mut cursor_x,
+                    &mut cursor_y,
+                    &mut line_height,
+                    &mut line_index,
+                    padding_edge,
+                    border_edge,
+                );
+
+                layout_boxes_buf.push(box_model);
+            }
+
             // Create box model with spacing
             node.layout_boxes = LayoutBoxes::Multiple(layout_boxes_buf);
 
