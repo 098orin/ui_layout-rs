@@ -401,7 +401,11 @@ fn inline_percentage_spacing() {
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
     match &root.children[0].layout_boxes {
-        LayoutBoxes::Single(box_model) => {
+        LayoutBoxes::Multiple(box_models) => {
+            assert_eq!(box_models.len(), 1);
+
+            let box_model = &box_models[1];
+
             // Content box should be fragment size
             assert_eq!(box_model.content_box.width, 30.0);
             assert_eq!(box_model.content_box.height, 20.0);
@@ -414,7 +418,7 @@ fn inline_percentage_spacing() {
             assert_eq!(box_model.border_box.x, 4.0); // 2% of 200px
             assert_eq!(box_model.border_box.y, 0.0); // 0% margin_top
         }
-        _ => panic!("Expected single box model"),
+        _ => panic!("Expected multiple box model"),
     }
 }
 
