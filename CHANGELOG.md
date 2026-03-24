@@ -7,7 +7,7 @@ and this project loosely follows Semantic Versioning.
 
 ---
 
-## [0.9.7] - 2026-03-15
+## [0.9.8] - 2026-03-15
 
 ### Fixed
 * Fixed incorrect width calculation for `Inline` layout box.
