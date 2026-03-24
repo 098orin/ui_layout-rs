@@ -941,11 +941,14 @@ impl LayoutEngine {
             fn place_fragment(
                 cursor_x: f32,
                 cursor_y: f32,
-                content_start_x: f32,
-                content_start_y: f32,
                 line_index: usize,
+                first_margin: f32,
             ) -> FragmentPlacement {
-                let (pos_x, pos_y) = (cursor_x + content_start_x, cursor_y + content_start_y);
+                let (mut pos_x, pos_y) = (cursor_x, cursor_y);
+
+                if line_index == 0 {
+                    pos_x -= first_margin;
+                }
 
                 FragmentPlacement {
                     offset: (pos_x, pos_y),
@@ -996,13 +999,8 @@ impl LayoutEngine {
 
                         layout_boxes_buf.push(box_model);
                         if !intrinsic_pass {
-                            let fragment_placement = place_fragment(
-                                cursor_x,
-                                cursor_y,
-                                content_start_x,
-                                content_start_y,
-                                line_index,
-                            );
+                            let fragment_placement =
+                                place_fragment(cursor_x, cursor_y, line_index, first_margin);
 
                             node.placements.push(fragment_placement);
                         }
@@ -1024,13 +1022,8 @@ impl LayoutEngine {
                         }
 
                         if !intrinsic_pass {
-                            let fragment_placement = place_fragment(
-                                cursor_x,
-                                cursor_y,
-                                content_start_x,
-                                content_start_y,
-                                line_index,
-                            );
+                            let fragment_placement =
+                                place_fragment(cursor_x, cursor_y, line_index, first_margin);
 
                             node.placements.push(fragment_placement);
                         }
