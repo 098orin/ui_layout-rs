@@ -85,13 +85,25 @@ impl LayoutBoxes {
         }
     }
 
-    /// Returns the total height (sum of all boxes).
+    /// Returns the total height.
     /// See [`BoxModel::height`].
     pub fn height(&self) -> f32 {
         match self {
             LayoutBoxes::None => 0.0,
             LayoutBoxes::Single(b) => b.height(),
-            LayoutBoxes::Multiple(list) => list.iter().map(|b| b.height()).sum(),
+            LayoutBoxes::Multiple(list) => {
+                if list.is_empty() {
+                    0.0
+                } else {
+                    let first_box = list.first().unwrap();
+                    let last_box = list.last().unwrap();
+
+                    let first_y = first_box.border_box.y;
+                    let last_y = last_box.border_box.y + last_box.border_box.height;
+
+                    (last_y - first_y).abs()
+                }
+            }
         }
     }
 
