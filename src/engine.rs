@@ -18,7 +18,7 @@ use crate::{
 /// - Border edges (start, before, end, after)
 type ContainerSizes = (Option<f32>, Option<f32>, Edge, Edge);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
 struct Edge {
     left: f32,
     top: f32,
@@ -248,7 +248,7 @@ impl LayoutEngine {
         };
 
         let engine = LayoutEngine;
-        engine.layout_node(root, false, (0.0, 0.0), 0.0, &ctx);
+        engine.layout_node(root, false, (0.0, 0.0), Edge::default(), 0.0, &ctx);
     }
 
     /// Layouts a single node and its descendants.
@@ -258,6 +258,7 @@ impl LayoutEngine {
         node: &mut LayoutNode,
         intrinsic_pass: bool,
         origin: (f32, f32),
+        resolved_margin_edge: Edge,
         incoming_line_height: f32,
         ctx: &LayoutContext,
     ) -> ((f32, f32), f32) {
@@ -274,9 +275,14 @@ impl LayoutEngine {
                 node.layout_boxes = LayoutBoxes::None;
                 (origin, 0.0)
             }
-            Display::Block | Display::Inline | Display::Flex { .. } => {
-                self.layout_unified_flow(node, intrinsic_pass, origin, incoming_line_height, ctx)
-            }
+            Display::Block | Display::Inline | Display::Flex { .. } => self.layout_unified_flow(
+                node,
+                intrinsic_pass,
+                origin,
+                resolved_margin_edge,
+                incoming_line_height,
+                ctx,
+            ),
         };
 
         if intrinsic_pass {
@@ -294,6 +300,7 @@ impl LayoutEngine {
         node: &mut LayoutNode,
         intrinsic_pass: bool,
         origin: (f32, f32),
+        resolved_margin_edge: Edge,
         incoming_line_height: f32,
         ctx: &LayoutContext,
     ) -> ((f32, f32), f32) {
@@ -319,7 +326,7 @@ impl LayoutEngine {
                 node,
                 intrinsic_pass,
                 origin,
-                todo!(),
+                resolved_margin_edge,
                 incoming_line_height,
                 ctx,
             ),
@@ -787,13 +794,22 @@ impl LayoutEngine {
                     previous_margin_bottom = 0.0;
                 }
 
-                ((cursor_x, cursor_y), incoming_line_height) = self.layout_node(
-                    child,
-                    intrinsic_pass,
-                    (cursor_x, cursor_y),
-                    incoming_line_height,
-                    &child_ctx,
-                );
+                ((cursor_x, cursor_y), incoming_line_height) = {
+                    let resolved_margin_edge = Edge {
+                        left: ml_opt.unwrap_or(0.0),
+                        top: mt,
+                        right: mr_opt.unwrap_or(0.0),
+                        bottom: mb,
+                    };
+                    self.layout_node(
+                        child,
+                        intrinsic_pass,
+                        (cursor_x, cursor_y),
+                        resolved_margin_edge,
+                        incoming_line_height,
+                        &child_ctx,
+                    )
+                };
 
                 if is_block_level {
                     // Resolve auto margins for block-level children (horizontal auto margins are ignored for blocks)
@@ -1034,6 +1050,7 @@ impl LayoutEngine {
                     child,
                     intrinsic_pass,
                     (cursor_x, cursor_y),
+                    resolved_margin_edge,
                     incoming_line_height,
                     ctx,
                 );
@@ -1266,7 +1283,14 @@ impl LayoutEngine {
                                 parent_assigned_border_height: None,
                             };
 
-                            self.layout_node(child, true, (0.0, 0.0), 0.0, &intrinsic_ctx);
+                            self.layout_node(
+                                child,
+                                true,
+                                (0.0, 0.0),
+                                Edge::default(),
+                                0.0,
+                                &intrinsic_ctx,
+                            );
 
                             if let LayoutBoxes::Single(ref box_model) = child.layout_boxes {
                                 axis.main(&box_model.content_box)
@@ -1496,7 +1520,14 @@ impl LayoutEngine {
                 ..*child_ctx
             };
 
-            self.layout_node(child, intrinsic_pass, (0.0, 0.0), 0.0, &child_ctx);
+            self.layout_node(
+                child,
+                intrinsic_pass,
+                (0.0, 0.0),
+                Edge::default(),
+                0.0,
+                &child_ctx,
+            );
 
             if let LayoutBoxes::Single(box_model) = &child.layout_boxes {
                 total_border_main += axis.main(&box_model.border_box);
