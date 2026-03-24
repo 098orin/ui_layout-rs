@@ -230,7 +230,11 @@ fn inline_with_margins() {
 
     // Inline element layout
     match &root.children[0].children[0].layout_boxes {
-        LayoutBoxes::Single(box_model) => {
+        LayoutBoxes::Multiple(box_models) => {
+            assert_eq!(box_models.len(), 1);
+
+            let box_model = &box_models[0];
+
             // Horizontal margins affect x-position
             assert_eq!(box_model.border_box.x, 10.0);
 
@@ -240,7 +244,7 @@ fn inline_with_margins() {
             assert_eq!(box_model.content_box.width, 50.0);
             assert_eq!(box_model.content_box.height, 20.0);
         }
-        _ => panic!("Expected single box model"),
+        _ => panic!("Expected multiple box model"),
     }
 
     // Parent height calculation
@@ -353,7 +357,11 @@ fn inline_with_borders() {
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
     match &root.children[0].layout_boxes {
-        LayoutBoxes::Single(box_model) => {
+        LayoutBoxes::Multiple(box_models) => {
+            assert_eq!(box_models.len(), 1);
+
+            let box_model = &box_models[0];
+
             // Content box should be fragment size
             assert_eq!(box_model.content_box.width, 35.0);
             assert_eq!(box_model.content_box.height, 22.0);
@@ -366,7 +374,7 @@ fn inline_with_borders() {
             assert_eq!(box_model.border_box.width, 54.0); // 49 + 3 + 2
             assert_eq!(box_model.border_box.height, 32.0); // 29 + 1 + 2
         }
-        _ => panic!("Expected single box model"),
+        _ => panic!("Expected multile box model"),
     }
 }
 
