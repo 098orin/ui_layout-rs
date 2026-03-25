@@ -931,6 +931,8 @@ impl LayoutEngine {
                     box_model.shift(first_margin, 0.0);
                 }
 
+                box_model.shift(0.0, *cursor_y);
+
                 *cursor_x = 0.0;
                 *cursor_y += *line_height;
                 *line_height = 0.0;
@@ -962,10 +964,12 @@ impl LayoutEngine {
             let max_wrap_width =
                 container_width - border.left - border.right - padding.left - padding.right;
 
-            let mut cursor_x = 0.0;
+            let mut cursor_x = origin.0;
             let mut cursor_y = 0.0;
             let mut line_height = incoming_line_height;
             let mut line_index = 0;
+
+            let mut first = true;
 
             let mut layout_boxes_buf = Vec::new();
 
@@ -1009,7 +1013,7 @@ impl LayoutEngine {
 
                     crate::ItemFragment::Fragment(f) => {
                         if cursor_x + f.width > max_wrap_width && cursor_x != 0.0 {
-                            let box_model = do_line_break(
+                            let mut box_model = do_line_break(
                                 &mut cursor_x,
                                 &mut cursor_y,
                                 &mut line_height,
@@ -1018,6 +1022,13 @@ impl LayoutEngine {
                                 padding,
                                 border,
                             );
+
+                            if first {
+                                box_model.border_box.width = 0.0;
+                                box_model.padding_box.width = 0.0;
+                                box_model.content_box.width = 0.0;
+                                box_model.children_box.width = 0.0;
+                            }
 
                             layout_boxes_buf.push(box_model);
                         }
@@ -1033,9 +1044,15 @@ impl LayoutEngine {
                         line_height = line_height.max(f.height);
                     }
                 }
+
+                first = false;
             }
 
             if cursor_x != 0.0 {
+                // We wanna get new line object but dont wanna break the line so keep nesesialy info.
+                let line_height_keep = line_height;
+                let cursor_x_keep = cursor_x;
+
                 let box_model = do_line_break(
                     &mut cursor_x,
                     &mut cursor_y,
@@ -1045,6 +1062,10 @@ impl LayoutEngine {
                     padding,
                     border,
                 );
+
+                line_height = line_height_keep;
+                cursor_x = cursor_x_keep;
+                cursor_y -= line_height;
 
                 layout_boxes_buf.push(box_model);
             }
@@ -1063,10 +1084,49 @@ impl LayoutEngine {
         // self_fragment.is_empty && children exist
         // -> Inline container. Layout children in flow layout and size container to fit children.
         if !node.children.is_empty() {
-            let mut cursor_x = origin.0 + border.right + padding.right;
-            let mut cursor_y = origin.1 + border.top + padding.top;
+            fn create_line_box_via_base_pos(
+                base_rect: Rect,
+                padding: Edge,
+                border: Edge,
+                base_pos: (f32, f32),
+            ) -> BoxModel {
+                fn left_top_from_edge(edge: &Edge) -> (f32, f32) {
+                    let Edge { left, top, .. } = edge;
+                    (*left, *top)
+                }
+
+                let width = base_rect.width;
+                let height = base_rect.height;
+
+                let mut box_model = create_box_model(width, height, width, height, padding, border);
+
+                let x = base_rect.x + base_pos.0;
+                let y = base_rect.y + base_pos.1;
+
+                set_position(
+                    &mut box_model,
+                    (x, y),
+                    left_top_from_edge(&padding),
+                    left_top_from_edge(&border),
+                );
+
+                box_model
+            }
+
+            let mut cursor_x = origin.0;
+            let mut cursor_y = origin.1;
             let mut incoming_line_height = incoming_line_height.max(0.0);
+
+            let mut layout_boxes_buf = Vec::new();
+
+            let mut last_line_border = Rect::default();
+
+            let mut base_pos = (cursor_x, cursor_y);
+
             for child in node.children.iter_mut() {
+                base_pos = (cursor_x, cursor_y);
+
+                // Child layout pass
                 let child_resolved_margin_edge = resolve_margins(&child.style.spacing, ctx);
                 ((cursor_x, cursor_y), incoming_line_height) = self.layout_node(
                     child,
@@ -1076,7 +1136,69 @@ impl LayoutEngine {
                     incoming_line_height,
                     ctx,
                 );
+
+                // Create lines (LayoutBoxes)
+                let mut iter = child.layout_boxes.iter().peekable();
+                let mut current: Option<Rect> = None;
+                let mut is_first_line = true;
+
+                while let Some(line) = iter.next() {
+                    let line_rect = line.border_box;
+
+                    match current {
+                        None => {
+                            // first line of this child
+                            if is_first_line && line_rect.y == base_pos.1 {
+                                // merge with previous sibling line
+                                let merged = Rect {
+                                    x: last_line_border.x,
+                                    y: line_rect.y,
+                                    width: (line_rect.right() - last_line_border.x).max(0.0),
+                                    height: line_rect.height.max(last_line_border.height),
+                                };
+                                current = Some(merged);
+                            } else {
+                                current = Some(line_rect);
+                            }
+
+                            is_first_line = false;
+                        }
+                        Some(mut cur) => {
+                            if cur.y == line_rect.y {
+                                // merge within same line
+                                cur = Rect {
+                                    x: cur.x,
+                                    y: line_rect.y,
+                                    width: (line_rect.right() - cur.x).max(0.0),
+                                    height: line_rect.height.max(cur.height),
+                                };
+                                current = Some(cur);
+                            } else {
+                                // flush previous line
+                                layout_boxes_buf.push(create_line_box_via_base_pos(
+                                    cur, padding, border, base_pos,
+                                ));
+                                current = Some(line_rect);
+                            }
+                        }
+                    }
+                }
+
+                // flush last line of this child
+                if let Some(cur) = current {
+                    last_line_border = cur;
+                }
             }
+
+            // Finally, push the accumulated last_line.
+            layout_boxes_buf.push(create_line_box_via_base_pos(
+                last_line_border,
+                padding,
+                border,
+                base_pos,
+            ));
+
+            node.layout_boxes = LayoutBoxes::Multiple(layout_boxes_buf);
 
             ((cursor_x, cursor_y), incoming_line_height)
         } else {
