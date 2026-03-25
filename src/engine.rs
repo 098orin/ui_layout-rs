@@ -968,11 +968,7 @@ impl LayoutEngine {
             let mut line_height = incoming_line_height;
             let mut line_index = 0;
 
-            let mut layout_boxes_buf = if intrinsic_pass {
-                Vec::new()
-            } else {
-                Vec::with_capacity(node.self_fragments.len())
-            };
+            let mut layout_boxes_buf = Vec::new();
 
             let padding_edge = resolve_padding(&node.style.spacing, ctx);
             let border_edge = resolve_border(&node.style.spacing, ctx);
