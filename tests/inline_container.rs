@@ -31,7 +31,7 @@ fn inline_container_line_break() {
         vec![child1, child2],
     );
 
-    let mut root = LayoutNode::with_children(
+    let inner = LayoutNode::with_children(
         Style {
             size: SizeStyle {
                 width: Length::Px(100.0),
@@ -42,9 +42,11 @@ fn inline_container_line_break() {
         vec![inline_container],
     );
 
+    let mut root = LayoutNode::with_children(Style::default(), vec![inner]);
+
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
-    match &root.children[0].layout_boxes {
+    match &root.children[0].children[0].layout_boxes {
         LayoutBoxes::Multiple(lines) => {
             assert_eq!(lines.len(), 2);
         }
@@ -187,10 +189,17 @@ fn inline_container_parent_height() {
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
+    match &root.children[0].children[0].layout_boxes {
+        LayoutBoxes::Multiple(box_models) => {
+            assert_eq!(box_models.len(), 2);
+        }
+        _ => panic!("Expected multiple"),
+    }
+
     match &root.children[0].layout_boxes {
         LayoutBoxes::Single(box_model) => {
             // 2 lines × 20px
-            assert_eq!(dbg!(box_model).content_box.height, 40.0);
+            assert_eq!(box_model.content_box.height, 40.0);
         }
         _ => panic!("Expected single"),
     }
