@@ -1717,25 +1717,24 @@ fn resolve_margins(spacing: &Spacing, ctx: &LayoutContext) -> Edge {
     let vw = ctx.viewport_width;
     let vh = ctx.viewport_height;
 
-    (
-        spacing
+    Edge {
+        left: spacing
             .margin_left
             .resolve_with(ctx.containing_block_width, vw, vh)
             .unwrap_or(0.0),
-        spacing
+        top: spacing
             .margin_top
             .resolve_with(Some(containing_width), vw, vh)
             .unwrap_or(0.0),
-        spacing
+        right: spacing
             .margin_right
             .resolve_with(ctx.containing_block_width, vw, vh)
             .unwrap_or(0.0),
-        spacing
+        bottom: spacing
             .margin_bottom
             .resolve_with(Some(containing_width), vw, vh)
             .unwrap_or(0.0),
-    )
-        .into()
+    }
 }
 
 /// Computes justify-content offset and gap spacing.
