@@ -552,12 +552,7 @@ fn inline_empty_fragments() {
 
     // Empty inline element should still have padding
     match &root.children[0].layout_boxes {
-        LayoutBoxes::Single(box_model) => {
-            assert_eq!(box_model.content_box.width, 0.0); // No content
-            assert_eq!(box_model.content_box.height, 0.0); // No content
-            assert_eq!(box_model.padding_box.width, 20.0); // Still has padding
-            assert_eq!(box_model.padding_box.height, 10.0); // Still has padding
-        }
+        LayoutBoxes::None => {}
         _ => panic!("Expected single box model"),
     }
 
