@@ -969,8 +969,6 @@ impl LayoutEngine {
 
             let mut layout_boxes_buf = Vec::new();
 
-            let padding_edge = resolve_padding(&node.style.spacing, ctx);
-            let border_edge = resolve_border(&node.style.spacing, ctx);
             let Edge {
                 left: first_margin,
                 // Ignore the last_margin for now.
@@ -996,8 +994,8 @@ impl LayoutEngine {
                             &mut line_height,
                             &mut line_index,
                             first_margin,
-                            padding_edge,
-                            border_edge,
+                            padding,
+                            border,
                         );
 
                         layout_boxes_buf.push(box_model);
@@ -1017,8 +1015,8 @@ impl LayoutEngine {
                                 &mut line_height,
                                 &mut line_index,
                                 first_margin,
-                                padding_edge,
-                                border_edge,
+                                padding,
+                                border,
                             );
 
                             layout_boxes_buf.push(box_model);
@@ -1044,8 +1042,8 @@ impl LayoutEngine {
                     &mut line_height,
                     &mut line_index,
                     first_margin,
-                    padding_edge,
-                    border_edge,
+                    padding,
+                    border,
                 );
 
                 layout_boxes_buf.push(box_model);
