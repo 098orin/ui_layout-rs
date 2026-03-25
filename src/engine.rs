@@ -1054,9 +1054,10 @@ impl LayoutEngine {
             // Create box model with spacing
             node.layout_boxes = LayoutBoxes::Multiple(layout_boxes_buf);
 
-            // The parent has already calculated the margin,
-            // so we need to avoid calculating it again.
-            node.layout_boxes.shift(origin.0 - first_margin, origin.1);
+            // The origin in the x-direction is 0, but in the y-direction,
+            // the position is adjusted accordingly because inline objects
+            // are superimposed in front of it.
+            node.layout_boxes.shift(0.0, origin.1);
 
             return ((cursor_x, cursor_y), line_height);
         }
