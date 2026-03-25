@@ -918,7 +918,7 @@ impl LayoutEngine {
                     *cursor_x
                 };
 
-                let box_model = create_box_model(
+                let mut box_model = create_box_model(
                     width,
                     *line_height,
                     width,
@@ -926,6 +926,10 @@ impl LayoutEngine {
                     padding_edge,
                     border_edge,
                 );
+
+                if *line_index == 0 {
+                    box_model.shift(first_margin, 0.0);
+                }
 
                 *cursor_x = 0.0;
                 *cursor_y += *line_height;
