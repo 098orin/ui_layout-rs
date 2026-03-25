@@ -941,7 +941,6 @@ impl LayoutEngine {
 
             // Place
             #[must_use]
-            #[allow(clippy::too_many_arguments)]
             fn place_fragment(
                 cursor_x: f32,
                 cursor_y: f32,
