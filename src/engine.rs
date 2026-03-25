@@ -984,6 +984,12 @@ impl LayoutEngine {
 
             cursor_x += first_margin;
 
+            if cursor_x > max_wrap_width {
+                cursor_x = first_margin;
+                cursor_y += line_height;
+                line_height = 0.0;
+            }
+
             // Shift layout boxes at the end.
             for frag in &node.self_fragments {
                 match frag {
