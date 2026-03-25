@@ -7,6 +7,20 @@ and this project loosely follows Semantic Versioning.
 
 ---
 
+## [0.10.0] - 2026-3-25
+
+### Fixed
+* Inline `LayoutBoxes` will now use `LayoutBoxes::Multiple`, correctly returning results for multi-row LayoutBoxes.
+* Margin, Padding, and Border calculations will now be correct due to changes associated with the use of
+  `LayoutBoxes::Multiple` (slightly early wrap for Margin will not be implemented).
+* Inline Containers will use `LayoutBoxes::Multiple` to correctly wrap inline child elements across multiple rows.
+
+### Breaking Changes
+* `FragmentPlacement` has been changed so that it is positioned relative to the LayoutBox of that row.
+
+
+---
+
 ## [0.9.8] - 2026-03-15
 
 ### Fixed
