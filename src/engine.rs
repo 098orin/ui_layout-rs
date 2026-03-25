@@ -1079,38 +1079,11 @@ impl LayoutEngine {
                     ctx,
                 );
             }
+
+            ((cursor_x, cursor_y), incoming_line_height)
+        } else {
+            (origin, incoming_line_height)
         }
-        let content_width = 0.0;
-        let content_height = 0.0;
-
-        node.layout_boxes = LayoutBoxes::Single(create_box_model(
-            content_width,
-            content_height,
-            content_width,
-            content_height,
-            padding,
-            border,
-        ));
-
-        if let LayoutBoxes::Single(ref mut box_model) = node.layout_boxes {
-            let pos_x = origin.0;
-            let pos_y = origin.1;
-            set_position(
-                box_model,
-                (pos_x, pos_y),
-                (padding.left, padding.top),
-                (border.left, border.top),
-            );
-        }
-
-        let total_width = content_width + padding.right + padding.left + border.right + border.left;
-        let total_height =
-            content_height + padding.top + padding.bottom + border.top + border.bottom;
-
-        (
-            (origin.0 + total_width, origin.1 + total_height),
-            total_height,
-        )
     }
 
     /// Resolve Flex container sizes
