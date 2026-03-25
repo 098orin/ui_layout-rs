@@ -978,7 +978,8 @@ impl LayoutEngine {
             let border_edge = resolve_border(&node.style.spacing, ctx);
             let Edge {
                 left: first_margin,
-                right: last_margin,
+                // Ignore the last_margin for now.
+                right: _last_margin,
                 ..
             } = resolved_margin_edge;
 
