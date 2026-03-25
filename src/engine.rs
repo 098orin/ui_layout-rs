@@ -864,8 +864,8 @@ impl LayoutEngine {
             border,
         );
 
-        let padding_edge = (padding.right, padding.top);
-        let border_edge = (border.right, border.top);
+        let padding_edge = (padding.left, padding.top);
+        let border_edge = (border.left, border.top);
 
         set_position(&mut box_model, origin, padding_edge, border_edge);
 
@@ -1091,8 +1091,8 @@ impl LayoutEngine {
             set_position(
                 box_model,
                 (pos_x, pos_y),
-                (padding.right, padding.top),
-                (border.right, border.top),
+                (padding.left, padding.top),
+                (border.left, border.top),
             );
         }
 
