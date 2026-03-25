@@ -1614,24 +1614,23 @@ fn create_box_model(
     };
 
     let padding_box = Rect {
-        x: 0.0,
-        y: 0.0,
+        x: bl,
+        y: bt,
         width: content_width + pl + pr,
         height: content_height + pt + pb,
     };
 
     let content_box = Rect {
-        x: 0.0,
-        y: 0.0,
+        x: bl + pl,
+        y: bt + pt,
         width: content_width,
         height: content_height,
     };
 
     let children_box = Rect {
-        x: 0.0,
-        y: 0.0,
         width: children_width,
         height: children_height,
+        ..content_box
     };
 
     BoxModel {
@@ -1785,62 +1784,54 @@ fn resolve_align_position(align: AlignItems, size: f32, container: f32) -> f32 {
 
 /// Resolves padding values.
 /// Percentage values resolve relative to the containing block's width.
-///
-/// # Returns
-/// - (padding_left, padding_top, padding_right, padding_bottom)
 fn resolve_padding(spacing: &Spacing, ctx: &LayoutContext) -> Edge {
     let containing_width = ctx.containing_block_width.unwrap_or(ctx.viewport_width);
     let vw = ctx.viewport_width;
     let vh = ctx.viewport_height;
 
-    (
-        spacing
+    Edge {
+        left: spacing
             .padding_left
             .resolve_with(Some(containing_width), vw, vh)
             .unwrap_or(0.0),
-        spacing
+        top: spacing
             .padding_top
             .resolve_with(Some(containing_width), vw, vh)
             .unwrap_or(0.0),
-        spacing
+        right: spacing
             .padding_right
             .resolve_with(Some(containing_width), vw, vh)
             .unwrap_or(0.0),
-        spacing
+        bottom: spacing
             .padding_bottom
             .resolve_with(Some(containing_width), vw, vh)
             .unwrap_or(0.0),
-    )
-        .into()
+    }
 }
 
 /// Resolves border values.
 /// Percentage values resolve relative to the containing block's width.
-///
-/// # Returns
-/// - (border_left, border_top, border_right, border_bottom)
 fn resolve_border(spacing: &Spacing, ctx: &LayoutContext) -> Edge {
     let containing_width = ctx.containing_block_width.unwrap_or(ctx.viewport_width);
     let vw = ctx.viewport_width;
     let vh = ctx.viewport_height;
 
-    (
-        spacing
+    Edge {
+        left: spacing
             .border_left
             .resolve_with(Some(containing_width), vw, vh)
             .unwrap_or(0.0),
-        spacing
+        top: spacing
             .border_top
             .resolve_with(Some(containing_width), vw, vh)
             .unwrap_or(0.0),
-        spacing
+        right: spacing
             .border_right
             .resolve_with(Some(containing_width), vw, vh)
             .unwrap_or(0.0),
-        spacing
+        bottom: spacing
             .border_bottom
             .resolve_with(Some(containing_width), vw, vh)
             .unwrap_or(0.0),
-    )
-        .into()
+    }
 }
