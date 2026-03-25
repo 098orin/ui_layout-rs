@@ -8,12 +8,20 @@ pub struct Rect {
     pub height: f32,
 }
 
+/// Represents the layout box model of an element.
+///
+/// Each field is expressed in absolute coordinates relative to the
+/// `border_box` origin. The `border_box` serves as the reference,
+/// where its position is always "zero".
 #[derive(Debug, Clone, Default)]
 pub struct BoxModel {
+    /// The outermost box including border.
     pub border_box: Rect,
+    /// The box inside the border, including padding.
     pub padding_box: Rect,
+    /// The innermost box where actual content is placed.
     pub content_box: Rect,
-    /// Scrollable content size
+    /// The area covering all child content.
     pub children_box: Rect,
 }
 
