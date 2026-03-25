@@ -50,7 +50,7 @@ impl Rect {
 
 impl BoxModel {
     /// Translates the entire box by the given offset.
-    fn shift(&mut self, dx: f32, dy: f32) {
+    pub(crate) fn shift(&mut self, dx: f32, dy: f32) {
         self.border_box.shift(dx, dy);
         self.padding_box.shift(dx, dy);
         self.content_box.shift(dx, dy);
