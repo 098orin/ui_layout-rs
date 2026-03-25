@@ -46,6 +46,22 @@ fn inline_container_line_break() {
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
+    match &root.children[0].children[0].children[0].layout_boxes {
+        LayoutBoxes::Multiple(lines) => {
+            assert_eq!(lines.len(), 1);
+        }
+        _ => panic!("Expected multiple line boxes"),
+    }
+
+    match &root.children[0].children[0].children[1].layout_boxes {
+        LayoutBoxes::Multiple(lines) => {
+            // First one is the last part of the previous line
+            // so width should be 0.
+            assert_eq!(lines.len(), 2);
+        }
+        _ => panic!("Expected multiple line boxes"),
+    }
+
     match &root.children[0].children[0].layout_boxes {
         LayoutBoxes::Multiple(lines) => {
             assert_eq!(lines.len(), 2);
