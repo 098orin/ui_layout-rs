@@ -980,8 +980,6 @@ impl LayoutEngine {
                 ..
             } = resolved_margin_edge;
 
-            cursor_x += first_margin;
-
             if cursor_x > max_wrap_width {
                 cursor_x = first_margin;
                 cursor_y += line_height;
