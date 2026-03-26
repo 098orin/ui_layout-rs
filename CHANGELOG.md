@@ -9,6 +9,9 @@ and this project loosely follows Semantic Versioning.
 
 ## [0.10.0] - 2026-3-25
 
+> [!WARNING]
+> This version is yanked.
+
 ### Fixed
 * Inline `LayoutBoxes` will now use `LayoutBoxes::Multiple`, correctly returning results for multi-row LayoutBoxes.
 * Margin, Padding, and Border calculations will now be correct due to changes associated with the use of
