@@ -4,8 +4,8 @@ use crate::{ItemFragment, LayoutNode};
 ///
 /// `LayoutItem` represents a single unit in the layout flow and can be either:
 ///
-/// - A child layout node (`LayoutNode`)
-/// - An inline-level fragment (`ItemFragment`)
+/// - A child layout node ([`LayoutNode`])
+/// - An inline-level fragment ([`ItemFragment`])
 ///
 /// This abstraction allows the layout engine to treat structural elements
 /// and already-fragmented inline content uniformly while preserving their order.
