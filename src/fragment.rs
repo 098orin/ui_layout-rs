@@ -49,15 +49,3 @@ pub struct Fragment {
     /// Fragment height
     pub height: f32,
 }
-
-/// Layout result for an inline fragment placement.
-///
-/// Represents where a fragment is positioned after layout computation.
-/// Each placement corresponds 1:1 to a fragment in the input.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct FragmentPlacement {
-    /// Offset position (x, y) relative to the container
-    pub offset: (f32, f32),
-    /// 0-indexed line index where this fragment is placed
-    pub line_index: usize,
-}
