@@ -104,7 +104,12 @@ fn nested_border_box_sizing() {
             parent
                 .children
                 .push(LayoutItem::Node(LayoutNode::new(style.clone())));
-            push_child(&mut parent.children[0], style.clone(), max, current + 1);
+            push_child(
+                &mut parent.children[0].node().unwrap(),
+                style.clone(),
+                max,
+                current + 1,
+            );
         } else {
             parent
                 .children
@@ -118,8 +123,14 @@ fn nested_border_box_sizing() {
         }
     }
 
-    root.children.push(LayoutNode::new(def_style.clone()));
-    push_child(&mut root.children[0], def_style.clone(), 3, 0);
+    root.children
+        .push(LayoutItem::Node(LayoutNode::new(def_style.clone())));
+    push_child(
+        &mut root.children[0].node().unwrap(),
+        def_style.clone(),
+        3,
+        0,
+    );
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
