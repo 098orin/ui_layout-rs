@@ -112,7 +112,7 @@ impl LayoutBoxes {
                     let last_box = list.last().unwrap();
 
                     let first_y = first_box.border_box.y;
-                    let last_y = last_box.border_box.y + last_box.border_box.height;
+                    let last_y = last_box.border_box.bottom();
 
                     (last_y - first_y).abs()
                 }
