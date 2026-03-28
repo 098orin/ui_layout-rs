@@ -23,7 +23,7 @@ fn inline_container_line_break() {
     });
     child2.set_fragments(vec![frag2]);
 
-    let inline_container = LayoutNode::with_children(
+    let inline_container = LayoutNode::with_node_children(
         Style {
             display: Display::Inline,
             ..Default::default()
@@ -31,7 +31,7 @@ fn inline_container_line_break() {
         vec![child1, child2],
     );
 
-    let inner = LayoutNode::with_children(
+    let inner = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
                 width: Length::Px(100.0),
@@ -42,7 +42,7 @@ fn inline_container_line_break() {
         vec![inline_container],
     );
 
-    let mut root = LayoutNode::with_children(Style::default(), vec![inner]);
+    let mut root = LayoutNode::with_node_children(Style::default(), vec![inner]);
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
@@ -83,7 +83,7 @@ fn inline_container_margin_horizontal_only() {
     });
     child.set_fragments(vec![frag]);
 
-    let inline_container = LayoutNode::with_children(
+    let inline_container = LayoutNode::with_node_children(
         Style {
             display: Display::Inline,
             spacing: Spacing {
@@ -96,7 +96,7 @@ fn inline_container_margin_horizontal_only() {
         vec![child],
     );
 
-    let mut root = LayoutNode::with_children(Style::default(), vec![inline_container]);
+    let mut root = LayoutNode::with_node_children(Style::default(), vec![inline_container]);
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
@@ -127,7 +127,7 @@ fn inline_container_padding_border() {
     });
     child.set_fragments(vec![frag]);
 
-    let inline_container = LayoutNode::with_children(
+    let inline_container = LayoutNode::with_node_children(
         Style {
             display: Display::Inline,
             spacing: Spacing {
@@ -140,7 +140,7 @@ fn inline_container_padding_border() {
         vec![child],
     );
 
-    let mut root = LayoutNode::with_children(Style::default(), vec![inline_container]);
+    let mut root = LayoutNode::with_node_children(Style::default(), vec![inline_container]);
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
@@ -182,7 +182,7 @@ fn inline_container_parent_height() {
     });
     child2.set_fragments(vec![frag2]);
 
-    let inline_container = LayoutNode::with_children(
+    let inline_container = LayoutNode::with_node_children(
         Style {
             display: Display::Inline,
             ..Default::default()
@@ -190,7 +190,7 @@ fn inline_container_parent_height() {
         vec![child1, child2],
     );
 
-    let inner = LayoutNode::with_children(
+    let inner = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
                 width: Length::Px(100.0),
@@ -201,7 +201,7 @@ fn inline_container_parent_height() {
         vec![inline_container],
     );
 
-    let mut root = LayoutNode::with_children(Style::default(), vec![inner]);
+    let mut root = LayoutNode::with_node_children(Style::default(), vec![inner]);
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 

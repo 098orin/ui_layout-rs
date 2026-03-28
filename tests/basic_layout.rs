@@ -47,7 +47,7 @@ fn block_auto_height_from_children() {
         ..Default::default()
     });
 
-    let mut root = LayoutNode::with_children(
+    let mut root = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
                 width: Length::Px(100.0),
@@ -87,7 +87,7 @@ fn flex_row_grow() {
         ..Default::default()
     });
 
-    let mut root = LayoutNode::with_children(
+    let mut root = LayoutNode::with_node_children(
         Style {
             display: Display::Flex {
                 flex_direction: FlexDirection::Row,
@@ -137,7 +137,7 @@ fn flex_gap_affects_children_box() {
         ..Default::default()
     });
 
-    let mut root = LayoutNode::with_children(
+    let mut root = LayoutNode::with_node_children(
         Style {
             display: Display::Flex {
                 flex_direction: FlexDirection::Row,
@@ -184,7 +184,7 @@ fn flex_align_items_stretch() {
         ..Default::default()
     });
 
-    let mut root = LayoutNode::with_children(
+    let mut root = LayoutNode::with_node_children(
         Style {
             display: Display::Flex {
                 flex_direction: FlexDirection::Row,
@@ -227,7 +227,7 @@ fn block_margin_auto_centering() {
         ..Default::default()
     });
 
-    let mut root = LayoutNode::with_children(
+    let mut root = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
                 width: Length::Px(300.0),

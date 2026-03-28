@@ -101,16 +101,20 @@ fn nested_border_box_sizing() {
 
     fn push_child(parent: &mut LayoutNode, style: Style, max: usize, current: usize) {
         if current + 1 < max {
-            parent.children.push(LayoutNode::new(style.clone()));
+            parent
+                .children
+                .push(LayoutItem::Node(LayoutNode::new(style.clone())));
             push_child(&mut parent.children[0], style.clone(), max, current + 1);
         } else {
-            parent.children.push(LayoutNode::new(Style {
-                size: SizeStyle {
-                    height: Length::Px(50.0),
-                    ..Default::default()
-                },
-                ..style
-            }));
+            parent
+                .children
+                .push(LayoutItem::Node(LayoutNode::new(Style {
+                    size: SizeStyle {
+                        height: Length::Px(50.0),
+                        ..Default::default()
+                    },
+                    ..style
+                })));
         }
     }
 
@@ -183,7 +187,7 @@ fn margins_affect_positioning() {
         ..Default::default()
     });
 
-    let inner = LayoutNode::with_children(
+    let inner = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
                 width: Length::Px(300.0),
@@ -195,7 +199,7 @@ fn margins_affect_positioning() {
         vec![child],
     );
 
-    let mut root = LayoutNode::with_children(Style::default(), vec![inner]);
+    let mut root = LayoutNode::with_node_children(Style::default(), vec![inner]);
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
@@ -289,7 +293,7 @@ fn min_max_height_constraints() {
         ..Default::default()
     });
 
-    let mut root = LayoutNode::with_children(
+    let mut root = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
                 width: Length::Px(300.0),
@@ -372,7 +376,7 @@ fn viewport_relative_sizing() {
         ..Default::default()
     });
 
-    let mut root = LayoutNode::with_children(Style::default(), vec![inner]);
+    let mut root = LayoutNode::with_node_children(Style::default(), vec![inner]);
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
@@ -426,7 +430,7 @@ fn complex_spacing_calculation() {
         ..Default::default()
     });
 
-    let mut root = LayoutNode::with_children(Style::default(), vec![inner]);
+    let mut root = LayoutNode::with_node_children(Style::default(), vec![inner]);
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
@@ -489,7 +493,7 @@ fn flex_with_spacing_constraints() {
         ..Default::default()
     });
 
-    let mut root = LayoutNode::with_children(
+    let mut root = LayoutNode::with_node_children(
         Style {
             display: Display::Flex {
                 flex_direction: FlexDirection::Row,
@@ -542,7 +546,7 @@ fn auto_width_single_child() {
         ..Default::default()
     });
 
-    let mut root = LayoutNode::with_children(
+    let mut root = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
                 width: Length::Auto,
@@ -577,7 +581,7 @@ fn auto_height_single_child() {
         ..Default::default()
     });
 
-    let inner = LayoutNode::with_children(
+    let inner = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
                 width: Length::Px(200.0),
@@ -589,7 +593,7 @@ fn auto_height_single_child() {
         vec![child],
     );
 
-    let mut root = LayoutNode::with_children(Style::default(), vec![inner]);
+    let mut root = LayoutNode::with_node_children(Style::default(), vec![inner]);
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
@@ -623,7 +627,7 @@ fn auto_width_multiple_children() {
         ..Default::default()
     });
 
-    let mut root = LayoutNode::with_children(
+    let mut root = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
                 width: Length::Auto,
@@ -667,7 +671,7 @@ fn auto_height_multiple_children() {
         ..Default::default()
     });
 
-    let inner = LayoutNode::with_children(
+    let inner = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
                 width: Length::Px(200.0),
@@ -679,7 +683,7 @@ fn auto_height_multiple_children() {
         vec![child1, child2],
     );
 
-    let mut root = LayoutNode::with_children(Style::default(), vec![inner]);
+    let mut root = LayoutNode::with_node_children(Style::default(), vec![inner]);
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
@@ -704,7 +708,7 @@ fn auto_width_with_padding() {
         ..Default::default()
     });
 
-    let mut root = LayoutNode::with_children(
+    let mut root = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
                 width: Length::Auto,
@@ -750,7 +754,7 @@ fn auto_height_with_padding() {
         ..Default::default()
     });
 
-    let inner = LayoutNode::with_children(
+    let inner = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
                 width: Length::Px(200.0),
@@ -769,7 +773,7 @@ fn auto_height_with_padding() {
         vec![child],
     );
 
-    let mut root = LayoutNode::with_children(Style::default(), vec![inner]);
+    let mut root = LayoutNode::with_node_children(Style::default(), vec![inner]);
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
@@ -798,7 +802,7 @@ fn auto_width_with_border() {
         ..Default::default()
     });
 
-    let mut root = LayoutNode::with_children(
+    let mut root = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
                 width: Length::Auto,
@@ -848,7 +852,7 @@ fn auto_height_with_border() {
         ..Default::default()
     });
 
-    let mut root = LayoutNode::with_children(
+    let mut root = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
                 width: Length::Px(200.0),
@@ -900,7 +904,7 @@ fn auto_sizing_with_padding_and_border() {
         ..Default::default()
     });
 
-    let mut root = LayoutNode::with_children(
+    let mut root = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
                 width: Length::Auto,
@@ -1012,7 +1016,7 @@ fn auto_width_with_child_margins() {
         ..Default::default()
     });
 
-    let mut root = LayoutNode::with_children(
+    let mut root = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
                 width: Length::Auto,
@@ -1054,7 +1058,7 @@ fn auto_width_with_child_padding() {
         ..Default::default()
     });
 
-    let mut root = LayoutNode::with_children(
+    let mut root = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
                 width: Length::Auto,
@@ -1096,7 +1100,7 @@ fn auto_width_with_child_border() {
         ..Default::default()
     });
 
-    let mut root = LayoutNode::with_children(
+    let mut root = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
                 width: Length::Auto,
@@ -1150,7 +1154,7 @@ fn auto_width_with_multiple_children_different_sizes() {
         ..Default::default()
     });
 
-    let mut root = LayoutNode::with_children(
+    let mut root = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
                 width: Length::Auto,
@@ -1185,7 +1189,7 @@ fn auto_width_with_parent_padding() {
         ..Default::default()
     });
 
-    let mut root = LayoutNode::with_children(
+    let mut root = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
                 width: Length::Auto,
@@ -1231,7 +1235,7 @@ fn auto_width_with_parent_border() {
         ..Default::default()
     });
 
-    let mut root = LayoutNode::with_children(
+    let mut root = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
                 width: Length::Auto,
@@ -1281,7 +1285,7 @@ fn auto_width_nested_blocks() {
         ..Default::default()
     });
 
-    let child = LayoutNode::with_children(
+    let child = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
                 width: Length::Auto,
@@ -1293,7 +1297,7 @@ fn auto_width_nested_blocks() {
         vec![grandchild],
     );
 
-    let mut root = LayoutNode::with_children(
+    let mut root = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
                 width: Length::Auto,
@@ -1337,7 +1341,7 @@ fn auto_width_nested_blocks() {
 
 #[test]
 fn auto_width_empty_container() {
-    let mut root = LayoutNode::with_children(
+    let mut root = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
                 width: Length::Auto,
@@ -1380,7 +1384,7 @@ fn auto_width_with_border_box_sizing() {
         ..Default::default()
     });
 
-    let mut root = LayoutNode::with_children(
+    let mut root = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
                 width: Length::Auto,

@@ -23,7 +23,7 @@ fn inline_basic_flow() {
     });
     inline_node.set_fragments(vec![fragment1, fragment2, fragment3]);
 
-    let mut root = LayoutNode::with_children(
+    let mut root = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
                 width: Length::Px(200.0),
@@ -86,7 +86,7 @@ fn inline_line_wrapping() {
     });
     inline_node.set_fragments(vec![fragment1, fragment2, fragment3]);
 
-    let mut root = LayoutNode::with_children(
+    let mut root = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
                 width: Length::Px(120.0), // Force wrapping
@@ -152,7 +152,7 @@ fn inline_with_line_breaks() {
     });
     inline_node.set_fragments(vec![fragment1, line_break, fragment2]);
 
-    let mut root = LayoutNode::with_children(
+    let mut root = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
                 width: Length::Px(200.0),
@@ -212,7 +212,7 @@ fn inline_with_margins() {
     });
     inline_node.set_fragments(vec![fragment1]);
 
-    let inner = LayoutNode::with_children(
+    let inner = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
                 width: Length::Px(200.0),
@@ -224,7 +224,7 @@ fn inline_with_margins() {
         vec![inline_node],
     );
 
-    let mut root = LayoutNode::with_children(Style::default(), vec![inner]);
+    let mut root = LayoutNode::with_node_children(Style::default(), vec![inner]);
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
@@ -277,7 +277,7 @@ fn inline_with_padding() {
     });
     inline_node.set_fragments(vec![fragment1]);
 
-    let mut root = LayoutNode::with_children(
+    let mut root = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
                 width: Length::Px(200.0),
@@ -342,7 +342,7 @@ fn inline_with_borders() {
     });
     inline_node.set_fragments(vec![fragment1]);
 
-    let mut root = LayoutNode::with_children(
+    let mut root = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
                 width: Length::Px(200.0),
@@ -401,7 +401,7 @@ fn inline_percentage_spacing() {
     });
     inline_node.set_fragments(vec![fragment1]);
 
-    let mut root = LayoutNode::with_children(
+    let mut root = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
                 width: Length::Px(200.0),
@@ -471,7 +471,7 @@ fn mixed_inline_and_block_children() {
     });
     inline_node2.set_fragments(vec![fragment2]);
 
-    let mut root = LayoutNode::with_children(
+    let mut root = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
                 width: Length::Px(200.0),
@@ -536,7 +536,7 @@ fn inline_empty_fragments() {
     });
     // No fragments set - empty inline element
 
-    let mut root = LayoutNode::with_children(
+    let mut root = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
                 width: Length::Px(200.0),

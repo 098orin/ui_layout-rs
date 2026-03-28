@@ -12,7 +12,7 @@ fn test_child_coordinates_relative_to_parent_content_box() {
         ..Default::default()
     });
 
-    let mut parent = LayoutNode::with_children(
+    let mut parent = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
                 width: Length::Px(200.0),
@@ -74,7 +74,7 @@ fn test_nested_coordinate_system() {
         ..Default::default()
     });
 
-    let child = LayoutNode::with_children(
+    let child = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
                 width: Length::Px(100.0),
@@ -93,7 +93,7 @@ fn test_nested_coordinate_system() {
         vec![grandchild],
     );
 
-    let mut root = LayoutNode::with_children(
+    let mut root = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
                 width: Length::Px(300.0),
@@ -166,7 +166,7 @@ fn test_flex_children_coordinates() {
         ..Default::default()
     });
 
-    let mut flex_container = LayoutNode::with_children(
+    let mut flex_container = LayoutNode::with_node_children(
         Style {
             display: Display::Flex {
                 flex_direction: FlexDirection::Row,
@@ -247,7 +247,7 @@ fn test_block_children_coordinates_with_margins() {
         ..Default::default()
     });
 
-    let mut parent = LayoutNode::with_children(
+    let mut parent = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
                 width: Length::Px(300.0),
@@ -310,7 +310,7 @@ fn test_coordinate_system_with_auto_margins() {
         ..Default::default()
     });
 
-    let mut parent = LayoutNode::with_children(
+    let mut parent = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
                 width: Length::Px(200.0),
