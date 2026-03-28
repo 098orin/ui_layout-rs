@@ -11,7 +11,7 @@ pub struct Rect {
 /// Represents the layout box model of an element.
 ///
 /// Each field is expressed in absolute coordinates relative to the
-/// `border_box` origin which is always `zero`.
+/// `border_box` origin.
 #[derive(Debug, Clone, Default)]
 pub struct BoxModel {
     /// The outermost box including border.
