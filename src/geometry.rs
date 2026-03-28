@@ -24,6 +24,10 @@ pub struct BoxModel {
     pub children_box: Rect,
 }
 
+/// Types of BoxModel.
+///
+/// All coordinates are relative to the parent.
+/// For [`LayoutBoxes::Multiple`], the coordinates are based on the content_box in the first row.
 #[derive(Debug, Clone, Default)]
 pub enum LayoutBoxes {
     #[default]

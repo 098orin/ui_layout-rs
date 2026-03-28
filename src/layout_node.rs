@@ -37,8 +37,6 @@ type LayoutCache = (u32, (LayoutBoxes, Vec<Placement>, ((f32, f32), f32)));
 /// ## Box model
 ///
 /// `layout_boxes` stores the computed box model for this node.
-/// All box coordinates are defined in the local coordinate space,
-/// with the border box origin at (0, 0).
 ///
 /// ## Layout behavior
 ///
