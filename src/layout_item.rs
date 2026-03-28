@@ -25,3 +25,41 @@ pub enum LayoutItem {
     Node(LayoutNode),
     Fragment(ItemFragment),
 }
+
+impl LayoutItem {
+    /// Returns an immutable reference to the inner [LayoutNode] if this item is a node.
+    ///
+    /// This method provides a convenient way to access the node without pattern matching.
+    /// If the item is not a Node, None is returned.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// if let Some(node) = item.node() { /* Access the node */ }
+    /// ```
+    pub fn node(&self) -> Option<&LayoutNode> {
+        match self {
+            LayoutItem::Node(n) => Some(n),
+            _ => None,
+        }
+    }
+    pub fn node_mut(&mut self) -> Option<&mut LayoutNode> {
+        match self {
+            LayoutItem::Node(n) => Some(n),
+            _ => None,
+        }
+    }
+
+    pub fn fragment(&self) -> Option<&ItemFragment> {
+        match self {
+            LayoutItem::Fragment(f) => Some(f),
+            _ => None,
+        }
+    }
+    pub fn fragment_mut(&mut self) -> Option<&mut ItemFragment> {
+        match self {
+            LayoutItem::Fragment(f) => Some(f),
+            _ => None,
+        }
+    }
+}
