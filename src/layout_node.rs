@@ -1,6 +1,6 @@
 use crate::{LayoutBoxes, LayoutItem, Placement, Style};
 
-type LayoutCache = (u32, (LayoutBoxes, Vec<Placement>, ((f32, f32), f32)));
+type LayoutCache = (u32, (LayoutBoxes, ((f32, f32), f32)));
 
 /// A node in the layout tree.
 ///
@@ -62,7 +62,7 @@ pub struct LayoutNode {
     pub placements: Vec<Placement>,
 
     // --- cache ---
-    pub(crate) layout_boxes_cache: LayoutCache, // (key, layout_boxes, placements, ((f32, f32), f32))
+    pub(crate) layout_boxes_cache: LayoutCache, // (key, layout_boxes, ((f32, f32), f32))
 }
 
 impl LayoutNode {
@@ -72,7 +72,7 @@ impl LayoutNode {
             placements: Vec::new(),
             layout_boxes: LayoutBoxes::default(),
             children: Vec::new(),
-            layout_boxes_cache: (0, (LayoutBoxes::default(), vec![], ((0.0, 0.0), 0.0))),
+            layout_boxes_cache: (0, (LayoutBoxes::default(), ((0.0, 0.0), 0.0))),
         }
     }
 
@@ -85,7 +85,7 @@ impl LayoutNode {
             placements: Vec::new(),
             layout_boxes: LayoutBoxes::default(),
             children,
-            layout_boxes_cache: (0, (LayoutBoxes::default(), vec![], ((0.0, 0.0), 0.0))),
+            layout_boxes_cache: (0, (LayoutBoxes::default(), ((0.0, 0.0), 0.0))),
         }
     }
 
@@ -98,7 +98,7 @@ impl LayoutNode {
             placements: Vec::new(),
             layout_boxes: LayoutBoxes::default(),
             children,
-            layout_boxes_cache: (0, (LayoutBoxes::default(), vec![], ((0.0, 0.0), 0.0))),
+            layout_boxes_cache: (0, (LayoutBoxes::default(), ((0.0, 0.0), 0.0))),
         }
     }
 }
