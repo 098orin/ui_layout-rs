@@ -1,4 +1,4 @@
-use crate::{LayoutBoxes, LayoutItem, Placement, Style};
+use crate::{LayoutBoxes, LayoutChildren, Placement, Style};
 
 type LayoutCache = (u32, (LayoutBoxes, ((f32, f32), f32)));
 
@@ -56,7 +56,7 @@ type LayoutCache = (u32, (LayoutBoxes, ((f32, f32), f32)));
 pub struct LayoutNode {
     pub style: Style,
 
-    pub children: Vec<LayoutItem>,
+    pub children: LayoutChildren,
 
     pub layout_boxes: LayoutBoxes,
     pub placements: Vec<Placement>,
@@ -71,14 +71,14 @@ impl LayoutNode {
             style,
             placements: Vec::new(),
             layout_boxes: LayoutBoxes::default(),
-            children: Vec::new(),
+            children: LayoutChildren::new_empty_node(),
             layout_boxes_cache: (0, (LayoutBoxes::default(), ((0.0, 0.0), 0.0))),
         }
     }
 
-    /// A function to create a [`LayoutNode`] whose children are only [`LayoutNode`]
+    /// A function to create a [`LayoutNode`] whose children are [`LayoutNode`]
     pub fn with_node_children(style: Style, node_children: Vec<LayoutNode>) -> Self {
-        let children = node_children.into_iter().map(LayoutItem::Node).collect();
+        let children = LayoutChildren::Node(node_children);
 
         Self {
             style,
@@ -89,10 +89,10 @@ impl LayoutNode {
         }
     }
 
-    /// A function to create a [`LayoutNode`] with children.
-    ///
-    /// See [`LayoutItem`] for detail.
-    pub fn with_children(style: Style, children: Vec<LayoutItem>) -> Self {
+    /// A function to create a [`LayoutNode`] whose children are [`ItemFragment`]
+    pub fn with_fragment_children(style: Style, fragment_children: Vec<LayoutNode>) -> Self {
+        let children = LayoutChildren::Node(fragment_children);
+
         Self {
             style,
             placements: Vec::new(),
