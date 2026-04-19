@@ -55,4 +55,11 @@ impl LayoutChildren {
             _ => None,
         }
     }
+
+    pub fn is_empty(&self) -> bool {
+        match self {
+            LayoutChildren::Node(v) => v.is_empty(),
+            LayoutChildren::Fragment(v) => v.is_empty(),
+        }
+    }
 }
