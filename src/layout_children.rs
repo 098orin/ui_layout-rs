@@ -62,4 +62,11 @@ impl LayoutChildren {
             LayoutChildren::Fragment(v) => v.is_empty(),
         }
     }
+
+    pub fn len(&self) -> usize {
+        match self {
+            LayoutChildren::Node(v) => v.len(),
+            LayoutChildren::Fragment(v) => v.len(),
+        }
+    }
 }
