@@ -89,7 +89,7 @@ impl LayoutNode {
         }
     }
 
-    /// A function to create a [`LayoutNode`] whose children are [`ItemFragment`]
+    /// A function to create a [`LayoutNode`] whose children are [`crate::ItemFragment`]
     pub fn with_fragment_children(style: Style, fragment_children: Vec<LayoutNode>) -> Self {
         let children = LayoutChildren::Node(fragment_children);
 
