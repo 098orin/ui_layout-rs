@@ -1,7 +1,7 @@
-use crate::{LayoutBoxes, LayoutChildren, Style};
+use crate::{LayoutBoxes, LayoutChildren, LineContext, Style};
 
-/// (key, layout_boxes, ((f32, f32), f32))
-type LayoutCache = (u32, (LayoutBoxes, ((f32, f32), f32)));
+/// (key, (layout_boxes, LineContext))
+type LayoutCache = (u32, (LayoutBoxes, LineContext));
 
 /// A node in the layout tree.
 ///

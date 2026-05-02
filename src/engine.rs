@@ -30,7 +30,7 @@ enum Axis {
 pub struct LayoutEngine;
 
 /// ((end_x, end_y), line_height)
-type LineContext = ((f32, f32), f32);
+pub(crate) type LineContext = ((f32, f32), f32);
 
 impl LayoutEngine {
     /// Main layout entry point.
