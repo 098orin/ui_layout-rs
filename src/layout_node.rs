@@ -23,18 +23,6 @@ type LayoutCache = (u32, (LayoutBoxes, LineContext));
 ///
 /// The order of `children` is preserved and defines the layout flow.
 ///
-/// ## Placement model
-///
-/// `placements` stores the layout result for each child in `children`.
-/// Each entry corresponds 1:1 with `children` and provides the computed
-/// relative position of that item within this node.
-///
-/// - `placements.len() == children.len()` after layout
-/// - Each placement is expressed in the local coordinate space of this node
-/// - Placement data is only valid after layout computation
-///
-/// This model unifies positioning for both fragments and child nodes.
-///
 /// ## Box model
 ///
 /// `layout_boxes` stores the computed box model for this node.
