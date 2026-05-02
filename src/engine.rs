@@ -8,6 +8,11 @@ struct Edge {
     bottom: f32,
 }
 
+struct LayoutContext {
+    viewport_width: f32,
+    viewport_height: f32,
+}
+
 /// Axis orientation
 ///
 /// Provides helper methods to abstract width/height selection, reducing code duplication
