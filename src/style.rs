@@ -18,6 +18,51 @@ pub struct Display {
     pub display: (OuterDisplay, InnerDisplay),
 }
 
+impl Display {
+    /// Parse CSS display string (single keyword)
+    pub fn from_css_name(name: &str) -> Option<Self> {
+        match name {
+            "block" => Some(Self {
+                display: (OuterDisplay::Block, InnerDisplay::Flow),
+            }),
+            "inline" => Some(Self {
+                display: (OuterDisplay::Inline, InnerDisplay::Flow),
+            }),
+            "none" => Some(Self {
+                display: (OuterDisplay::None, InnerDisplay::Flow),
+            }),
+            "flex" => Some(Self {
+                display: (OuterDisplay::Block, InnerDisplay::Flex),
+            }),
+            "inline-flex" => Some(Self {
+                display: (OuterDisplay::Inline, InnerDisplay::Flex),
+            }),
+            _ => None,
+        }
+    }
+
+    /// Parse CSS display value (can be multiple tokens)
+    pub fn from_css(input: &str) -> (Option<OuterDisplay>, Option<InnerDisplay>) {
+        let mut outer = None;
+        let mut inner = None;
+
+        for token in input.split_whitespace() {
+            match token {
+                "block" => outer = Some(OuterDisplay::Block),
+                "inline" => outer = Some(OuterDisplay::Inline),
+                "none" => outer = Some(OuterDisplay::None),
+
+                "flow" => inner = Some(InnerDisplay::Flow),
+                "flex" => inner = Some(InnerDisplay::Flex),
+
+                _ => {}
+            }
+        }
+
+        (outer, inner)
+    }
+}
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum FlexDirection {
     Row,
