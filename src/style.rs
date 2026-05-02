@@ -60,46 +60,46 @@ impl Length {
     /// This version uses a single viewport value (for backward compatibility with axis-based layout).
     pub fn resolve_with(
         &self,
-        containing_block: Option<f32>,
+        percentage_base: Option<f32>,
         viewport_width: f32,
         viewport_height: f32,
     ) -> Option<f32> {
         match self {
             Length::Auto => None,
             Length::Px(v) => Some(*v),
-            Length::Percent(p) => containing_block.map(|cb| cb * *p / 100.0),
+            Length::Percent(p) => percentage_base.map(|cb| cb * *p / 100.0),
             Length::Vw(v) => Some(viewport_width * *v / 100.0),
             Length::Vh(v) => Some(viewport_height * *v / 100.0),
             Length::Add(a, b) => Some(
-                a.resolve_with(containing_block, viewport_width, viewport_height)?
-                    + b.resolve_with(containing_block, viewport_width, viewport_height)?,
+                a.resolve_with(percentage_base, viewport_width, viewport_height)?
+                    + b.resolve_with(percentage_base, viewport_width, viewport_height)?,
             ),
             Length::Sub(a, b) => Some(
-                a.resolve_with(containing_block, viewport_width, viewport_height)?
-                    - b.resolve_with(containing_block, viewport_width, viewport_height)?,
+                a.resolve_with(percentage_base, viewport_width, viewport_height)?
+                    - b.resolve_with(percentage_base, viewport_width, viewport_height)?,
             ),
             Length::Mul(a, n) => {
-                Some(a.resolve_with(containing_block, viewport_width, viewport_height)? * n)
+                Some(a.resolve_with(percentage_base, viewport_width, viewport_height)? * n)
             }
             Length::Div(a, n) => {
                 if *n == 0.0 {
                     None
                 } else {
-                    Some(a.resolve_with(containing_block, viewport_width, viewport_height)? / n)
+                    Some(a.resolve_with(percentage_base, viewport_width, viewport_height)? / n)
                 }
             }
             Length::Min(a, b) => Some(
-                a.resolve_with(containing_block, viewport_width, viewport_height)?
-                    .min(b.resolve_with(containing_block, viewport_width, viewport_height)?),
+                a.resolve_with(percentage_base, viewport_width, viewport_height)?
+                    .min(b.resolve_with(percentage_base, viewport_width, viewport_height)?),
             ),
             Length::Max(a, b) => Some(
-                a.resolve_with(containing_block, viewport_width, viewport_height)?
-                    .max(b.resolve_with(containing_block, viewport_width, viewport_height)?),
+                a.resolve_with(percentage_base, viewport_width, viewport_height)?
+                    .max(b.resolve_with(percentage_base, viewport_width, viewport_height)?),
             ),
             Length::Clamp { min, val, max } => {
-                let v = val.resolve_with(containing_block, viewport_width, viewport_height)?;
-                let min_v = min.resolve_with(containing_block, viewport_width, viewport_height)?;
-                let max_v = max.resolve_with(containing_block, viewport_width, viewport_height)?;
+                let v = val.resolve_with(percentage_base, viewport_width, viewport_height)?;
+                let min_v = min.resolve_with(percentage_base, viewport_width, viewport_height)?;
+                let max_v = max.resolve_with(percentage_base, viewport_width, viewport_height)?;
 
                 Some(v.clamp(min_v, max_v))
             }
