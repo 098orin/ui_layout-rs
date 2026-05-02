@@ -1,3 +1,5 @@
+use crate::LayoutNode;
+
 #[derive(Clone, Copy, Default)]
 struct Edge {
     left: f32,
@@ -18,4 +20,6 @@ enum Axis {
 
 pub struct LayoutEngine;
 
-impl LayoutEngine {}
+impl LayoutEngine {
+    pub fn layout(root: &mut LayoutNode, width: f32, height: f32) {}
+}
