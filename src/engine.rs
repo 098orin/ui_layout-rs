@@ -11,6 +11,8 @@ struct Edge {
 pub(crate) struct LayoutContext {
     pub(crate) containing_block_width: Option<f32>,
     pub(crate) containing_block_height: Option<f32>,
+    pub(crate) available_width: Option<f32>,
+    pub(crate) available_height: Option<f32>,
     pub(crate) viewport_width: f32,
     pub(crate) viewport_height: f32,
 }
@@ -27,14 +29,34 @@ enum Axis {
 
 pub struct LayoutEngine;
 
+/// ((end_x, end_y), line_height)
+type LineContext = ((f32, f32), f32);
+
 impl LayoutEngine {
     /// Main layout entry point.
     /// Initiates layout computation from the root node with specified viewport dimensions.
-    pub fn layout(root: &mut LayoutNode, width: f32, height: f32) {}
+    pub fn layout(root: &mut LayoutNode, width: f32, height: f32) {
+        let ctx = LayoutContext {
+            containing_block_width: Some(width),
+            containing_block_height: Some(height),
+            available_width: Some(width),
+            available_height: Some(height),
+            viewport_width: width,
+            viewport_height: height,
+        };
+
+        Self::layout_node(root, &ctx, ((0.0, 0.0), 0.0), false);
+    }
 
     /// Internal method for layout a node.
     /// Layouts a single node and its descendants.
-    fn layout_node() {}
+    fn layout_node(
+        node: &mut LayoutNode,
+        ctx: &LayoutContext,
+        line_ctx: LineContext,
+        intrinsic_pass: bool,
+    ) -> LineContext {
+    }
 }
 
 fn resolve_padding(spacing: &Spacing, ctx: &LayoutContext) -> Edge {
