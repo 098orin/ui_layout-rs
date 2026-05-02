@@ -8,9 +8,9 @@ struct Edge {
     bottom: f32,
 }
 
-struct LayoutContext {
-    viewport_width: f32,
-    viewport_height: f32,
+pub(crate) struct LayoutContext {
+    pub(crate) viewport_width: f32,
+    pub(crate) viewport_height: f32,
 }
 
 /// Axis orientation
