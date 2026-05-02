@@ -29,4 +29,8 @@ impl LayoutEngine {
     /// Main layout entry point.
     /// Initiates layout computation from the root node with specified viewport dimensions.
     pub fn layout(root: &mut LayoutNode, width: f32, height: f32) {}
+
+    /// Internal method for layout a node.
+    /// Layouts a single node and its descendants.
+    fn layout_node() {}
 }
