@@ -197,6 +197,7 @@ pub enum AlignItems {
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Style {
     pub display: Display,
+
     pub item_style: ItemStyle,
     pub size: SizeStyle,
     pub box_sizing: BoxSizing,
