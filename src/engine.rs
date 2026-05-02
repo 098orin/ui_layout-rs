@@ -6,6 +6,16 @@ struct Edge {
     bottom: f32,
 }
 
+/// Axis orientation
+///
+/// Provides helper methods to abstract width/height selection, reducing code duplication
+/// for row and column layout support.
+#[derive(Debug, Clone, Copy)]
+enum Axis {
+    Horizontal,
+    Vertical,
+}
+
 pub struct LayoutEngine;
 
 impl LayoutEngine {}
