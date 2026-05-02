@@ -1,12 +1,21 @@
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub enum Display {
-    Flex {
-        flex_direction: FlexDirection,
-    },
+pub enum OuterDisplay {
     #[default]
     Block,
     Inline,
     None,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum InnerDisplay {
+    #[default]
+    Flow,
+    Flex,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Display {
+    pub display: (OuterDisplay, InnerDisplay),
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -195,6 +204,8 @@ pub struct Style {
 
     pub justify_content: JustifyContent,
     pub align_items: AlignItems,
+
+    pub flex_direction: FlexDirection,
     pub column_gap: Length,
     pub row_gap: Length,
 }
