@@ -1,18 +1,18 @@
-use crate::{ItemFragment, LayoutNode};
+use crate::{FragmentNode, LayoutNode};
 
 /// A unified layout item used during layout processing.
 ///
 /// `LayoutChildren` represents multiple units in the layout flow and can be either:
 ///
 /// - Layout nodes ([`LayoutNode`])
-/// - Inline-level fragments ([`ItemFragment`])
+/// - Inline-level fragments ([`FragmentNode`])
 ///
 /// This abstraction allows the layout engine to treat structural elements
 /// and already-fragmented inline content uniformly while preserving their order.
 #[derive(Debug)]
 pub enum LayoutChildren {
     Node(Vec<LayoutNode>),
-    Fragment(Vec<ItemFragment>),
+    Fragment(Vec<FragmentNode>),
 }
 
 impl LayoutChildren {
@@ -43,13 +43,13 @@ impl LayoutChildren {
         }
     }
 
-    pub fn fragment(&self) -> Option<&Vec<ItemFragment>> {
+    pub fn fragment(&self) -> Option<&Vec<FragmentNode>> {
         match self {
             LayoutChildren::Fragment(f) => Some(f),
             _ => None,
         }
     }
-    pub fn fragment_mut(&mut self) -> Option<&mut Vec<ItemFragment>> {
+    pub fn fragment_mut(&mut self) -> Option<&mut Vec<FragmentNode>> {
         match self {
             LayoutChildren::Fragment(f) => Some(f),
             _ => None,

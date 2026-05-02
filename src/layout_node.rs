@@ -1,4 +1,4 @@
-use crate::{LayoutBoxes, LayoutChildren, Placement, Style};
+use crate::{LayoutBoxes, LayoutChildren, Style};
 
 /// (key, layout_boxes, ((f32, f32), f32))
 type LayoutCache = (u32, (LayoutBoxes, ((f32, f32), f32)));
@@ -60,7 +60,6 @@ pub struct LayoutNode {
     pub children: LayoutChildren,
 
     pub layout_boxes: LayoutBoxes,
-    pub placements: Vec<Placement>,
 
     // --- cache ---
     pub(crate) layout_boxes_cache: LayoutCache,
@@ -70,7 +69,6 @@ impl LayoutNode {
     pub fn new(style: Style) -> Self {
         Self {
             style,
-            placements: Vec::new(),
             layout_boxes: LayoutBoxes::default(),
             children: LayoutChildren::new_empty_node(),
             layout_boxes_cache: (0, (LayoutBoxes::default(), ((0.0, 0.0), 0.0))),
@@ -83,7 +81,6 @@ impl LayoutNode {
 
         Self {
             style,
-            placements: Vec::new(),
             layout_boxes: LayoutBoxes::default(),
             children,
             layout_boxes_cache: (0, (LayoutBoxes::default(), ((0.0, 0.0), 0.0))),
@@ -96,7 +93,6 @@ impl LayoutNode {
 
         Self {
             style,
-            placements: Vec::new(),
             layout_boxes: LayoutBoxes::default(),
             children,
             layout_boxes_cache: (0, (LayoutBoxes::default(), ((0.0, 0.0), 0.0))),

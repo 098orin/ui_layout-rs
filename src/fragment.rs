@@ -3,6 +3,12 @@
 //! This module defines the fragment model used for inline content layout,
 //! including splittable content fragments and control characters.
 
+#[derive(Debug, Clone, Copy)]
+pub struct FragmentNode {
+    pub node: ItemFragment,
+    pub placements: Placement,
+}
+
 /// An item fragment for inline layout.
 ///
 /// Represents the smallest splittable unit of inline content or a control character.
@@ -48,4 +54,17 @@ pub struct Fragment {
     pub width: f32,
     /// Fragment height
     pub height: f32,
+}
+
+/// Layout result for an inline placement.
+///
+/// Represents where a is positioned after layout computation.
+/// Each placement corresponds 1:1 to a in the input.
+/// This 1:1 mapping applies uniformly to both `Node` and `Fragment`.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Placement {
+    /// Offset position (x, y) relative to the container
+    pub offset: (f32, f32),
+    /// 0-indexed line index where the item is placed
+    pub line_index: usize,
 }
