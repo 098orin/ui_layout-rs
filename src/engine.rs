@@ -9,6 +9,8 @@ struct Edge {
 }
 
 pub(crate) struct LayoutContext {
+    pub(crate) containing_block_width: Option<f32>,
+    pub(crate) containing_block_height: Option<f32>,
     pub(crate) viewport_width: f32,
     pub(crate) viewport_height: f32,
 }
