@@ -1,5 +1,6 @@
 use crate::{LayoutBoxes, LayoutChildren, Placement, Style};
 
+/// (key, layout_boxes, ((f32, f32), f32))
 type LayoutCache = (u32, (LayoutBoxes, ((f32, f32), f32)));
 
 /// A node in the layout tree.
@@ -62,7 +63,7 @@ pub struct LayoutNode {
     pub placements: Vec<Placement>,
 
     // --- cache ---
-    pub(crate) layout_boxes_cache: LayoutCache, // (key, layout_boxes, ((f32, f32), f32))
+    pub(crate) layout_boxes_cache: LayoutCache,
 }
 
 impl LayoutNode {
