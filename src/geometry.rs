@@ -1,4 +1,4 @@
-// Geometry-related types and implementations.
+//! Geometry-related types and implementations.
 
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct Rect {
