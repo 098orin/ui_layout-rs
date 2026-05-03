@@ -89,15 +89,15 @@ impl LayoutEngine {
             OuterDisplay::Inline => Self::layout_inline_level(node, ctx, line_ctx, intrinsic_pass),
         }
     }
-}
 
-fn layout_by_inner_display(
-    node: &mut LayoutNode,
-    ctx: &LayoutContext,
-    line_ctx: LineContext,
-    intrinsic_pass: bool,
-) -> LineContext {
-    match node.style.display.1 {}
+    fn layout_by_inner_display(
+        node: &mut LayoutNode,
+        ctx: &LayoutContext,
+        line_ctx: LineContext,
+        intrinsic_pass: bool,
+    ) -> LineContext {
+        match node.style.display.1 {}
+    }
 }
 
 fn resolve_padding(spacing: &Spacing, ctx: &LayoutContext) -> Edge {
