@@ -1,4 +1,4 @@
-use crate::{LayoutNode, Spacing};
+use crate::{LayoutBoxes, LayoutNode, OuterDisplay, Spacing};
 
 #[derive(Clone, Copy, Default)]
 struct Edge {
@@ -56,7 +56,48 @@ impl LayoutEngine {
         line_ctx: LineContext,
         intrinsic_pass: bool,
     ) -> LineContext {
+        if intrinsic_pass {
+            let (key, (layout_boxes, line_ctx)) = &node.layout_boxes_cache;
+            if *key == crate::cache::make_layout_key(ctx) {
+                node.layout_boxes = layout_boxes.clone();
+                return *line_ctx;
+            }
+        }
+
+        let out = Self::layout_by_display(node, &ctx, line_ctx, intrinsic_pass);
+
+        if intrinsic_pass {
+            let key = crate::cache::make_layout_key(ctx);
+            node.layout_boxes_cache = (key, (node.layout_boxes.clone(), out));
+        }
+
+        out
     }
+
+    fn layout_by_display(
+        node: &mut LayoutNode,
+        ctx: &LayoutContext,
+        line_ctx: LineContext,
+        intrinsic_pass: bool,
+    ) -> LineContext {
+        match node.style.display.display.0 {
+            OuterDisplay::None => {
+                node.layout_boxes = LayoutBoxes::None;
+                line_ctx
+            }
+            OuterDisplay::Block => Self::layout_block_level(node, ctx, line_ctx, intrinsic_pass),
+            OuterDisplay::Inline => Self::layout_inline_level(node, ctx, line_ctx, intrinsic_pass),
+        }
+    }
+}
+
+fn layout_by_inner_display(
+    node: &mut LayoutNode,
+    ctx: &LayoutContext,
+    line_ctx: LineContext,
+    intrinsic_pass: bool,
+) -> LineContext {
+    match node.style.display.1 {}
 }
 
 fn resolve_padding(spacing: &Spacing, ctx: &LayoutContext) -> Edge {
