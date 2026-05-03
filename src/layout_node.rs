@@ -4,42 +4,6 @@ use crate::{LayoutBoxes, LayoutChildren, LineContext, Style};
 type LayoutCache = (u32, (LayoutBoxes, LineContext));
 
 /// A node in the layout tree.
-///
-/// A `LayoutNode` represents a single layout object and is responsible for:
-///
-/// - Holding layout-related style information
-/// - Owning child layout items (mixed inline fragments and child nodes)
-/// - Storing layout results (box model and placements)
-///
-/// ## Children model
-///
-/// `children` is an ordered list of layout items (`LayoutItem`), which may contain:
-///
-/// - Other `LayoutNode`s (block-level or container-level items)
-/// - Inline-level fragments (`ItemFragment`)
-///
-/// This unified representation allows inline and block content to coexist,
-/// enabling correct handling of cases such as inline content interrupted by blocks.
-///
-/// The order of `children` is preserved and defines the layout flow.
-///
-/// ## Box model
-///
-/// `layout_boxes` stores the computed box model for this node.
-///
-/// ## Layout behavior
-///
-/// This structure does not encode layout behavior at the type level.
-/// Instead, behavior (inline, block, flex, etc.) is determined by `Style::display`.
-///
-/// ## Results storage
-///
-/// Layout results are stored directly on the node:
-///
-/// - `layout_boxes`: computed box geometry for this node
-/// - `placements`: computed positions for each child in `children`
-///
-/// This allows efficient post-layout traversal and rendering without recomputation.
 #[non_exhaustive]
 #[derive(Debug)]
 pub struct LayoutNode {
