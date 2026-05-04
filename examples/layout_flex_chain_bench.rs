@@ -64,8 +64,14 @@ fn make_branch(depth: usize, max_depth: usize) -> LayoutNode {
     flex.children.push(make_flex_chain(depth, max_depth));
 
     if depth % 3 == 0 {
-        let mut side = node(Display::Block);
-        side.children.push(node(Display::Block));
+        let mut side = node(Display {
+            outer: OuterDisplay::Block,
+            inner: InnerDisplay::Flex,
+        });
+        side.children.push(node(Display {
+            outer: OuterDisplay::Block,
+            inner: InnerDisplay::Flex,
+        }));
         flex.children.push(side);
     }
 
@@ -73,10 +79,16 @@ fn make_branch(depth: usize, max_depth: usize) -> LayoutNode {
 }
 
 fn make_tree() -> LayoutNode {
-    let mut root = node(Display::Block);
+    let mut root = node(Display {
+        outer: OuterDisplay::Block,
+        inner: InnerDisplay::Flex,
+    });
 
     // 上位は Block
-    root.children.push(node(Display::Block));
+    root.children.push(node(Display {
+        outer: OuterDisplay::Block,
+        inner: InnerDisplay::Flex,
+    }));
 
     // 問題の塊
     root.children.push(make_branch(0, 20));
