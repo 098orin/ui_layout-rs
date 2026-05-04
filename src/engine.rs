@@ -153,8 +153,12 @@ impl LayoutEngine {
         intrinsic_pass: bool,
     ) -> LineContext {
         match node.style.display.inner {
-            InnerDisplay::Flow => {}
-            InnerDisplay::Flex => {}
+            InnerDisplay::Flow => {
+                todo!()
+            }
+            InnerDisplay::Flex => {
+                todo!()
+            }
         }
     }
 }
