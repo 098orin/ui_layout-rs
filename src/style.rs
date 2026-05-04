@@ -15,7 +15,8 @@ pub enum InnerDisplay {
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Display {
-    pub display: (OuterDisplay, InnerDisplay),
+    pub outer: OuterDisplay,
+    pub inner: InnerDisplay,
 }
 
 impl Display {
@@ -23,19 +24,24 @@ impl Display {
     pub fn from_css_name(name: &str) -> Option<Self> {
         match name {
             "block" => Some(Self {
-                display: (OuterDisplay::Block, InnerDisplay::Flow),
+                outer: OuterDisplay::Block,
+                inner: InnerDisplay::Flow,
             }),
             "inline" => Some(Self {
-                display: (OuterDisplay::Inline, InnerDisplay::Flow),
+                outer: OuterDisplay::Inline,
+                inner: InnerDisplay::Flow,
             }),
             "none" => Some(Self {
-                display: (OuterDisplay::None, InnerDisplay::Flow),
+                outer: OuterDisplay::None,
+                inner: InnerDisplay::Flow,
             }),
             "flex" => Some(Self {
-                display: (OuterDisplay::Block, InnerDisplay::Flex),
+                outer: OuterDisplay::Block,
+                inner: InnerDisplay::Flex,
             }),
             "inline-flex" => Some(Self {
-                display: (OuterDisplay::Inline, InnerDisplay::Flex),
+                outer: OuterDisplay::Inline,
+                inner: InnerDisplay::Flex,
             }),
             _ => None,
         }
