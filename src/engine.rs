@@ -96,6 +96,12 @@ impl LayoutEngine {
         line_ctx: LineContext,
         intrinsic_pass: bool,
     ) -> LineContext {
+        let ((width_opt, height_opt), border, padding) = resolve_base_content_size_and_spacing(
+            &node.style.size,
+            &node.style.spacing,
+            &node.style.box_sizing,
+            ctx,
+        );
     }
 
     fn layout_inline_level(
@@ -104,6 +110,12 @@ impl LayoutEngine {
         line_ctx: LineContext,
         intrinsic_pass: bool,
     ) -> LineContext {
+        let ((width_opt, height_opt), border, padding) = resolve_base_content_size_and_spacing(
+            &node.style.size,
+            &node.style.spacing,
+            &node.style.box_sizing,
+            ctx,
+        );
     }
 
     fn layout_by_inner_display(
