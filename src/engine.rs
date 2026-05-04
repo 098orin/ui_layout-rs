@@ -126,19 +126,19 @@ fn resolve_padding(spacing: &Spacing, ctx: &LayoutContext) -> Edge {
 
     Edge {
         left: spacing
-            .border_left
+            .padding_left
             .resolve_with(containing_width, vw, vh)
             .unwrap_or(0.0),
         top: spacing
-            .border_top
+            .padding_top
             .resolve_with(containing_width, vw, vh)
             .unwrap_or(0.0),
         right: spacing
-            .border_right
+            .padding_right
             .resolve_with(containing_width, vw, vh)
             .unwrap_or(0.0),
         bottom: spacing
-            .border_bottom
+            .padding_bottom
             .resolve_with(containing_width, vw, vh)
             .unwrap_or(0.0),
     }
