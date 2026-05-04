@@ -168,3 +168,28 @@ fn resolve_border(spacing: &Spacing, ctx: &LayoutContext) -> Edge {
             .unwrap_or(0.0),
     }
 }
+
+fn resolve_margins(spacing: &Spacing, ctx: &LayoutContext) -> Edge {
+    let containing_width = ctx.containing_block_width.unwrap_or(ctx.viewport_width);
+    let vw = ctx.viewport_width;
+    let vh = ctx.viewport_height;
+
+    Edge {
+        left: spacing
+            .margin_left
+            .resolve_with(ctx.containing_block_width, vw, vh)
+            .unwrap_or(0.0),
+        top: spacing
+            .margin_top
+            .resolve_with(Some(containing_width), vw, vh)
+            .unwrap_or(0.0),
+        right: spacing
+            .margin_right
+            .resolve_with(ctx.containing_block_width, vw, vh)
+            .unwrap_or(0.0),
+        bottom: spacing
+            .margin_bottom
+            .resolve_with(Some(containing_width), vw, vh)
+            .unwrap_or(0.0),
+    }
+}
