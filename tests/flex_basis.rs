@@ -5,14 +5,16 @@ use ui_layout::*;
 #[test]
 fn test_flex_basis_auto() {
     let mut container = LayoutNode::new(Style {
-        display: Display::Flex {
-            flex_direction: FlexDirection::Row,
+        display: Display {
+            outer: OuterDisplay::Block,
+            inner: InnerDisplay::Flex,
         },
         size: SizeStyle {
             width: Length::Px(300.0),
             height: Length::Px(100.0),
             ..Default::default()
         },
+        flex_direction: FlexDirection::Row,
         ..Default::default()
     });
 
@@ -67,14 +69,16 @@ fn test_flex_basis_auto() {
 #[ignore = "The implementation of ignoring Width and treating it as basis when flexing is not implemented yet."]
 fn flex_basis_overrides_width_when_no_grow_or_shrink() {
     let mut container = LayoutNode::new(Style {
-        display: Display::Flex {
-            flex_direction: FlexDirection::Row,
+        display: Display {
+            outer: OuterDisplay::Block,
+            inner: InnerDisplay::Flex,
         },
         size: SizeStyle {
             width: Length::Px(300.0),
             height: Length::Px(100.0),
             ..Default::default()
         },
+        flex_direction: FlexDirection::Row,
         ..Default::default()
     });
 
@@ -103,13 +107,15 @@ fn flex_basis_overrides_width_when_no_grow_or_shrink() {
 #[test]
 fn flex_basis_is_starting_point_for_grow() {
     let mut container = LayoutNode::new(Style {
-        display: Display::Flex {
-            flex_direction: FlexDirection::Row,
+        display: Display {
+            outer: OuterDisplay::Block,
+            inner: InnerDisplay::Flex,
         },
         size: SizeStyle {
             width: Length::Px(300.0),
             ..Default::default()
         },
+        flex_direction: FlexDirection::Row,
         ..Default::default()
     });
 
@@ -133,13 +139,15 @@ fn flex_basis_is_starting_point_for_grow() {
 #[test]
 fn flex_basis_is_starting_point_for_shrink() {
     let mut container = LayoutNode::new(Style {
-        display: Display::Flex {
-            flex_direction: FlexDirection::Row,
+        display: Display {
+            outer: OuterDisplay::Block,
+            inner: InnerDisplay::Flex,
         },
         size: SizeStyle {
             width: Length::Px(100.0),
             ..Default::default()
         },
+        flex_direction: FlexDirection::Row,
         ..Default::default()
     });
 
@@ -166,14 +174,16 @@ fn flex_basis_is_starting_point_for_shrink() {
 #[test]
 fn test_flex_basis_with_grow() {
     let mut container = LayoutNode::new(Style {
-        display: Display::Flex {
-            flex_direction: FlexDirection::Row,
+        display: Display {
+            outer: OuterDisplay::Block,
+            inner: InnerDisplay::Flex,
         },
         size: SizeStyle {
             width: Length::Px(400.0),
             height: Length::Px(100.0),
             ..Default::default()
         },
+        flex_direction: FlexDirection::Row,
         ..Default::default()
     });
 
@@ -217,14 +227,16 @@ fn test_flex_basis_with_grow() {
 #[test]
 fn test_flex_basis_with_shrink() {
     let mut container = LayoutNode::new(Style {
-        display: Display::Flex {
-            flex_direction: FlexDirection::Row,
+        display: Display {
+            outer: OuterDisplay::Block,
+            inner: InnerDisplay::Flex,
         },
         size: SizeStyle {
             width: Length::Px(200.0),
             height: Length::Px(100.0),
             ..Default::default()
         },
+        flex_direction: FlexDirection::Row,
         ..Default::default()
     });
 
@@ -270,14 +282,16 @@ fn test_flex_basis_with_shrink() {
 #[test]
 fn test_flex_basis_percentage() {
     let mut container = LayoutNode::new(Style {
-        display: Display::Flex {
-            flex_direction: FlexDirection::Row,
+        display: Display {
+            outer: OuterDisplay::Block,
+            inner: InnerDisplay::Flex,
         },
         size: SizeStyle {
             width: Length::Px(400.0),
             height: Length::Px(100.0),
             ..Default::default()
         },
+        flex_direction: FlexDirection::Row,
         ..Default::default()
     });
 
@@ -335,14 +349,16 @@ fn test_flex_basis_percentage() {
 #[ignore = "The implementation of ignoring Width and treating it as basis when flexing is not implemented yet."]
 fn test_mixed_flex_properties_complete() {
     let mut container = LayoutNode::new(Style {
-        display: Display::Flex {
-            flex_direction: FlexDirection::Row,
+        display: Display {
+            outer: OuterDisplay::Block,
+            inner: InnerDisplay::Flex,
         },
         size: SizeStyle {
             width: Length::Px(500.0),
             height: Length::Px(100.0),
             ..Default::default()
         },
+        flex_direction: FlexDirection::Row,
         ..Default::default()
     });
 
@@ -471,14 +487,16 @@ fn test_mixed_flex_properties_complete() {
 #[test]
 fn test_flex_basis_column_direction() {
     let mut container = LayoutNode::new(Style {
-        display: Display::Flex {
-            flex_direction: FlexDirection::Column,
+        display: Display {
+            outer: OuterDisplay::Block,
+            inner: InnerDisplay::Flex,
         },
         size: SizeStyle {
             width: Length::Px(200.0),
             height: Length::Px(300.0),
             ..Default::default()
         },
+        flex_direction: FlexDirection::Column,
         ..Default::default()
     });
 

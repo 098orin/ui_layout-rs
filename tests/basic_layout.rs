@@ -89,14 +89,16 @@ fn flex_row_grow() {
 
     let mut root = LayoutNode::with_node_children(
         Style {
-            display: Display::Flex {
-                flex_direction: FlexDirection::Row,
+            display: Display {
+                outer: OuterDisplay::Block,
+                inner: InnerDisplay::Flex,
             },
             size: SizeStyle {
                 width: Length::Px(300.0),
                 height: Length::Px(50.0),
                 ..Default::default()
             },
+            flex_direction: FlexDirection::Row,
             ..Default::default()
         },
         vec![child1, child2],
@@ -139,14 +141,16 @@ fn flex_gap_affects_children_box() {
 
     let mut root = LayoutNode::with_node_children(
         Style {
-            display: Display::Flex {
-                flex_direction: FlexDirection::Row,
+            display: Display {
+                outer: OuterDisplay::Block,
+                inner: InnerDisplay::Flex,
             },
             size: SizeStyle {
                 width: Length::Px(200.0),
                 height: Length::Px(50.0),
                 ..Default::default()
             },
+            flex_direction: FlexDirection::Row,
             column_gap: Length::Px(20.0),
             ..Default::default()
         },
@@ -186,14 +190,16 @@ fn flex_align_items_stretch() {
 
     let mut root = LayoutNode::with_node_children(
         Style {
-            display: Display::Flex {
-                flex_direction: FlexDirection::Row,
+            display: Display {
+                outer: OuterDisplay::Block,
+                inner: InnerDisplay::Flex,
             },
             size: SizeStyle {
                 width: Length::Px(100.0),
                 height: Length::Px(80.0),
                 ..Default::default()
             },
+            flex_direction: FlexDirection::Row,
             align_items: AlignItems::Stretch,
             ..Default::default()
         },

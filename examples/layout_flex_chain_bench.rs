@@ -25,7 +25,7 @@ fn node(display: Display) -> LayoutNode {
 
 /// Flex の深い連鎖を作る
 fn make_flex_chain(depth: usize, max_depth: usize) -> LayoutNode {
-    let mut root = node(Display::Flex {
+    let mut root = node(Display { outer: OuterDisplay::Block, inner: InnerDisplay::Flex } {
         flex_direction: FlexDirection::Row,
     });
 
@@ -46,7 +46,7 @@ fn make_flex_chain(depth: usize, max_depth: usize) -> LayoutNode {
 
 /// 実サイトっぽい「枝」を追加
 fn make_branch(depth: usize, max_depth: usize) -> LayoutNode {
-    let mut flex = node(Display::Flex {
+    let mut flex = node(Display { outer: OuterDisplay::Block, inner: InnerDisplay::Flex } {
         flex_direction: FlexDirection::Column,
     });
 

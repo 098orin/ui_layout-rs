@@ -4,7 +4,7 @@ use ui_layout::*;
 fn make_node(is_flex: bool) -> LayoutNode {
     LayoutNode::new(Style {
         display: if is_flex {
-            Display::Flex {
+            Display { outer: OuterDisplay::Block, inner: InnerDisplay::Flex } {
                 flex_direction: FlexDirection::Row,
             }
         } else {

@@ -28,14 +28,16 @@ fn flex_column_layout() {
 
     let mut root = LayoutNode::with_node_children(
         Style {
-            display: Display::Flex {
-                flex_direction: FlexDirection::Column,
+            display: Display {
+                outer: OuterDisplay::Block,
+                inner: InnerDisplay::Flex,
             },
             size: SizeStyle {
                 width: Length::Px(200.0),
                 height: Length::Px(150.0),
                 ..Default::default()
             },
+            flex_direction: FlexDirection::Column,
             ..Default::default()
         },
         vec![child1, child2, child3],
@@ -96,8 +98,9 @@ fn flex_justify_content_space_evenly() {
 
     let mut root = LayoutNode::with_node_children(
         Style {
-            display: Display::Flex {
-                flex_direction: FlexDirection::Row,
+            display: Display {
+                outer: OuterDisplay::Block,
+                inner: InnerDisplay::Flex,
             },
             size: SizeStyle {
                 width: Length::Px(300.0),
@@ -105,6 +108,7 @@ fn flex_justify_content_space_evenly() {
                 ..Default::default()
             },
             justify_content: JustifyContent::SpaceEvenly,
+            flex_direction: FlexDirection::Row,
             ..Default::default()
         },
         vec![child1, child2, child3],
@@ -181,8 +185,9 @@ fn flex_align_items_different_values() {
 
     let mut root = LayoutNode::with_node_children(
         Style {
-            display: Display::Flex {
-                flex_direction: FlexDirection::Row,
+            display: Display {
+                outer: OuterDisplay::Block,
+                inner: InnerDisplay::Flex,
             },
             size: SizeStyle {
                 width: Length::Px(300.0),
@@ -190,6 +195,7 @@ fn flex_align_items_different_values() {
                 ..Default::default()
             },
             align_items: AlignItems::Stretch, // Default, but children override
+            flex_direction: FlexDirection::Row,
             ..Default::default()
         },
         vec![child1, child2, child3],
@@ -251,14 +257,16 @@ fn nested_flex_containers() {
 
     let inner_flex = LayoutNode::with_node_children(
         Style {
-            display: Display::Flex {
-                flex_direction: FlexDirection::Row,
+            display: Display {
+                outer: OuterDisplay::Block,
+                inner: InnerDisplay::Flex,
             },
             size: SizeStyle {
                 width: Length::Px(120.0),
                 height: Length::Px(30.0),
                 ..Default::default()
             },
+            flex_direction: FlexDirection::Row,
             ..Default::default()
         },
         vec![inner_child1, inner_child2],
@@ -276,14 +284,16 @@ fn nested_flex_containers() {
 
     let mut root = LayoutNode::with_node_children(
         Style {
-            display: Display::Flex {
-                flex_direction: FlexDirection::Row,
+            display: Display {
+                outer: OuterDisplay::Block,
+                inner: InnerDisplay::Flex,
             },
             size: SizeStyle {
                 width: Length::Px(250.0),
                 height: Length::Px(50.0),
                 ..Default::default()
             },
+            flex_direction: FlexDirection::Row,
             column_gap: Length::Px(10.0),
             ..Default::default()
         },
@@ -347,14 +357,16 @@ fn flex_with_percentage_basis() {
 
     let mut root = LayoutNode::with_node_children(
         Style {
-            display: Display::Flex {
-                flex_direction: FlexDirection::Row,
+            display: Display {
+                outer: OuterDisplay::Block,
+                inner: InnerDisplay::Flex,
             },
             size: SizeStyle {
                 width: Length::Px(300.0),
                 height: Length::Px(50.0),
                 ..Default::default()
             },
+            flex_direction: FlexDirection::Row,
             ..Default::default()
         },
         vec![child1, child2],
@@ -415,14 +427,16 @@ fn flex_auto_margins_override_justify_content() {
 
     let mut root = LayoutNode::with_node_children(
         Style {
-            display: Display::Flex {
-                flex_direction: FlexDirection::Row,
+            display: Display {
+                outer: OuterDisplay::Block,
+                inner: InnerDisplay::Flex,
             },
             size: SizeStyle {
                 width: Length::Px(300.0),
                 height: Length::Px(50.0),
                 ..Default::default()
             },
+            flex_direction: FlexDirection::Row,
             justify_content: JustifyContent::Center, // Should be overridden by auto margins
             ..Default::default()
         },
@@ -476,14 +490,16 @@ fn flex_row_gap_column_gap() {
 
     let mut root = LayoutNode::with_node_children(
         Style {
-            display: Display::Flex {
-                flex_direction: FlexDirection::Row,
+            display: Display {
+                outer: OuterDisplay::Block,
+                inner: InnerDisplay::Flex,
             },
             size: SizeStyle {
                 width: Length::Px(300.0),
                 height: Length::Px(80.0),
                 ..Default::default()
             },
+            flex_direction: FlexDirection::Row,
             column_gap: Length::Px(15.0), // Gap between items in row
             row_gap: Length::Px(10.0),    // Not used in single row, but testing
             ..Default::default()
@@ -550,14 +566,16 @@ fn flex_min_max_constraints_with_grow() {
 
     let mut root = LayoutNode::with_node_children(
         Style {
-            display: Display::Flex {
-                flex_direction: FlexDirection::Row,
+            display: Display {
+                outer: OuterDisplay::Block,
+                inner: InnerDisplay::Flex,
             },
             size: SizeStyle {
                 width: Length::Px(400.0),
                 height: Length::Px(50.0),
                 ..Default::default()
             },
+            flex_direction: FlexDirection::Row,
             ..Default::default()
         },
         vec![child1, child2],

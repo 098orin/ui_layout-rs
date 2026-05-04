@@ -168,8 +168,9 @@ fn test_flex_children_coordinates() {
 
     let mut flex_container = LayoutNode::with_node_children(
         Style {
-            display: Display::Flex {
-                flex_direction: FlexDirection::Row,
+            display: Display {
+                outer: OuterDisplay::Block,
+                inner: InnerDisplay::Flex,
             },
             size: SizeStyle {
                 width: Length::Px(200.0),
@@ -183,6 +184,7 @@ fn test_flex_children_coordinates() {
                 padding_bottom: Length::Px(8.0),
                 ..Default::default()
             },
+            flex_direction: FlexDirection::Row,
             column_gap: Length::Px(20.0),
             ..Default::default()
         },

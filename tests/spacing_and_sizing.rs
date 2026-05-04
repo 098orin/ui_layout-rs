@@ -506,14 +506,16 @@ fn flex_with_spacing_constraints() {
 
     let mut root = LayoutNode::with_node_children(
         Style {
-            display: Display::Flex {
-                flex_direction: FlexDirection::Row,
+            display: Display {
+                outer: OuterDisplay::Block,
+                inner: InnerDisplay::Flex,
             },
             size: SizeStyle {
                 width: Length::Px(400.0),
                 height: Length::Px(100.0),
                 ..Default::default()
             },
+            flex_direction: FlexDirection::Row,
             column_gap: Length::Px(20.0),
             ..Default::default()
         },
