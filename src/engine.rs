@@ -90,6 +90,22 @@ impl LayoutEngine {
         }
     }
 
+    fn layout_block_level(
+        node: &mut LayoutNode,
+        ctx: &LayoutContext,
+        line_ctx: LineContext,
+        intrinsic_pass: bool,
+    ) -> LineContext {
+    }
+
+    fn layout_inline_level(
+        node: &mut LayoutNode,
+        ctx: &LayoutContext,
+        line_ctx: LineContext,
+        intrinsic_pass: bool,
+    ) -> LineContext {
+    }
+
     fn layout_by_inner_display(
         node: &mut LayoutNode,
         ctx: &LayoutContext,
