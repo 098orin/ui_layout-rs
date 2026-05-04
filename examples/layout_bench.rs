@@ -4,11 +4,15 @@ use ui_layout::*;
 fn make_node(is_flex: bool) -> LayoutNode {
     LayoutNode::new(Style {
         display: if is_flex {
-            Display { outer: OuterDisplay::Block, inner: InnerDisplay::Flex } {
-                flex_direction: FlexDirection::Row,
+            Display {
+                outer: OuterDisplay::Block,
+                inner: InnerDisplay::Flex,
             }
         } else {
-            Display::Block
+            Display {
+                outer: OuterDisplay::Block,
+                inner: InnerDisplay::Flow,
+            }
         },
         size: SizeStyle {
             width: Length::Auto,
