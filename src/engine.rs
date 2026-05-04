@@ -98,7 +98,7 @@ impl LayoutEngine {
         line_ctx: LineContext,
         intrinsic_pass: bool,
     ) -> LineContext {
-        let ((width_opt, height_opt), border, padding) = resolve_base_content_size_and_spacing(
+        let ((width_opt, height_opt), _, _) = resolve_base_content_size_and_spacing(
             &node.style.size,
             &node.style.spacing,
             &node.style.box_sizing,
@@ -106,6 +106,14 @@ impl LayoutEngine {
         );
 
         let width_opt = width_opt.or(ctx.available_width);
+
+        Self::layout_by_inner_display(
+            node,
+            &ctx,
+            line_ctx,
+            (width_opt, height_opt),
+            intrinsic_pass,
+        )
     }
 
     fn layout_inline_level(
@@ -114,18 +122,27 @@ impl LayoutEngine {
         line_ctx: LineContext,
         intrinsic_pass: bool,
     ) -> LineContext {
-        let ((width_opt, height_opt), border, padding) = resolve_base_content_size_and_spacing(
+        let ((width_opt, height_opt), _, _) = resolve_base_content_size_and_spacing(
             &node.style.size,
             &node.style.spacing,
             &node.style.box_sizing,
             ctx,
         );
+
+        Self::layout_by_inner_display(
+            node,
+            &ctx,
+            line_ctx,
+            (width_opt, height_opt),
+            intrinsic_pass,
+        )
     }
 
     fn layout_by_inner_display(
         node: &mut LayoutNode,
         ctx: &LayoutContext,
         line_ctx: LineContext,
+        size_opt: (Option<f32>, Option<f32>),
         intrinsic_pass: bool,
     ) -> LineContext {
         match node.style.display.inner {
