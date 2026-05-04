@@ -108,8 +108,11 @@ impl LayoutBoxes {
             LayoutBoxes::BlockBox(b) => b.height(),
             LayoutBoxes::InlineBox(l) => {
                 // Last y pos - First y pos + line border height
-                l.line_spans.last().unwrap().start_pos.1 - l.line_spans.first().unwrap().start_pos.1
-                    + l.box_model.height()
+                if let (Some(first), Some(last)) = (l.line_spans.first(), l.line_spans.last()) {
+                    last.start_pos.1 - first.start_pos.1 + l.box_model.height()
+                } else {
+                    0.0
+                }
             }
         }
     }
@@ -166,7 +169,7 @@ impl<'a> IntoIterator for &'a LayoutBoxes {
     fn into_iter(self) -> Self::IntoIter {
         match self {
             LayoutBoxes::None => [].iter(),
-            LayoutBoxes::Single(b) => std::slice::from_ref(b).iter(),
+            LayoutBoxes::BlockBox(b) => std::slice::from_ref(b).iter(),
             LayoutBoxes::Multiple(list) => list.iter(),
         }
     }
@@ -179,7 +182,7 @@ impl<'a> IntoIterator for &'a mut LayoutBoxes {
     fn into_iter(self) -> Self::IntoIter {
         match self {
             LayoutBoxes::None => [].iter_mut(),
-            LayoutBoxes::Single(b) => std::slice::from_mut(b).iter_mut(),
+            LayoutBoxes::BlockBox(b) => std::slice::from_mut(b).iter_mut(),
             LayoutBoxes::Multiple(list) => list.iter_mut(),
         }
     }
@@ -192,7 +195,7 @@ impl IntoIterator for LayoutBoxes {
     fn into_iter(self) -> Self::IntoIter {
         match self {
             LayoutBoxes::None => Vec::new().into_iter(),
-            LayoutBoxes::Single(b) => vec![b].into_iter(),
+            LayoutBoxes::BlockBox(b) => vec![b].into_iter(),
             LayoutBoxes::Multiple(list) => list.into_iter(),
         }
     }
