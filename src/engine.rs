@@ -1,4 +1,4 @@
-use crate::{LayoutBoxes, LayoutNode, OuterDisplay, Spacing};
+use crate::{InnerDisplay, LayoutBoxes, LayoutNode, OuterDisplay, Spacing};
 
 #[derive(Clone, Copy, Default)]
 struct Edge {
@@ -112,7 +112,10 @@ impl LayoutEngine {
         line_ctx: LineContext,
         intrinsic_pass: bool,
     ) -> LineContext {
-        match node.style.display.inner {}
+        match node.style.display.inner {
+            InnerDisplay::Flow => {}
+            InnerDisplay::Flex => {}
+        }
     }
 }
 
