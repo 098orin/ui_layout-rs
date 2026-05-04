@@ -1,4 +1,4 @@
-use crate::{InnerDisplay, LayoutBoxes, LayoutNode, OuterDisplay, Spacing};
+use crate::{BoxSizing, InnerDisplay, LayoutBoxes, LayoutNode, OuterDisplay, Spacing};
 
 #[derive(Clone, Copy, Default)]
 struct Edge {
@@ -80,7 +80,7 @@ impl LayoutEngine {
         line_ctx: LineContext,
         intrinsic_pass: bool,
     ) -> LineContext {
-        match node.style.display.outer {
+        match style.display.outer {
             OuterDisplay::None => {
                 node.layout_boxes = LayoutBoxes::None;
                 line_ctx
@@ -112,11 +112,110 @@ impl LayoutEngine {
         line_ctx: LineContext,
         intrinsic_pass: bool,
     ) -> LineContext {
-        match node.style.display.inner {
+        match style.display.inner {
             InnerDisplay::Flow => {}
             InnerDisplay::Flex => {}
         }
     }
+}
+
+/// ((width_opt, height_opt), border, padding)
+fn resolve_base_content_size_and_spacing(
+    size_style: &crate::SizeStyle,
+    spacing: &crate::Spacing,
+    box_sizing: &BoxSizing,
+    ctx: &LayoutContext,
+) -> ((Option<f32>, Option<f32>), Edge, Edge) {
+    let border = resolve_border(&spacing, ctx);
+    let padding = resolve_padding(&spacing, ctx);
+
+    let vw = ctx.viewport_width;
+    let vh = ctx.viewport_height;
+
+    // --- width ---
+    let content_width = size_style
+        .width
+        .resolve_with(ctx.containing_block_width, vw, vh)
+        .map(|width| {
+            let padding_edge = (padding.left, padding.right);
+            let border_edge = (border.left, border.right);
+            resolve_content_size_with_box_sizing(box_sizing, width, padding_edge, border_edge)
+        })
+        .map(|width| apply_size_constraints(width, size_style, ctx, true));
+
+    // --- height ---
+    let content_height = size_style
+        .height
+        .resolve_with(ctx.containing_block_height, vw, vh)
+        .map(|height| {
+            let padding_edge = (padding.top, padding.bottom);
+            let border_edge = (border.top, border.bottom);
+            resolve_content_size_with_box_sizing(box_sizing, height, padding_edge, border_edge)
+        })
+        .map(|height| apply_size_constraints(height, size_style, ctx, false));
+
+    ((content_width, content_height), border, padding)
+}
+
+/// Resolves content size based on the box-sizing property.
+///
+/// # Arguments
+/// * `box_sizing` - Box-sizing style
+/// * `size` - The border or content box size to resolve
+/// * `padding_edge` - (padding start, padding end)
+/// * `border_edge` - (border start, border end)
+fn resolve_content_size_with_box_sizing(
+    box_sizing: &BoxSizing,
+    size: f32,
+    padding_edge: (f32, f32),
+    border_edge: (f32, f32),
+) -> f32 {
+    match box_sizing {
+        BoxSizing::ContentBox => size,
+        BoxSizing::BorderBox => {
+            size - padding_edge.0 - padding_edge.1 - border_edge.0 - border_edge.1
+        }
+    }
+    .max(0.0)
+}
+
+/// Applies min/max size constraints to a dimension value.
+fn apply_size_constraints(
+    value: f32,
+    size_style: &crate::SizeStyle,
+    ctx: &LayoutContext,
+    is_width: bool,
+) -> f32 {
+    let vw = ctx.viewport_width;
+    let vh = ctx.viewport_height;
+
+    let (min_constraint, max_constraint) = if is_width {
+        (
+            size_style
+                .min_width
+                .resolve_with(ctx.containing_block_width, vw, vh),
+            size_style
+                .max_width
+                .resolve_with(ctx.containing_block_width, vw, vh),
+        )
+    } else {
+        (
+            size_style
+                .min_height
+                .resolve_with(ctx.containing_block_height, vw, vh),
+            size_style
+                .max_height
+                .resolve_with(ctx.containing_block_height, vw, vh),
+        )
+    };
+
+    clamp(value, min_constraint, max_constraint)
+}
+
+/// Clamps a value between optional minimum and maximum bounds.
+fn clamp(value: f32, min: Option<f32>, max: Option<f32>) -> f32 {
+    let v = min.map_or(value, |m| value.max(m));
+    max.map_or(v, |m| v.min(m))
 }
 
 fn resolve_padding(spacing: &Spacing, ctx: &LayoutContext) -> Edge {
