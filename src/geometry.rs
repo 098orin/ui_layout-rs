@@ -24,20 +24,30 @@ pub struct BoxModel {
     pub children_box: Rect,
 }
 
+#[derive(Debug, Clone)]
+pub struct InlineBox {
+    pub box_model: BoxModel,
+    pub line_spans: Vec<LineSpan>,
+}
+
+#[derive(Debug, Clone)]
+pub struct LineSpan {
+    pub start_pos: (f32, f32),
+    pub end_x_pos: f32,
+    /// 0-indexed line index.
+    pub line_index: usize,
+}
+
 /// Types of BoxModel.
 ///
 /// All coordinates are relative to the parent.
-/// For [`LayoutBoxes::Multiple`], the coordinates are based on the content_box in the first row.
 #[derive(Debug, Clone, Default)]
 pub enum LayoutBoxes {
     #[default]
     /// No layout boxes.
     None,
-    /// A single layout box.
-    Single(BoxModel),
-    /// Multiple layout boxes split across lines.
-    /// Represents line fragments and may be empty.
-    Multiple(Vec<BoxModel>),
+    BlockBox(BoxModel),
+    InlineBox(InlineBox),
 }
 
 impl Rect {
@@ -80,25 +90,13 @@ impl BoxModel {
 }
 
 impl LayoutBoxes {
-    pub(crate) fn shift(&mut self, dx: f32, dy: f32) {
-        match self {
-            LayoutBoxes::None => {}
-            LayoutBoxes::Single(b) => b.shift(dx, dy),
-            LayoutBoxes::Multiple(list) => {
-                for b in list {
-                    b.shift(dx, dy);
-                }
-            }
-        }
-    }
-
     /// Returns the maximum width among all boxes.
     /// See [`BoxModel::width`].
     pub fn width(&self) -> f32 {
         match self {
             LayoutBoxes::None => 0.0,
-            LayoutBoxes::Single(b) => b.width(),
-            LayoutBoxes::Multiple(list) => list.iter().map(|b| b.width()).fold(0.0, f32::max),
+            LayoutBoxes::BlockBox(b) => b.width(),
+            LayoutBoxes::InlineBox(l) => l.box_model.width(),
         }
     }
 
@@ -107,19 +105,11 @@ impl LayoutBoxes {
     pub fn height(&self) -> f32 {
         match self {
             LayoutBoxes::None => 0.0,
-            LayoutBoxes::Single(b) => b.height(),
-            LayoutBoxes::Multiple(list) => {
-                if list.is_empty() {
-                    0.0
-                } else {
-                    let first_box = list.first().unwrap();
-                    let last_box = list.last().unwrap();
-
-                    let first_y = first_box.border_box.y;
-                    let last_y = last_box.border_box.bottom();
-
-                    (last_y - first_y).abs()
-                }
+            LayoutBoxes::BlockBox(b) => b.height(),
+            LayoutBoxes::InlineBox(l) => {
+                // Last y pos - First y pos + line border height
+                l.line_spans.last().unwrap().start_pos.1 - l.line_spans.first().unwrap().start_pos.1
+                    + l.box_model.height()
             }
         }
     }
@@ -127,16 +117,15 @@ impl LayoutBoxes {
     pub fn is_empty(&self) -> bool {
         match self {
             LayoutBoxes::None => true,
-            LayoutBoxes::Single(_) => false,
-            LayoutBoxes::Multiple(v) => v.is_empty(),
+            LayoutBoxes::BlockBox(_) | LayoutBoxes::InlineBox(_) => false,
         }
     }
 
     pub fn len(&self) -> usize {
         match self {
             LayoutBoxes::None => 0,
-            LayoutBoxes::Single(_) => 1,
-            LayoutBoxes::Multiple(v) => v.len(),
+            LayoutBoxes::BlockBox(_) => 1,
+            LayoutBoxes::InlineBox(v) => v.line_spans.len(),
         }
     }
 
