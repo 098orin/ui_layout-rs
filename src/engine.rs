@@ -143,3 +143,28 @@ fn resolve_padding(spacing: &Spacing, ctx: &LayoutContext) -> Edge {
             .unwrap_or(0.0),
     }
 }
+
+fn resolve_border(spacing: &Spacing, ctx: &LayoutContext) -> Edge {
+    let containing_width = ctx.containing_block_width;
+    let vw = ctx.viewport_width;
+    let vh = ctx.viewport_height;
+
+    Edge {
+        left: spacing
+            .border_left
+            .resolve_with(containing_width, vw, vh)
+            .unwrap_or(0.0),
+        top: spacing
+            .border_top
+            .resolve_with(containing_width, vw, vh)
+            .unwrap_or(0.0),
+        right: spacing
+            .border_right
+            .resolve_with(containing_width, vw, vh)
+            .unwrap_or(0.0),
+        bottom: spacing
+            .border_bottom
+            .resolve_with(containing_width, vw, vh)
+            .unwrap_or(0.0),
+    }
+}
