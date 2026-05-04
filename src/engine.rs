@@ -8,6 +8,8 @@ struct Edge {
     bottom: f32,
 }
 
+/// The difference between available_* and containing_block_* is
+/// whether or not the margins of the child blocks are taken into consideration.
 pub(crate) struct LayoutContext {
     pub(crate) containing_block_width: Option<f32>,
     pub(crate) containing_block_height: Option<f32>,
@@ -102,6 +104,8 @@ impl LayoutEngine {
             &node.style.box_sizing,
             ctx,
         );
+
+        let width = width_opt.unwrap_or(ctx.available_width);
     }
 
     fn layout_inline_level(
