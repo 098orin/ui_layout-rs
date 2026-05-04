@@ -8,8 +8,15 @@ struct Edge {
     bottom: f32,
 }
 
-/// The difference between available_* and containing_block_* is
-/// whether or not the margins of the child blocks are taken into consideration.
+/// The difference between containing_block_* and available_* is:
+///
+/// - containing_block_*:
+///   The base size used for resolving percentages and intrinsic sizing.
+///   Independent of layout results.
+///
+/// - available_*:
+///   The actual free space available for layout after considering
+///   constraints such as sibling layout, margins, and line breaking.
 pub(crate) struct LayoutContext {
     pub(crate) containing_block_width: Option<f32>,
     pub(crate) containing_block_height: Option<f32>,
