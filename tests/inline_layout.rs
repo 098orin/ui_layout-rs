@@ -456,7 +456,10 @@ fn mixed_inline_and_block_children() {
     inline_node1.set_fragments(vec![fragment1]);
 
     let block_node = LayoutNode::new(Style {
-        display: Display::Block,
+        display: Display {
+            outer: OuterDisplay::Block,
+            inner: InnerDisplay::Flow,
+        },
         size: SizeStyle {
             width: Length::Px(100.0),
             height: Length::Px(25.0),
