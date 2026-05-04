@@ -1,3 +1,6 @@
+/// Represents the outer display type of a box.
+///
+/// This corresponds to how the element participates in the parent formatting context.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum OuterDisplay {
     #[default]
@@ -6,6 +9,10 @@ pub enum OuterDisplay {
     None,
 }
 
+/// Represents the inner display type of a box.
+///
+/// This defines how children are laid out inside the element.
+/// In CSS terms, this is the "inner display type".
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum InnerDisplay {
     #[default]
@@ -13,6 +20,20 @@ pub enum InnerDisplay {
     Flex,
 }
 
+// for future implmentation:
+// https://drafts.csswg.org/css-display/#the-display-properties
+
+/// Full representation of the CSS `display` property,
+/// split into outer and inner display types.
+///
+/// This follows the modern CSS Display specification:
+/// https://www.w3.org/TR/css-display-3/
+///
+/// Examples:
+/// - `block`        => (Block, Flow)
+/// - `inline`       => (Inline, Flow)
+/// - `flex`         => (Block, Flex)
+/// - `inline-flex`  => (Inline, Flex)
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Display {
     pub outer: OuterDisplay,
@@ -20,7 +41,20 @@ pub struct Display {
 }
 
 impl Display {
-    /// Parse CSS display string (single keyword)
+    /// Parses a single-keyword CSS `display` value.
+    ///
+    /// This handles legacy single-keyword forms like:
+    /// - `block`
+    /// - `inline`
+    /// - `flex`
+    /// - `inline-flex`
+    /// - `none`
+    ///
+    /// Returns `None` if the keyword is not recognized.
+    ///
+    /// Note:
+    /// This function does NOT support multi-keyword syntax like
+    /// `display: inline flex`. Use `from_css` for that.
     pub fn from_css_name(name: &str) -> Option<Self> {
         match name {
             "block" => Some(Self {
@@ -47,7 +81,31 @@ impl Display {
         }
     }
 
-    /// Parse CSS display value (can be multiple tokens)
+    /// Parses a CSS `display` value that may contain multiple tokens.
+    ///
+    /// This supports the modern syntax like:
+    /// - `display: block flow`
+    /// - `display: inline flex`
+    ///
+    /// Returns a tuple:
+    /// `(outer, inner)`
+    ///
+    /// Each component is optional because:
+    /// - CSS allows partial specification
+    /// - Missing parts are resolved later via defaults or cascading rules
+    ///
+    /// Example:
+    /// ```
+    /// let (outer, inner) = Display::from_css("inline flex");
+    /// assert_eq!(outer, Some(OuterDisplay::Inline));
+    /// assert_eq!(inner, Some(InnerDisplay::Flex));
+    /// ```
+    ///
+    /// Unknown tokens are ignored.
+    ///
+    /// Note:
+    /// This function does not resolve final computed values.
+    /// It only performs syntactic parsing.
     pub fn from_css(input: &str) -> (Option<OuterDisplay>, Option<InnerDisplay>) {
         let mut outer = None;
         let mut inner = None;
@@ -66,6 +124,115 @@ impl Display {
         }
 
         (outer, inner)
+    }
+
+    /// Unified parser for CSS `display`.
+    ///
+    /// Internally:
+    /// 1. Try single-keyword parsing (`from_css_name`)
+    /// 2. Fallback to multi-token parsing (`from_css`)
+    /// 3. Resolve defaults
+    ///
+    /// Returns `None` if nothing could be parsed.
+    ///
+    ///
+    /// # Examples
+    ///
+    /// Basic single-keyword values:
+    ///
+    /// ```
+    /// # use ui_layout::*;
+    /// let d = Display::parse("block").unwrap();
+    /// assert_eq!(d.outer, OuterDisplay::Block);
+    /// assert_eq!(d.inner, InnerDisplay::Flow);
+    ///
+    /// let d = Display::parse("inline").unwrap();
+    /// assert_eq!(d.outer, OuterDisplay::Inline);
+    /// assert_eq!(d.inner, InnerDisplay::Flow);
+    /// ```
+    ///
+    /// Flex values:
+    ///
+    /// ```
+    /// # use ui_layout::*;
+    /// let d = Display::parse("flex").unwrap();
+    /// assert_eq!(d.outer, OuterDisplay::Block);
+    /// assert_eq!(d.inner, InnerDisplay::Flex);
+    ///
+    /// let d = Display::parse("inline-flex").unwrap();
+    /// assert_eq!(d.outer, OuterDisplay::Inline);
+    /// assert_eq!(d.inner, InnerDisplay::Flex);
+    /// ```
+    ///
+    /// Multi-keyword syntax:
+    ///
+    /// ```
+    /// # use ui_layout::*;
+    /// let d = Display::parse("inline flex").unwrap();
+    /// assert_eq!(d.outer, OuterDisplay::Inline);
+    /// assert_eq!(d.inner, InnerDisplay::Flex);
+    ///
+    /// let d = Display::parse("block flow").unwrap();
+    /// assert_eq!(d.outer, OuterDisplay::Block);
+    /// assert_eq!(d.inner, InnerDisplay::Flow);
+    /// ```
+    ///
+    /// Missing parts are filled with defaults:
+    ///
+    /// ```
+    /// # use ui_layout::*;
+    /// let d = Display::parse("flex").unwrap();
+    /// // outer defaults to Block
+    /// assert_eq!(d.outer, OuterDisplay::Block);
+    ///
+    /// let d = Display::parse("inline").unwrap();
+    /// // inner defaults to Flow
+    /// assert_eq!(d.inner, InnerDisplay::Flow);
+    /// ```
+    ///
+    /// Special case: `none`
+    ///
+    /// ```
+    /// # use ui_layout::*;
+    /// let d = Display::parse("none").unwrap();
+    /// assert_eq!(d.outer, OuterDisplay::None);
+    /// assert_eq!(d.inner, InnerDisplay::Flow);
+    /// ```
+    ///
+    /// Invalid input:
+    ///
+    /// ```
+    /// # use ui_layout::*;
+    /// assert!(Display::parse("unknown").is_none());
+    /// assert!(Display::parse("").is_none());
+    /// ```
+    pub fn parse(input: &str) -> Option<Self> {
+        // Fast path: single keyword (also handles inline-flex etc.)
+        if let Some(display) = Self::from_css_name(input.trim()) {
+            return Some(display);
+        }
+
+        // Fallback: multi-token parsing
+        let (outer, inner) = Self::from_css(input);
+
+        // Nothing recognized
+        if outer.is_none() && inner.is_none() {
+            return None;
+        }
+
+        // Special case: none
+        if matches!(outer, Some(OuterDisplay::None)) {
+            return Some(Self {
+                outer: OuterDisplay::None,
+                inner: InnerDisplay::Flow,
+            });
+        }
+
+        // Resolve defaults
+        let outer = outer.unwrap_or(OuterDisplay::Block);
+        let inner = inner.unwrap_or(InnerDisplay::Flow);
+
+        Some(Self { outer, inner })
     }
 }
 
@@ -263,6 +430,16 @@ pub struct Style {
 }
 
 // =======================
+
+use std::str::FromStr;
+
+impl FromStr for Display {
+    type Err = ();
+
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
+        Self::parse(input).ok_or(())
+    }
+}
 
 use std::ops::{Add, Sub};
 
