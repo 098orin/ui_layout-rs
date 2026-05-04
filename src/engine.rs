@@ -80,7 +80,7 @@ impl LayoutEngine {
         line_ctx: LineContext,
         intrinsic_pass: bool,
     ) -> LineContext {
-        match node.style.display.display.0 {
+        match node.style.display.outer {
             OuterDisplay::None => {
                 node.layout_boxes = LayoutBoxes::None;
                 line_ctx
@@ -96,7 +96,7 @@ impl LayoutEngine {
         line_ctx: LineContext,
         intrinsic_pass: bool,
     ) -> LineContext {
-        match node.style.display.1 {}
+        match node.style.display.inner {}
     }
 }
 
