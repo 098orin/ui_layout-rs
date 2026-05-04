@@ -82,7 +82,7 @@ impl LayoutEngine {
         line_ctx: LineContext,
         intrinsic_pass: bool,
     ) -> LineContext {
-        match style.display.outer {
+        match node.style.display.outer {
             OuterDisplay::None => {
                 node.layout_boxes = LayoutBoxes::None;
                 line_ctx
@@ -105,7 +105,7 @@ impl LayoutEngine {
             ctx,
         );
 
-        let width = width_opt.unwrap_or(ctx.available_width);
+        let width_opt = width_opt.or(ctx.available_width);
     }
 
     fn layout_inline_level(
@@ -128,7 +128,7 @@ impl LayoutEngine {
         line_ctx: LineContext,
         intrinsic_pass: bool,
     ) -> LineContext {
-        match style.display.inner {
+        match node.style.display.inner {
             InnerDisplay::Flow => {}
             InnerDisplay::Flex => {}
         }
