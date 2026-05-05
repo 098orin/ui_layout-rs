@@ -170,15 +170,64 @@ impl LayoutBoxes {
 //   Implementing IntoIterator for LayoutBoxes
 // =============================================
 
-impl<'a> IntoIterator for &'a LayoutBoxes {
-    type Item = &'a BoxModel;
-    type IntoIter = std::slice::Iter<'a, BoxModel>;
+impl IntoIterator for &LayoutBoxes {
+    type Item = BoxModel;
+    type IntoIter = std::vec::IntoIter<BoxModel>;
 
     fn into_iter(self) -> Self::IntoIter {
         match self {
-            LayoutBoxes::None => [].iter(),
-            LayoutBoxes::BlockBox(b) => std::slice::from_ref(b).iter(),
-            LayoutBoxes::Multiple(list) => list.iter(),
+            LayoutBoxes::None => Vec::new().into_iter(),
+
+            LayoutBoxes::BlockBox(b) => vec![b.clone()].into_iter(),
+
+            LayoutBoxes::InlineBox(inline) => {
+                let len = inline.line_spans.len();
+
+                let left_extra_padding = inline.box_model.padding_box.x;
+                let right_extra_padding = inline.box_model.border_box.width
+                    - (inline.box_model.padding_box.x + inline.box_model.padding_box.width);
+                let left_extra_content = inline.box_model.content_box.x;
+                let right_extra_content = inline.box_model.border_box.width
+                    - (inline.box_model.content_box.x + inline.box_model.content_box.width);
+
+                inline
+                    .line_spans
+                    .iter()
+                    .map(|span| {
+                        let i = span.line_index;
+                        let mut b = inline.box_model.clone();
+
+                        // shift
+                        let dx = span.start_pos.0 - b.content_box.x;
+                        let dy = span.start_pos.1 - b.content_box.y;
+                        b.shift(dx, dy);
+
+                        let new_border_width = span.end_x_pos - span.start_pos.0;
+
+                        // decide which sides to keep
+                        let keep_left = i == 0;
+                        let keep_right = i == len - 1;
+
+                        let left_padding = if keep_left { left_extra_padding } else { 0.0 };
+                        let right_padding = if keep_right { right_extra_padding } else { 0.0 };
+                        let left_content = if keep_left { left_extra_content } else { 0.0 };
+                        let right_content = if keep_right { right_extra_content } else { 0.0 };
+
+                        // set content width
+                        b.border_box.width = new_border_width;
+
+                        // rebuild inner boxes
+                        b.padding_box.x = left_padding;
+                        b.content_box.x = left_content;
+                        b.padding_box.width = new_border_width - left_padding - right_padding;
+                        b.content_box.width = new_border_width - left_content - right_content;
+                        b.children_box = b.content_box;
+
+                        b
+                    })
+                    .collect::<Vec<_>>()
+                    .into_iter()
+            }
         }
     }
 }
