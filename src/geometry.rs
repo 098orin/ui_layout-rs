@@ -50,9 +50,8 @@ pub struct LineSpan {
 ///
 /// All coordinates are relative to the parent.
 #[derive(Debug, Clone, Default)]
-pub enum LayoutBoxes {
+pub enum LayoutBox {
     #[default]
-    /// No layout boxes.
     None,
     BlockBox(BoxModel),
     InlineBox(InlineBox),
@@ -97,14 +96,14 @@ impl BoxModel {
     }
 }
 
-impl LayoutBoxes {
+impl LayoutBox {
     /// Returns the maximum width among all boxes.
     /// See [`BoxModel::width`].
     pub fn width(&self) -> f32 {
         match self {
-            LayoutBoxes::None => 0.0,
-            LayoutBoxes::BlockBox(b) => b.width(),
-            LayoutBoxes::InlineBox(l) => l.box_model.width(),
+            LayoutBox::None => 0.0,
+            LayoutBox::BlockBox(b) => b.width(),
+            LayoutBox::InlineBox(l) => l.box_model.width(),
         }
     }
 
@@ -112,9 +111,9 @@ impl LayoutBoxes {
     /// See [`BoxModel::height`].
     pub fn height(&self) -> f32 {
         match self {
-            LayoutBoxes::None => 0.0,
-            LayoutBoxes::BlockBox(b) => b.height(),
-            LayoutBoxes::InlineBox(l) => {
+            LayoutBox::None => 0.0,
+            LayoutBox::BlockBox(b) => b.height(),
+            LayoutBox::InlineBox(l) => {
                 // Last y pos - First y pos + line border height
                 if let (Some(first), Some(last)) = (l.line_spans.first(), l.line_spans.last()) {
                     last.start_pos.1 - first.start_pos.1 + l.box_model.height()
@@ -127,25 +126,25 @@ impl LayoutBoxes {
 
     pub fn is_empty(&self) -> bool {
         match self {
-            LayoutBoxes::None => true,
-            LayoutBoxes::BlockBox(_) | LayoutBoxes::InlineBox(_) => false,
+            LayoutBox::None => true,
+            LayoutBox::BlockBox(_) | LayoutBox::InlineBox(_) => false,
         }
     }
 
     pub fn len(&self) -> usize {
         match self {
-            LayoutBoxes::None => 0,
-            LayoutBoxes::BlockBox(_) => 1,
-            LayoutBoxes::InlineBox(v) => v.line_spans.len(),
+            LayoutBox::None => 0,
+            LayoutBox::BlockBox(_) => 1,
+            LayoutBox::InlineBox(v) => v.line_spans.len(),
         }
     }
 
     /// Returns an iterator over references to the contained [`BoxModel`]s.
     ///
     /// The iteration order is:
-    /// - empty for [`LayoutBoxes::None`]
-    /// - a single element for [`LayoutBoxes::Single`]
-    /// - the order of elements in the inner vector for [`LayoutBoxes::Multiple`]
+    /// - empty for [`LayoutBox::None`]
+    /// - a single element for [`LayoutBox::Single`]
+    /// - the order of elements in the inner vector for [`LayoutBox::Multiple`]
     ///
     /// This method provides a convenient way to iterate over all boxes
     /// regardless of the internal representation.
@@ -155,20 +154,20 @@ impl LayoutBoxes {
 }
 
 // =============================================
-//   Implementing IntoIterator for LayoutBoxes
+//   Implementing IntoIterator for LayoutBox
 // =============================================
 
-impl IntoIterator for &LayoutBoxes {
+impl IntoIterator for &LayoutBox {
     type Item = BoxModel;
     type IntoIter = std::vec::IntoIter<BoxModel>;
 
     fn into_iter(self) -> Self::IntoIter {
         match self {
-            LayoutBoxes::None => Vec::new().into_iter(),
+            LayoutBox::None => Vec::new().into_iter(),
 
-            LayoutBoxes::BlockBox(b) => vec![b.clone()].into_iter(),
+            LayoutBox::BlockBox(b) => vec![b.clone()].into_iter(),
 
-            LayoutBoxes::InlineBox(inline) => {
+            LayoutBox::InlineBox(inline) => {
                 let len = inline.line_spans.len();
 
                 let left_extra_padding = inline.box_model.padding_box.x;
@@ -220,17 +219,17 @@ impl IntoIterator for &LayoutBoxes {
     }
 }
 
-impl IntoIterator for LayoutBoxes {
+impl IntoIterator for LayoutBox {
     type Item = BoxModel;
     type IntoIter = std::vec::IntoIter<BoxModel>;
 
     fn into_iter(self) -> Self::IntoIter {
         match self {
-            LayoutBoxes::None => Vec::new().into_iter(),
+            LayoutBox::None => Vec::new().into_iter(),
 
-            LayoutBoxes::BlockBox(b) => vec![b].into_iter(),
+            LayoutBox::BlockBox(b) => vec![b].into_iter(),
 
-            LayoutBoxes::InlineBox(inline) => {
+            LayoutBox::InlineBox(inline) => {
                 let len = inline.line_spans.len();
 
                 let base = inline.box_model;

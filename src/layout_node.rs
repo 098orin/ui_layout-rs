@@ -1,7 +1,7 @@
-use crate::{FragmentNode, LayoutBoxes, LayoutChild, LineContext, Style};
+use crate::{FragmentNode, LayoutBox, LayoutChild, LineContext, Style};
 
 /// (key, (layout_boxes, LineContext))
-type LayoutCache = (u32, (LayoutBoxes, LineContext));
+type LayoutCache = (u32, (LayoutBox, LineContext));
 
 /// A node in the layout tree.
 #[non_exhaustive]
@@ -11,7 +11,7 @@ pub struct LayoutNode {
 
     pub children: Vec<LayoutChild>,
 
-    pub layout_boxes: LayoutBoxes,
+    pub layout_boxes: LayoutBox,
 
     // --- cache ---
     pub(crate) layout_boxes_cache: LayoutCache,
@@ -21,9 +21,9 @@ impl LayoutNode {
     pub fn new(style: Style) -> Self {
         Self {
             style,
-            layout_boxes: LayoutBoxes::default(),
+            layout_boxes: LayoutBox::default(),
             children: Vec::new(),
-            layout_boxes_cache: (0, (LayoutBoxes::default(), ((0.0, 0.0), 0.0))),
+            layout_boxes_cache: (0, (LayoutBox::default(), ((0.0, 0.0), 0.0))),
         }
     }
 
@@ -33,9 +33,9 @@ impl LayoutNode {
 
         Self {
             style,
-            layout_boxes: LayoutBoxes::default(),
+            layout_boxes: LayoutBox::default(),
             children,
-            layout_boxes_cache: (0, (LayoutBoxes::default(), ((0.0, 0.0), 0.0))),
+            layout_boxes_cache: (0, (LayoutBox::default(), ((0.0, 0.0), 0.0))),
         }
     }
 
@@ -48,9 +48,9 @@ impl LayoutNode {
 
         Self {
             style,
-            layout_boxes: LayoutBoxes::default(),
+            layout_boxes: LayoutBox::default(),
             children,
-            layout_boxes_cache: (0, (LayoutBoxes::default(), ((0.0, 0.0), 0.0))),
+            layout_boxes_cache: (0, (LayoutBox::default(), ((0.0, 0.0), 0.0))),
         }
     }
 }

@@ -1,4 +1,4 @@
-use crate::{BoxSizing, InnerDisplay, LayoutBoxes, LayoutNode, OuterDisplay, Spacing};
+use crate::{BoxSizing, InnerDisplay, LayoutBox, LayoutNode, OuterDisplay, Spacing};
 
 #[derive(Clone, Copy, Default)]
 struct Edge {
@@ -91,7 +91,7 @@ impl LayoutEngine {
     ) -> LineContext {
         match node.style.display.outer {
             OuterDisplay::None => {
-                node.layout_boxes = LayoutBoxes::None;
+                node.layout_boxes = LayoutBox::None;
                 line_ctx
             }
             OuterDisplay::Block => Self::layout_block_level(node, ctx, line_ctx, intrinsic_pass),
