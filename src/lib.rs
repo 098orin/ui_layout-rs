@@ -7,13 +7,13 @@ mod cache;
 mod engine;
 mod fragment;
 mod geometry;
-mod layout_children;
+mod layout_child;
 mod layout_node;
 mod style;
 
 pub use engine::*;
 pub use fragment::*;
 pub use geometry::*;
-pub use layout_children::*;
+pub use layout_child::*;
 pub use layout_node::*;
 pub use style::*;
