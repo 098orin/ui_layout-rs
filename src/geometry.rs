@@ -228,7 +228,7 @@ impl IntoIterator for LayoutBoxes {
         match self {
             LayoutBoxes::None => Vec::new().into_iter(),
 
-            LayoutBoxes::BlockBox(b) => vec![b.clone()].into_iter(),
+            LayoutBoxes::BlockBox(b) => vec![b].into_iter(),
 
             LayoutBoxes::InlineBox(inline) => {
                 let len = inline.line_spans.len();
