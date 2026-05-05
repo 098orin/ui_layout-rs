@@ -149,19 +149,7 @@ impl LayoutBoxes {
     ///
     /// This method provides a convenient way to iterate over all boxes
     /// regardless of the internal representation.
-    pub fn iter(&self) -> impl Iterator<Item = &BoxModel> {
-        self.into_iter()
-    }
-
-    /// Returns an iterator over mutable references to the contained [`BoxModel`]s.
-    ///
-    /// The iteration order is:
-    /// - empty for [`LayoutBoxes::None`]
-    /// - a single element for [`LayoutBoxes::Single`]
-    /// - the order of elements in the inner vector for [`LayoutBoxes::Multiple`]
-    ///
-    /// This allows in-place modification of all boxes in a uniform way.
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut BoxModel> {
+    pub fn iter(&self) -> impl Iterator<Item = BoxModel> {
         self.into_iter()
     }
 }
@@ -232,19 +220,6 @@ impl IntoIterator for &LayoutBoxes {
     }
 }
 
-impl<'a> IntoIterator for &'a mut LayoutBoxes {
-    type Item = &'a mut BoxModel;
-    type IntoIter = std::slice::IterMut<'a, BoxModel>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        match self {
-            LayoutBoxes::None => [].iter_mut(),
-            LayoutBoxes::BlockBox(b) => std::slice::from_mut(b).iter_mut(),
-            LayoutBoxes::Multiple(list) => list.iter_mut(),
-        }
-    }
-}
-
 impl IntoIterator for LayoutBoxes {
     type Item = BoxModel;
     type IntoIter = std::vec::IntoIter<BoxModel>;
@@ -252,8 +227,59 @@ impl IntoIterator for LayoutBoxes {
     fn into_iter(self) -> Self::IntoIter {
         match self {
             LayoutBoxes::None => Vec::new().into_iter(),
-            LayoutBoxes::BlockBox(b) => vec![b].into_iter(),
-            LayoutBoxes::Multiple(list) => list.into_iter(),
+
+            LayoutBoxes::BlockBox(b) => vec![b.clone()].into_iter(),
+
+            LayoutBoxes::InlineBox(inline) => {
+                let len = inline.line_spans.len();
+
+                let base = inline.box_model;
+                let spans = inline.line_spans;
+
+                let left_extra_padding = base.padding_box.x;
+                let right_extra_padding =
+                    base.border_box.width - (base.padding_box.x + base.padding_box.width);
+                let left_extra_content = base.content_box.x;
+                let right_extra_content =
+                    base.border_box.width - (base.content_box.x + base.content_box.width);
+
+                spans
+                    .iter()
+                    .map(|span| {
+                        let i = span.line_index;
+                        let mut b = base.clone();
+
+                        // shift
+                        let dx = span.start_pos.0 - b.content_box.x;
+                        let dy = span.start_pos.1 - b.content_box.y;
+                        b.shift(dx, dy);
+
+                        let new_border_width = span.end_x_pos - span.start_pos.0;
+
+                        // decide which sides to keep
+                        let keep_left = i == 0;
+                        let keep_right = i == len - 1;
+
+                        let left_padding = if keep_left { left_extra_padding } else { 0.0 };
+                        let right_padding = if keep_right { right_extra_padding } else { 0.0 };
+                        let left_content = if keep_left { left_extra_content } else { 0.0 };
+                        let right_content = if keep_right { right_extra_content } else { 0.0 };
+
+                        // set content width
+                        b.border_box.width = new_border_width;
+
+                        // rebuild inner boxes
+                        b.padding_box.x = left_padding;
+                        b.content_box.x = left_content;
+                        b.padding_box.width = new_border_width - left_padding - right_padding;
+                        b.content_box.width = new_border_width - left_content - right_content;
+                        b.children_box = b.content_box;
+
+                        b
+                    })
+                    .collect::<Vec<_>>()
+                    .into_iter()
+            }
         }
     }
 }
