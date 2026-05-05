@@ -66,9 +66,9 @@ impl LayoutEngine {
         intrinsic_pass: bool,
     ) -> LineContext {
         if intrinsic_pass {
-            let (key, (layout_boxes, line_ctx)) = &node.layout_boxes_cache;
+            let (key, (layout_box, line_ctx)) = &node.layout_box_cache;
             if *key == crate::cache::make_layout_key(ctx) {
-                node.layout_boxes = layout_boxes.clone();
+                node.layout_box = layout_box.clone();
                 return *line_ctx;
             }
         }
@@ -77,7 +77,7 @@ impl LayoutEngine {
 
         if intrinsic_pass {
             let key = crate::cache::make_layout_key(ctx);
-            node.layout_boxes_cache = (key, (node.layout_boxes.clone(), out));
+            node.layout_box_cache = (key, (node.layout_box.clone(), out));
         }
 
         out
@@ -91,7 +91,7 @@ impl LayoutEngine {
     ) -> LineContext {
         match node.style.display.outer {
             OuterDisplay::None => {
-                node.layout_boxes = LayoutBox::None;
+                node.layout_box = LayoutBox::None;
                 line_ctx
             }
             OuterDisplay::Block => Self::layout_block_level(node, ctx, line_ctx, intrinsic_pass),
