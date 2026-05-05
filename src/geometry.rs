@@ -24,17 +24,25 @@ pub struct BoxModel {
     pub children_box: Rect,
 }
 
+/// An inline box that may be split across multiple lines.
+///
+/// A single logical box is represented together with its per-line [`LineSpan`].
 #[derive(Debug, Clone)]
 pub struct InlineBox {
+    /// The original (unsplit) box model.
     pub box_model: BoxModel,
+    /// Span infomation of this box on each line.
     pub line_spans: Vec<LineSpan>,
 }
 
+/// A span of an inline box on a single line.
 #[derive(Debug, Clone)]
 pub struct LineSpan {
+    /// Start position (x, y) of this span.
     pub start_pos: (f32, f32),
+    /// End x position (width = end_x_pos - start_pos.0).
     pub end_x_pos: f32,
-    /// 0-indexed line index.
+    /// 0-based line index.
     pub line_index: usize,
 }
 
