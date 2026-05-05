@@ -153,13 +153,21 @@ impl LayoutEngine {
         intrinsic_pass: bool,
     ) -> LineContext {
         match node.style.display.inner {
-            InnerDisplay::Flow => {
-                todo!()
-            }
+            InnerDisplay::Flow => Self::layout_flow(node, ctx, line_ctx, size_opt, intrinsic_pass),
             InnerDisplay::Flex => {
                 todo!()
             }
         }
+    }
+
+    fn layout_flow(
+        node: &mut LayoutNode,
+        ctx: &LayoutContext,
+        line_ctx: LineContext,
+        size_opt: (Option<f32>, Option<f32>),
+        intrinsic_pass: bool,
+    ) -> LineContext {
+        todo!()
     }
 }
 
