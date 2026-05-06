@@ -386,20 +386,20 @@ pub enum BoxSizing {
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Spacing {
-    pub margin_top: Length,
-    pub margin_bottom: Length,
-    pub margin_left: Length,
-    pub margin_right: Length,
+    pub margin_top: LengthOrAuto,
+    pub margin_bottom: LengthOrAuto,
+    pub margin_left: LengthOrAuto,
+    pub margin_right: LengthOrAuto,
 
-    pub border_top: LengthOrAuto,
-    pub border_bottom: LengthOrAuto,
-    pub border_left: LengthOrAuto,
-    pub border_right: LengthOrAuto,
+    pub border_top: Length,
+    pub border_bottom: Length,
+    pub border_left: Length,
+    pub border_right: Length,
 
-    pub padding_top: LengthOrAuto,
-    pub padding_bottom: LengthOrAuto,
-    pub padding_left: LengthOrAuto,
-    pub padding_right: LengthOrAuto,
+    pub padding_top: Length,
+    pub padding_bottom: Length,
+    pub padding_left: Length,
+    pub padding_right: Length,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
