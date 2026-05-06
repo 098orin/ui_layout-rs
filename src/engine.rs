@@ -1,4 +1,6 @@
-use crate::{BoxSizing, InnerDisplay, LayoutBox, LayoutNode, OuterDisplay, Spacing};
+use crate::{
+    BoxSizing, FragmentNode, InnerDisplay, LayoutBox, LayoutNode, OuterDisplay, Rect, Spacing,
+};
 
 #[derive(Clone, Copy, Default)]
 struct Edge {
@@ -38,8 +40,12 @@ enum Axis {
 
 pub struct LayoutEngine;
 
-/// ((end_x, end_y), line_height)
-pub(crate) type LineContext = ((f32, f32), f32);
+/// (((end_x, end_y), line_height), (margin_end))
+///
+/// Every field will be zero for non-inline contexts.
+pub(crate) type LineContext = (((f32, f32), f32), (f32));
+
+pub(crate) const EMPTY_LINE_CONTEXT: LineContext = (((0.0, 0.0), 0.0), (0.0));
 
 impl LayoutEngine {
     /// Main layout entry point.
@@ -54,7 +60,7 @@ impl LayoutEngine {
             viewport_height: height,
         };
 
-        Self::layout_node(root, &ctx, ((0.0, 0.0), 0.0), false);
+        Self::layout_node(root, &ctx, EMPTY_LINE_CONTEXT, false);
     }
 
     /// Internal method for layout a node.
@@ -169,6 +175,8 @@ impl LayoutEngine {
     ) -> LineContext {
         todo!()
     }
+
+    fn flow_fragments(fragments: &mut Vec<FragmentNode>, line_ctx: LineContext, outline: Rect) {}
 }
 
 // ==========================================

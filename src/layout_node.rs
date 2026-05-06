@@ -1,4 +1,4 @@
-use crate::{FragmentNode, LayoutBox, LayoutChild, LineContext, Style};
+use crate::{EMPTY_LINE_CONTEXT, FragmentNode, LayoutBox, LayoutChild, LineContext, Style};
 
 /// (key, (layout_box, LineContext))
 type LayoutCache = (u32, (LayoutBox, LineContext));
@@ -23,7 +23,7 @@ impl LayoutNode {
             style,
             layout_box: LayoutBox::default(),
             children: Vec::new(),
-            layout_box_cache: (0, (LayoutBox::default(), ((0.0, 0.0), 0.0))),
+            layout_box_cache: (0, (LayoutBox::default(), EMPTY_LINE_CONTEXT)),
         }
     }
 
@@ -35,7 +35,7 @@ impl LayoutNode {
             style,
             layout_box: LayoutBox::default(),
             children,
-            layout_box_cache: (0, (LayoutBox::default(), ((0.0, 0.0), 0.0))),
+            layout_box_cache: (0, (LayoutBox::default(), EMPTY_LINE_CONTEXT)),
         }
     }
 
@@ -50,7 +50,7 @@ impl LayoutNode {
             style,
             layout_box: LayoutBox::default(),
             children,
-            layout_box_cache: (0, (LayoutBox::default(), ((0.0, 0.0), 0.0))),
+            layout_box_cache: (0, (LayoutBox::default(), EMPTY_LINE_CONTEXT)),
         }
     }
 }
