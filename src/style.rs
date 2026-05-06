@@ -249,7 +249,6 @@ pub enum Length {
     Percent(f32),
     Vw(f32),
     Vh(f32),
-    Auto,
     // calc
     Add(Box<Length>, Box<Length>),
     Sub(Box<Length>, Box<Length>),
@@ -274,8 +273,7 @@ impl Default for Length {
 impl Length {
     /// Resolves a length value to pixels.
     ///
-    /// If the containing block is `auto`, percentages are treated as `auto` for layout purposes.
-    /// This version uses a single viewport value (for backward compatibility with axis-based layout).
+    /// Unresolvable values will be [`Option::None`].
     pub fn resolve_with(
         &self,
         percentage_base: Option<f32>,
@@ -283,7 +281,6 @@ impl Length {
         viewport_height: f32,
     ) -> Option<f32> {
         match self {
-            Length::Auto => None,
             Length::Px(v) => Some(*v),
             Length::Percent(p) => percentage_base.map(|cb| cb * *p / 100.0),
             Length::Vw(v) => Some(viewport_width * *v / 100.0),
@@ -325,11 +322,37 @@ impl Length {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Default)]
+pub enum LengthOrAuto {
+    Length(Length),
+    #[default]
+    Auto,
+}
+
+impl LengthOrAuto {
+    /// Resolves a length value to pixels.
+    ///
+    /// Unresolvable values will be [`Option::None`].
+    pub fn resolve_with(
+        &self,
+        percentage_base: Option<f32>,
+        viewport_width: f32,
+        viewport_height: f32,
+    ) -> Option<f32> {
+        match self {
+            LengthOrAuto::Length(l) => {
+                l.resolve_with(percentage_base, viewport_width, viewport_height)
+            }
+            LengthOrAuto::Auto => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct ItemStyle {
     pub flex_grow: f32,
     pub flex_shrink: f32,
-    pub flex_basis: Length,
+    pub flex_basis: LengthOrAuto,
     pub align_self: Option<AlignItems>,
 }
 
@@ -338,33 +361,20 @@ impl Default for ItemStyle {
         ItemStyle {
             flex_grow: 0.0,
             flex_shrink: 1.0,
-            flex_basis: Length::Auto,
+            flex_basis: LengthOrAuto::Auto,
             align_self: None,
         }
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct SizeStyle {
-    pub width: Length,
-    pub height: Length,
-    pub min_width: Length,
-    pub max_width: Length,
-    pub min_height: Length,
-    pub max_height: Length,
-}
-
-impl Default for SizeStyle {
-    fn default() -> Self {
-        SizeStyle {
-            width: Length::Auto,
-            height: Length::Auto,
-            min_width: Length::Auto,
-            max_width: Length::Auto,
-            min_height: Length::Auto,
-            max_height: Length::Auto,
-        }
-    }
+    pub width: LengthOrAuto,
+    pub height: LengthOrAuto,
+    pub min_width: LengthOrAuto,
+    pub max_width: LengthOrAuto,
+    pub min_height: LengthOrAuto,
+    pub max_height: LengthOrAuto,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -381,15 +391,15 @@ pub struct Spacing {
     pub margin_left: Length,
     pub margin_right: Length,
 
-    pub border_top: Length,
-    pub border_bottom: Length,
-    pub border_left: Length,
-    pub border_right: Length,
+    pub border_top: LengthOrAuto,
+    pub border_bottom: LengthOrAuto,
+    pub border_left: LengthOrAuto,
+    pub border_right: LengthOrAuto,
 
-    pub padding_top: Length,
-    pub padding_bottom: Length,
-    pub padding_left: Length,
-    pub padding_right: Length,
+    pub padding_top: LengthOrAuto,
+    pub padding_bottom: LengthOrAuto,
+    pub padding_left: LengthOrAuto,
+    pub padding_right: LengthOrAuto,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -425,8 +435,8 @@ pub struct Style {
     pub align_items: AlignItems,
 
     pub flex_direction: FlexDirection,
-    pub column_gap: Length,
-    pub row_gap: Length,
+    pub column_gap: LengthOrAuto,
+    pub row_gap: LengthOrAuto,
 }
 
 // =======================
