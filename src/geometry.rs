@@ -46,6 +46,14 @@ pub struct LineSpan {
     pub line_index: usize,
 }
 
+impl LineSpan {
+    fn shift(&mut self, dx: f32, dy: f32) {
+        self.start_pos.0 += dx;
+        self.start_pos.1 += dy;
+        self.end_x_pos += dx;
+    }
+}
+
 /// Types of BoxModel.
 ///
 /// All coordinates are relative to the parent.
@@ -97,6 +105,20 @@ impl BoxModel {
 }
 
 impl LayoutBox {
+    pub(crate) fn shift(&mut self, dx: f32, dy: f32) {
+        match self {
+            LayoutBox::None => {}
+            LayoutBox::BlockBox(b) => b.shift(dx, dy),
+            LayoutBox::InlineBox(inline) => {
+                inline.box_model.shift(dx, dy);
+                inline
+                    .line_spans
+                    .iter_mut()
+                    .map(|line_span| line_span.shift(dx, dy));
+            }
+        }
+    }
+
     /// Returns the maximum width among all boxes.
     /// See [`BoxModel::width`].
     pub fn width(&self) -> f32 {
