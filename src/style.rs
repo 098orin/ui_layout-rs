@@ -431,6 +431,8 @@ pub struct Style {
     pub box_sizing: BoxSizing,
     pub spacing: Spacing,
 
+    pub line_height: Length,
+
     pub justify_content: JustifyContent,
     pub align_items: AlignItems,
 
