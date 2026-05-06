@@ -6,7 +6,7 @@
 #[derive(Debug, Clone, Copy)]
 pub struct FragmentNode {
     pub node: ItemFragment,
-    pub placements: Placement,
+    pub placement: Placement,
 }
 
 /// An item fragment for inline layout.
