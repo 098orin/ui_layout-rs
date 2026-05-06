@@ -105,6 +105,23 @@ impl BoxModel {
 }
 
 impl LayoutBox {
+    pub(crate) fn shift_root(&mut self, dx: f32, dy: f32) {
+        match self {
+            LayoutBox::None => {}
+            LayoutBox::BlockBox(b) => b.shift(dx, dy),
+            LayoutBox::InlineBox(inline) => {
+                inline.box_model.shift(dx, dy);
+                inline
+                    .line_spans
+                    .first_mut()
+                    .map(|line_span| {
+                        line_span.shift(dx, dy);
+                    })
+                    .unwrap();
+            }
+        }
+    }
+
     pub(crate) fn shift(&mut self, dx: f32, dy: f32) {
         match self {
             LayoutBox::None => {}
