@@ -10,6 +10,14 @@ struct Edge {
     bottom: f32,
 }
 
+#[derive(Clone, Copy, Default)]
+pub struct EdgeOption {
+    pub left: Option<f32>,
+    pub top: Option<f32>,
+    pub right: Option<f32>,
+    pub bottom: Option<f32>,
+}
+
 /// The difference between containing_block_* and available_* is:
 ///
 /// - containing_block_*:
@@ -330,27 +338,23 @@ fn resolve_border(spacing: &Spacing, ctx: &LayoutContext) -> Edge {
     }
 }
 
-fn resolve_margins(spacing: &Spacing, ctx: &LayoutContext) -> Edge {
+fn resolve_margins(spacing: &Spacing, ctx: &LayoutContext) -> EdgeOption {
     let containing_width = ctx.containing_block_width.unwrap_or(ctx.viewport_width);
     let vw = ctx.viewport_width;
     let vh = ctx.viewport_height;
 
-    Edge {
+    EdgeOption {
         left: spacing
             .margin_left
-            .resolve_with(ctx.containing_block_width, vw, vh)
-            .unwrap_or(0.0),
+            .resolve_with(ctx.containing_block_width, vw, vh),
         top: spacing
             .margin_top
-            .resolve_with(Some(containing_width), vw, vh)
-            .unwrap_or(0.0),
+            .resolve_with(Some(containing_width), vw, vh),
         right: spacing
             .margin_right
-            .resolve_with(ctx.containing_block_width, vw, vh)
-            .unwrap_or(0.0),
+            .resolve_with(ctx.containing_block_width, vw, vh),
         bottom: spacing
             .margin_bottom
-            .resolve_with(Some(containing_width), vw, vh)
-            .unwrap_or(0.0),
+            .resolve_with(Some(containing_width), vw, vh),
     }
 }
