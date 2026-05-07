@@ -38,19 +38,23 @@ pub struct InlineBox {
 /// A span of an inline box on a single line.
 #[derive(Debug, Clone)]
 pub struct LineSpan {
-    /// Start position (x, y) of this span.
-    pub start_pos: (f32, f32),
-    /// End x position (width = end_x_pos - start_pos.0).
-    pub end_x_pos: f32,
+    /// X-axis range inside the flat inline box.
+    /// This range is unaffected by line positioning.
+    pub x_range: std::ops::Range<f32>,
+    /// Line position.
+    pub line_pos: (f32, f32),
     /// 0-based line index.
     pub line_index: usize,
 }
 
 impl LineSpan {
     fn shift(&mut self, dx: f32, dy: f32) {
-        self.start_pos.0 += dx;
-        self.start_pos.1 += dy;
-        self.end_x_pos += dx;
+        self.line_pos.0 += dx;
+        self.line_pos.1 += dy;
+    }
+
+    pub fn width(&self) -> f32 {
+        self.x_range.end - self.x_range.start
     }
 }
 
@@ -155,7 +159,7 @@ impl LayoutBox {
             LayoutBox::InlineBox(l) => {
                 // Last y pos - First y pos + line border height
                 if let (Some(first), Some(last)) = (l.line_spans.first(), l.line_spans.last()) {
-                    last.start_pos.1 - first.start_pos.1 + l.box_model.height()
+                    last.line_pos.1 - first.line_pos.1 + l.box_model.height()
                 } else {
                     0.0
                 }
@@ -224,11 +228,11 @@ impl IntoIterator for &LayoutBox {
                         let mut b = inline.box_model.clone();
 
                         // shift
-                        let dx = span.start_pos.0 - b.content_box.x;
-                        let dy = span.start_pos.1 - b.content_box.y;
+                        let dx = span.line_pos.0 - b.content_box.x;
+                        let dy = span.line_pos.1 - b.content_box.y;
                         b.shift(dx, dy);
 
-                        let new_border_width = span.end_x_pos - span.start_pos.0;
+                        let new_border_width = span.width();
 
                         // decide which sides to keep
                         let keep_left = i == 0;
@@ -288,11 +292,11 @@ impl IntoIterator for LayoutBox {
                         let mut b = base.clone();
 
                         // shift
-                        let dx = span.start_pos.0 - b.content_box.x;
-                        let dy = span.start_pos.1 - b.content_box.y;
+                        let dx = span.line_pos.0 - b.content_box.x;
+                        let dy = span.line_pos.1 - b.content_box.y;
                         b.shift(dx, dy);
 
-                        let new_border_width = span.end_x_pos - span.start_pos.0;
+                        let new_border_width = span.width();
 
                         // decide which sides to keep
                         let keep_left = i == 0;
