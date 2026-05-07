@@ -48,6 +48,7 @@ pub struct LineSpan {
 }
 
 impl LineSpan {
+    /// Shift [`Self::line_pos`].
     fn shift(&mut self, dx: f32, dy: f32) {
         self.line_pos.0 += dx;
         self.line_pos.1 += dy;
@@ -109,33 +110,12 @@ impl BoxModel {
 }
 
 impl LayoutBox {
-    pub(crate) fn shift_root(&mut self, dx: f32, dy: f32) {
-        match self {
-            LayoutBox::None => {}
-            LayoutBox::BlockBox(b) => b.shift(dx, dy),
-            LayoutBox::InlineBox(inline) => {
-                inline.box_model.shift(dx, dy);
-                inline
-                    .line_spans
-                    .first_mut()
-                    .map(|line_span| {
-                        line_span.shift(dx, dy);
-                    })
-                    .unwrap();
-            }
-        }
-    }
-
     pub(crate) fn shift(&mut self, dx: f32, dy: f32) {
         match self {
             LayoutBox::None => {}
             LayoutBox::BlockBox(b) => b.shift(dx, dy),
             LayoutBox::InlineBox(inline) => {
                 inline.box_model.shift(dx, dy);
-                inline
-                    .line_spans
-                    .iter_mut()
-                    .map(|line_span| line_span.shift(dx, dy));
             }
         }
     }
