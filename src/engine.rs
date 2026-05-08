@@ -358,3 +358,60 @@ fn resolve_margins(spacing: &Spacing, ctx: &LayoutContext) -> EdgeOption {
             .resolve_with(Some(containing_width), vw, vh),
     }
 }
+
+/// Creates a box model with specified dimensions and spacing.
+fn create_box_model(
+    content_width: f32,
+    content_height: f32,
+    children_width: f32,
+    children_height: f32,
+    padding_edge: Edge,
+    border_edge: Edge,
+) -> BoxModel {
+    let Edge {
+        left: pl,
+        top: pt,
+        right: pr,
+        bottom: pb,
+    } = padding_edge;
+    let Edge {
+        left: bl,
+        top: bt,
+        right: br,
+        bottom: bb,
+    } = border_edge;
+
+    let border_box = Rect {
+        x: 0.0,
+        y: 0.0,
+        width: content_width + pl + pr + bl + br,
+        height: content_height + pt + pb + bt + bb,
+    };
+
+    let padding_box = Rect {
+        x: bl,
+        y: bt,
+        width: content_width + pl + pr,
+        height: content_height + pt + pb,
+    };
+
+    let content_box = Rect {
+        x: bl + pl,
+        y: bt + pt,
+        width: content_width,
+        height: content_height,
+    };
+
+    let children_box = Rect {
+        width: children_width,
+        height: children_height,
+        ..content_box
+    };
+
+    BoxModel {
+        content_box,
+        padding_box,
+        border_box,
+        children_box,
+    }
+}
