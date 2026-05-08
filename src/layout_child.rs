@@ -11,7 +11,7 @@ use crate::{FragmentNode, LayoutNode};
 /// and already-fragmented inline content uniformly while preserving their order.
 #[derive(Debug)]
 pub enum LayoutChild {
-    Node(LayoutNode),
+    Node(Box<LayoutNode>),
     Fragment(FragmentNode),
 }
 

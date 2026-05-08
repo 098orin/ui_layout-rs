@@ -29,7 +29,10 @@ impl LayoutNode {
 
     /// A function to create a [`LayoutNode`] whose children are [`LayoutNode`]
     pub fn with_node_children(style: Style, node_children: Vec<LayoutNode>) -> Self {
-        let children = node_children.into_iter().map(LayoutChild::Node).collect();
+        let children = node_children
+            .into_iter()
+            .map(|node| LayoutChild::Node(Box::new(node)))
+            .collect();
 
         Self {
             style,
