@@ -1,5 +1,6 @@
 use crate::{
-    BoxSizing, FragmentNode, InnerDisplay, LayoutBox, LayoutNode, OuterDisplay, Rect, Spacing,
+    BoxModel, BoxSizing, FragmentNode, InlineBox, InnerDisplay, ItemFragment, LayoutBox,
+    LayoutChild, LayoutNode, LineSpan, OuterDisplay, Placement, Rect, Spacing,
 };
 
 #[derive(Clone, Copy, Default)]
@@ -31,7 +32,6 @@ pub(crate) struct LayoutContext {
     pub(crate) containing_block_width: Option<f32>,
     pub(crate) containing_block_height: Option<f32>,
     pub(crate) available_width: Option<f32>,
-    pub(crate) available_height: Option<f32>,
     pub(crate) viewport_width: f32,
     pub(crate) viewport_height: f32,
 }
@@ -48,14 +48,15 @@ enum Axis {
 
 pub struct LayoutEngine;
 
-/// (((end_x, end_y), line_height), (margin_end))
+/// ((end_x, end_y), (current_x, line_start_x), line_index)
 ///
-/// Every field will be zero for non-inline contexts.
-pub(crate) type LineContext = (((f32, f32), f32), (f32));
+/// (current_x, line_start_x) will be zero for non-inline contexts.
+pub(crate) type LineContext = ((f32, f32), (f32, f32), usize);
 
-pub(crate) const EMPTY_LINE_CONTEXT: LineContext = (((0.0, 0.0), 0.0), (0.0));
+pub(crate) const EMPTY_LINE_CONTEXT: LineContext = ((0.0, 0.0), (0.0, 0.0), 0);
 
 impl LayoutEngine {
+    // TODO: implemant parent_margin_end
     /// Main layout entry point.
     /// Initiates layout computation from the root node with specified viewport dimensions.
     pub fn layout(root: &mut LayoutNode, width: f32, height: f32) {
@@ -63,16 +64,16 @@ impl LayoutEngine {
             containing_block_width: Some(width),
             containing_block_height: Some(height),
             available_width: Some(width),
-            available_height: Some(height),
             viewport_width: width,
             viewport_height: height,
         };
 
-        Self::layout_node(root, &ctx, EMPTY_LINE_CONTEXT, false);
+        let _ = Self::layout_node(root, &ctx, EMPTY_LINE_CONTEXT, false);
     }
 
     /// Internal method for layout a node.
     /// Layouts a single node and its descendants.
+    #[must_use]
     fn layout_node(
         node: &mut LayoutNode,
         ctx: &LayoutContext,
@@ -87,7 +88,7 @@ impl LayoutEngine {
             }
         }
 
-        let out = Self::layout_by_display(node, &ctx, line_ctx, intrinsic_pass);
+        let out = Self::layout_by_display(node, ctx, line_ctx, intrinsic_pass);
 
         if intrinsic_pass {
             let key = crate::cache::make_layout_key(ctx);
@@ -119,20 +120,23 @@ impl LayoutEngine {
         line_ctx: LineContext,
         intrinsic_pass: bool,
     ) -> LineContext {
-        let ((width_opt, height_opt), _, _) = resolve_base_content_size_and_spacing(
-            &node.style.size,
-            &node.style.spacing,
-            &node.style.box_sizing,
-            ctx,
-        );
+        let ((content_width_opt, content_height_opt), border, padding) =
+            resolve_base_content_size_and_spacing(
+                &node.style.size,
+                &node.style.spacing,
+                &node.style.box_sizing,
+                ctx,
+            );
 
-        let width_opt = width_opt.or(ctx.available_width);
+        let content_width_opt = content_width_opt.or(ctx
+            .available_width
+            .map(|v| v - border.left - border.right - padding.left - padding.right));
 
         Self::layout_by_inner_display(
             node,
-            &ctx,
+            ctx,
             line_ctx,
-            (width_opt, height_opt),
+            (content_width_opt, content_height_opt),
             intrinsic_pass,
         )
     }
@@ -143,7 +147,7 @@ impl LayoutEngine {
         line_ctx: LineContext,
         intrinsic_pass: bool,
     ) -> LineContext {
-        let ((width_opt, height_opt), _, _) = resolve_base_content_size_and_spacing(
+        let ((content_width_opt, content_height_opt), _, _) = resolve_base_content_size_and_spacing(
             &node.style.size,
             &node.style.spacing,
             &node.style.box_sizing,
@@ -152,9 +156,9 @@ impl LayoutEngine {
 
         Self::layout_by_inner_display(
             node,
-            &ctx,
+            ctx,
             line_ctx,
-            (width_opt, height_opt),
+            (content_width_opt, content_height_opt),
             intrinsic_pass,
         )
     }
@@ -178,26 +182,239 @@ impl LayoutEngine {
         node: &mut LayoutNode,
         ctx: &LayoutContext,
         line_ctx: LineContext,
-        size_opt: (Option<f32>, Option<f32>),
+        content_size_opt: (Option<f32>, Option<f32>),
         intrinsic_pass: bool,
     ) -> LineContext {
-        todo!()
+        let ((end_x, end_y), (mut current_x, mut line_start_x), mut line_index) = line_ctx;
+        let (mut cursor_x, mut cursor_y) = (end_x, end_y);
+
+        let (content_width_opt, content_height_opt) = content_size_opt;
+
+        let border = resolve_border(&node.style.spacing, ctx);
+        let padding = resolve_padding(&node.style.spacing, ctx);
+
+        let base_ctx_for_child = LayoutContext {
+            containing_block_width: content_width_opt,
+            containing_block_height: content_height_opt,
+            available_width: content_width_opt,
+            ..*ctx
+        };
+
+        let mut line_span_buf = Vec::new();
+        let line_height = node
+            .style
+            .line_height
+            .resolve_with(None, ctx.viewport_width, ctx.viewport_height)
+            .unwrap_or_default();
+        let mut fragment_node_buffer = Vec::with_capacity(node.children.len());
+
+        for child in &mut node.children {
+            match child {
+                LayoutChild::Fragment(fragment_node) => {
+                    fragment_node_buffer.push(fragment_node);
+                }
+                LayoutChild::Node(child_node) => {
+                    if !fragment_node_buffer.is_empty() {
+                        let line_ctx_for_child =
+                            ((cursor_x, cursor_y), (current_x, line_start_x), line_index);
+                        let (line_spans, updated_line_ctx) = Self::flow_fragments(
+                            &mut std::mem::take(&mut fragment_node_buffer),
+                            line_ctx_for_child,
+                            line_height,
+                            content_width_opt.unwrap_or(ctx.viewport_width),
+                        );
+                        ((cursor_x, cursor_y), (current_x, line_start_x), line_index) =
+                            updated_line_ctx;
+                        line_span_buf.extend_from_slice(&line_spans);
+                    }
+
+                    let child_margin = resolve_margins(&child_node.style.spacing, ctx);
+
+                    let ctx_for_child = LayoutContext {
+                        available_width: content_width_opt.map(|v| {
+                            v - child_margin.left.unwrap_or(0.0) - child_margin.right.unwrap_or(0.0)
+                        }),
+                        ..base_ctx_for_child
+                    };
+
+                    // Layout Node
+                    let line_ctx_for_child =
+                        ((cursor_x, cursor_y), (current_x, line_start_x), line_index);
+                    ((cursor_x, cursor_y), (current_x, line_start_x), line_index) =
+                        Self::layout_node(
+                            child_node,
+                            &ctx_for_child,
+                            line_ctx_for_child,
+                            intrinsic_pass,
+                        );
+
+                    // Process margin shift (judge formatting context).
+                    {
+                        let EdgeOption {
+                            left: ml_opt,
+                            top,
+                            right: mr_opt,
+                            ..
+                        } = child_margin;
+
+                        let (ml, _mr) = if child_node.style.display.outer == OuterDisplay::Block {
+                            let child_width = child_node.layout_box.width();
+                            let (ml, mr) = match (ml_opt, mr_opt, content_width_opt) {
+                                (None, None, Some(cw)) => {
+                                    let auto_margin = (cw - child_width) / 2.0;
+                                    (auto_margin, auto_margin)
+                                }
+                                (None, Some(mr), Some(cw)) => {
+                                    let auto_margin = cw - child_width - mr;
+                                    (auto_margin, mr)
+                                }
+                                (Some(ml), None, Some(cw)) => {
+                                    let auto_margin = cw - child_width - ml;
+                                    (ml, auto_margin)
+                                }
+                                _ => (ml_opt.unwrap_or(0.0), mr_opt.unwrap_or(0.0)),
+                            };
+
+                            (ml, mr)
+                        } else {
+                            (ml_opt.unwrap_or(0.0), mr_opt.unwrap_or(0.0))
+                        };
+
+                        child_node.layout_box.shift(ml, top.unwrap_or(0.0));
+                    }
+
+                    // Collect child's line_spans if it is needed.
+                }
+            }
+        }
+
+        if !fragment_node_buffer.is_empty() {
+            let line_ctx_for_child = ((cursor_x, cursor_y), (current_x, line_start_x), line_index);
+            let (line_spans, updated_line_ctx) = Self::flow_fragments(
+                &mut std::mem::take(&mut fragment_node_buffer),
+                line_ctx_for_child,
+                line_height,
+                content_width_opt.unwrap_or(ctx.viewport_width),
+            );
+            ((cursor_x, cursor_y), (current_x, line_start_x), line_index) = updated_line_ctx;
+            line_span_buf.extend_from_slice(&line_spans);
+        }
+
+        if node.style.display.outer == OuterDisplay::Inline {
+            let box_model = create_box_model(
+                current_x,
+                line_height,
+                current_x,
+                line_height,
+                padding,
+                border,
+            );
+            let inline_box = InlineBox {
+                box_model,
+                line_spans: line_span_buf,
+            };
+            node.layout_box = LayoutBox::InlineBox(inline_box);
+        } else {
+            current_x = line_ctx.1.0;
+
+            todo!()
+        }
+
+        ((cursor_x, cursor_y), (current_x, line_start_x), line_index)
     }
 
-    fn flow_fragments(fragments: &mut Vec<FragmentNode>, line_ctx: LineContext, outline: Rect) {}
+    fn flow_fragments(
+        fragments: &mut Vec<&mut FragmentNode>,
+        line_ctx: LineContext,
+        line_height: f32,
+        outbox_width: f32,
+    ) -> (Vec<LineSpan>, LineContext) {
+        let ((end_x, end_y), (mut current_x, mut line_start_x), mut line_index) = line_ctx;
+        let (mut cursor_x, mut cursor_y) = (end_x, end_y);
+
+        let mut if_first_of_line = current_x == line_start_x;
+
+        let mut line_span_buf = Vec::new();
+
+        for fragment_node in fragments {
+            match fragment_node.node {
+                ItemFragment::LineBreak => {
+                    line_span_buf.push(LineSpan {
+                        x_range: (line_start_x)..(current_x),
+                        line_pos: (line_start_x, cursor_y),
+                        line_index,
+                    });
+
+                    fragment_node.placement = Placement {
+                        offset: (cursor_x, cursor_y),
+                        line_index,
+                    };
+
+                    cursor_x = 0.0;
+                    cursor_y += line_height;
+                    line_index += 1;
+                    line_start_x = 0.0;
+                    if_first_of_line = true;
+                }
+                ItemFragment::Fragment(fragment_item) => {
+                    if cursor_x + fragment_item.width > outbox_width && !if_first_of_line {
+                        line_span_buf.push(LineSpan {
+                            x_range: (line_start_x)..(current_x),
+                            line_pos: (line_start_x, cursor_y),
+                            line_index,
+                        });
+
+                        fragment_node.placement = Placement {
+                            offset: (cursor_x, cursor_y),
+                            line_index,
+                        };
+
+                        cursor_x = 0.0;
+                        cursor_y += line_height;
+                        line_index += 1;
+                        line_start_x = 0.0;
+                        if_first_of_line = true;
+                    } else {
+                        if_first_of_line = false;
+                    }
+
+                    fragment_node.placement = Placement {
+                        offset: (cursor_x, cursor_y),
+                        line_index,
+                    };
+
+                    cursor_x += fragment_item.width;
+                    current_x += fragment_item.width;
+                }
+            }
+        }
+
+        if !if_first_of_line {
+            line_span_buf.push(LineSpan {
+                x_range: (line_start_x)..(current_x),
+                line_pos: (line_start_x, cursor_y),
+                line_index,
+            });
+        }
+
+        (
+            line_span_buf,
+            ((cursor_x, cursor_y), (current_x, line_start_x), line_index),
+        )
+    }
 }
 
 // ==========================================
 
-/// ((width_opt, height_opt), border, padding)
+/// ((content_width_opt, content_height_opt), border, padding)
 fn resolve_base_content_size_and_spacing(
     size_style: &crate::SizeStyle,
     spacing: &crate::Spacing,
     box_sizing: &BoxSizing,
     ctx: &LayoutContext,
 ) -> ((Option<f32>, Option<f32>), Edge, Edge) {
-    let border = resolve_border(&spacing, ctx);
-    let padding = resolve_padding(&spacing, ctx);
+    let border = resolve_border(spacing, ctx);
+    let padding = resolve_padding(spacing, ctx);
 
     let vw = ctx.viewport_width;
     let vh = ctx.viewport_height;
