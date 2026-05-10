@@ -309,7 +309,7 @@ impl LayoutEngine {
         }
 
         if node.style.display.outer == OuterDisplay::Inline {
-            let box_model = create_box_model(
+            let mut box_model = create_box_model(
                 current_x,
                 line_height,
                 current_x,
@@ -317,6 +317,8 @@ impl LayoutEngine {
                 padding,
                 border,
             );
+            box_model.shift(-(border.left + padding.left), -(border.top + padding.top));
+
             let inline_box = InlineBox {
                 box_model,
                 line_spans: line_span_buf,
