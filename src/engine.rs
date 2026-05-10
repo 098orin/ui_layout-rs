@@ -248,7 +248,7 @@ impl LayoutEngine {
                             intrinsic_pass,
                         );
 
-                    // Process margin shift (judge formatting context).
+                    // Process margin shift.
                     {
                         let EdgeOption {
                             left: ml_opt,
@@ -280,7 +280,11 @@ impl LayoutEngine {
                             (ml_opt.unwrap_or(0.0), mr_opt.unwrap_or(0.0))
                         };
 
-                        child_node.layout_box.shift(ml, top.unwrap_or(0.0));
+                        if child_node.style.display.outer == OuterDisplay::Inline {
+                            child_node.layout_box.shift(ml, 0.0);
+                        } else {
+                            child_node.layout_box.shift(ml, top.unwrap_or(0.0));
+                        }
                     }
 
                     // Collect child's line_spans if it is needed.
