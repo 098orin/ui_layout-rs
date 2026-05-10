@@ -71,6 +71,8 @@ impl LayoutEngine {
             available_width: Some(width),
             viewport_width: width,
             viewport_height: height,
+            parent_assigned_border_width: None,
+            parent_assigned_border_height: None,
         };
 
         let _ = Self::layout_node(root, &ctx, EMPTY_LINE_CONTEXT, false);
@@ -212,6 +214,8 @@ impl LayoutEngine {
             containing_block_width: content_width_opt,
             containing_block_height: content_height_opt,
             available_width: content_width_opt,
+            parent_assigned_border_width: None,
+            parent_assigned_border_height: None,
             ..*ctx
         };
 
