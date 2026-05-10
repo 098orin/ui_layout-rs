@@ -330,6 +330,11 @@ pub enum LengthOrAuto {
 }
 
 impl LengthOrAuto {
+    /// Returns LengthOrAuto::Length(value).
+    pub fn from_length(value: Length) -> Self {
+        LengthOrAuto::Length(value)
+    }
+
     /// Resolves a length value to pixels.
     ///
     /// Unresolvable values will be [`Option::None`].
