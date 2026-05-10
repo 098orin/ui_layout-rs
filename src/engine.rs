@@ -30,7 +30,7 @@ pub struct EdgeOption {
 ///   constraints such as sibling layout, margins, and line breaking.
 ///
 /// - `parent_assigned_border_*`:
-///     Border-box sizes assigned by parent (for stretch).
+///   Border-box sizes assigned by parent (for stretch).
 pub(crate) struct LayoutContext {
     pub(crate) containing_block_width: Option<f32>,
     pub(crate) containing_block_height: Option<f32>,
@@ -188,6 +188,7 @@ impl LayoutEngine {
     /// TODO:
     /// Optimize for layout contexts.
     /// - Avoid allocate unnecessary.
+    ///
     /// Fixes child height calculation.
     /// - Needs to account for the line layout algorithm.
     fn layout_flow(
