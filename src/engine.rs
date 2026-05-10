@@ -28,12 +28,17 @@ pub struct EdgeOption {
 /// - available_*:
 ///   The actual free space available for layout after considering
 ///   constraints such as sibling layout, margins, and line breaking.
+///
+/// - `parent_assigned_border_*`:
+///     Border-box sizes assigned by parent (for stretch).
 pub(crate) struct LayoutContext {
     pub(crate) containing_block_width: Option<f32>,
     pub(crate) containing_block_height: Option<f32>,
     pub(crate) available_width: Option<f32>,
     pub(crate) viewport_width: f32,
     pub(crate) viewport_height: f32,
+    pub(crate) parent_assigned_border_width: Option<f32>,
+    pub(crate) parent_assigned_border_height: Option<f32>,
 }
 
 /// Axis orientation
