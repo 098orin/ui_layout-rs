@@ -92,6 +92,13 @@ impl Axis {
         }
     }
 
+    fn edge_main(&self, edge: &Edge) -> (f32, f32) {
+        match self {
+            Self::Horizontal => (edge.left, edge.right),
+            Self::Vertical => (edge.top, edge.bottom),
+        }
+    }
+
     fn size_main<'a>(&self, size: &'a crate::SizeStyle) -> &'a LengthOrAuto {
         match self {
             Axis::Horizontal => &size.width,
