@@ -412,7 +412,7 @@ impl LayoutEngine {
                         line_span_buf.extend_from_slice(&line_spans);
                     }
 
-                    let child_margin = self.resolve_margins(&child_node.style.spacing, ctx);
+                    let child_margin = self.resolve_margin(&child_node.style.spacing, ctx);
 
                     let ctx_for_child = LayoutContext {
                         available_width: content_width_opt.map(|v| {
@@ -778,7 +778,7 @@ impl LayoutEngine {
         }
     }
 
-    fn resolve_margins(&self, spacing: &Spacing, ctx: &LayoutContext) -> EdgeOption {
+    fn resolve_margin(&self, spacing: &Spacing, ctx: &LayoutContext) -> EdgeOption {
         let containing_width = ctx.containing_block_width.unwrap_or(self.viewport_width);
         let vw = self.viewport_width;
         let vh = self.viewport_height;
