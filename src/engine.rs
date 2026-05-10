@@ -185,8 +185,9 @@ impl LayoutEngine {
         content_size_opt: (Option<f32>, Option<f32>),
         intrinsic_pass: bool,
     ) -> LineContext {
-        let ((end_x, end_y), (parent_current_x, mut line_start_x), mut line_index) = line_ctx;
+        let ((end_x, end_y), (parent_current_x, mut line_start_x), parent_line_index) = line_ctx;
         let mut current_x = 0.0;
+        let mut line_index = 0;
         let (mut cursor_x, mut cursor_y) = (end_x, end_y);
 
         let (content_width_opt, content_height_opt) = content_size_opt;
@@ -329,7 +330,7 @@ impl LayoutEngine {
         (
             (cursor_x, cursor_y),
             (parent_current_x + current_x, line_start_x),
-            line_index,
+            parent_line_index + line_index,
         )
     }
 
