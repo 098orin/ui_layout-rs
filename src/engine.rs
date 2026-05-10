@@ -287,7 +287,8 @@ impl LayoutEngine {
                         }
                     }
 
-                    // Collect child's line_spans if it is needed.
+                    // Collect child's line_spans if the outer display is Inline.
+                    if child_node.style.display.outer == OuterDisplay::Inline {}
                 }
             }
         }
