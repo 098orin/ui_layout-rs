@@ -1,6 +1,6 @@
 use crate::{
-    BoxModel, BoxSizing, FragmentNode, InlineBox, InnerDisplay, ItemFragment, LayoutBox,
-    LayoutChild, LayoutNode, LineSpan, OuterDisplay, Placement, Rect, Spacing,
+    BoxModel, BoxSizing, FlexDirection, FragmentNode, InlineBox, InnerDisplay, ItemFragment,
+    LayoutBox, LayoutChild, LayoutNode, LineSpan, OuterDisplay, Placement, Rect, Spacing,
 };
 
 #[derive(Clone, Copy, Default)]
@@ -49,6 +49,15 @@ pub(crate) struct LayoutContext {
 enum Axis {
     Horizontal,
     Vertical,
+}
+
+impl Axis {
+    fn from_flex_direction(value: &FlexDirection) -> Axis {
+        match value {
+            FlexDirection::Row => Axis::Horizontal,
+            FlexDirection::Column => Axis::Vertical,
+        }
+    }
 }
 
 pub struct LayoutEngine;
@@ -378,6 +387,9 @@ impl LayoutEngine {
         content_size_opt: (Option<f32>, Option<f32>),
         intrinsic_pass: bool,
     ) -> LineContext {
+        let axis = Axis::from_flex_direction(&node.style.flex_direction);
+
+        let (content_width_opt, content_height_opt) = content_size_opt;
         todo!()
     }
 
