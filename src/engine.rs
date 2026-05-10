@@ -48,7 +48,7 @@ enum Axis {
 
 pub struct LayoutEngine;
 
-/// ((end_x, end_y), (current_x, line_start_x), line_index)
+/// ((end_x, end_y), (current_x, prev_line_start_x), line_index)
 ///
 /// (current_x, line_start_x) will be zero for non-inline contexts.
 pub(crate) type LineContext = ((f32, f32), (f32, f32), usize);
@@ -185,7 +185,8 @@ impl LayoutEngine {
         content_size_opt: (Option<f32>, Option<f32>),
         intrinsic_pass: bool,
     ) -> LineContext {
-        let ((end_x, end_y), (mut current_x, mut line_start_x), mut line_index) = line_ctx;
+        let ((end_x, end_y), (parent_current_x, mut line_start_x), mut line_index) = line_ctx;
+        let mut current_x = 0.0;
         let (mut cursor_x, mut cursor_y) = (end_x, end_y);
 
         let (content_width_opt, content_height_opt) = content_size_opt;
@@ -325,7 +326,11 @@ impl LayoutEngine {
             todo!()
         }
 
-        ((cursor_x, cursor_y), (current_x, line_start_x), line_index)
+        (
+            (cursor_x, cursor_y),
+            (parent_current_x + current_x, line_start_x),
+            line_index,
+        )
     }
 
     fn flow_fragments(
