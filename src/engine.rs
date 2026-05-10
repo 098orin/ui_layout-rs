@@ -179,9 +179,7 @@ impl LayoutEngine {
     ) -> LineContext {
         match node.style.display.inner {
             InnerDisplay::Flow => Self::layout_flow(node, ctx, line_ctx, size_opt, intrinsic_pass),
-            InnerDisplay::Flex => {
-                todo!()
-            }
+            InnerDisplay::Flex => Self::layout_flex(node, ctx, line_ctx, size_opt, intrinsic_pass),
         }
     }
 
@@ -371,6 +369,16 @@ impl LayoutEngine {
             (parent_current_x + current_x, line_start_x),
             parent_line_index + line_index,
         )
+    }
+
+    fn layout_flex(
+        node: &mut LayoutNode,
+        ctx: &LayoutContext,
+        line_ctx: LineContext,
+        content_size_opt: (Option<f32>, Option<f32>),
+        intrinsic_pass: bool,
+    ) -> LineContext {
+        todo!()
     }
 
     fn flow_fragments(
