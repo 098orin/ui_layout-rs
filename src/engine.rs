@@ -39,6 +39,40 @@ pub(crate) struct LayoutContext {
     pub(crate) parent_assigned_border_height: Option<f32>,
 }
 
+impl LayoutContext {
+    /// Returns the containing-block size along the main axis.
+    fn containing_block_main(&self, axis: Axis) -> Option<f32> {
+        match axis {
+            Axis::Horizontal => self.containing_block_width,
+            Axis::Vertical => self.containing_block_height,
+        }
+    }
+
+    /// Returns the containing-block size along the cross axis.
+    fn containing_block_cross(&self, axis: Axis) -> Option<f32> {
+        match axis {
+            Axis::Horizontal => self.containing_block_height,
+            Axis::Vertical => self.containing_block_width,
+        }
+    }
+
+    /// Returns parent-assigned border-box size along the main axis (for stretch/relative fallback).
+    fn parent_assigned_border_main(&self, axis: Axis) -> Option<f32> {
+        match axis {
+            Axis::Horizontal => self.parent_assigned_border_width,
+            Axis::Vertical => self.parent_assigned_border_height,
+        }
+    }
+
+    /// Returns parent-assigned border-box size along the cross axis.
+    fn parent_assigned_border_cross(&self, axis: Axis) -> Option<f32> {
+        match axis {
+            Axis::Horizontal => self.parent_assigned_border_height,
+            Axis::Vertical => self.parent_assigned_border_width,
+        }
+    }
+}
+
 /// Axis orientation
 ///
 /// Provides helper methods to abstract width/height selection, reducing code duplication
@@ -54,6 +88,111 @@ impl Axis {
         match value {
             FlexDirection::Row => Axis::Horizontal,
             FlexDirection::Column => Axis::Vertical,
+        }
+    }
+
+    fn size_main<'a>(&self, size: &'a crate::SizeStyle) -> &'a LengthOrAuto {
+        match self {
+            Axis::Horizontal => &size.width,
+            Axis::Vertical => &size.height,
+        }
+    }
+
+    fn size_cross<'a>(&self, size: &'a crate::SizeStyle) -> &'a LengthOrAuto {
+        match self {
+            Axis::Horizontal => &size.height,
+            Axis::Vertical => &size.width,
+        }
+    }
+
+    fn min_main<'a>(&self, size: &'a crate::SizeStyle) -> &'a LengthOrAuto {
+        match self {
+            Axis::Horizontal => &size.min_width,
+            Axis::Vertical => &size.min_height,
+        }
+    }
+
+    fn max_main<'a>(&self, size: &'a crate::SizeStyle) -> &'a LengthOrAuto {
+        match self {
+            Axis::Horizontal => &size.max_width,
+            Axis::Vertical => &size.max_height,
+        }
+    }
+
+    fn min_cross<'a>(&self, size: &'a crate::SizeStyle) -> &'a LengthOrAuto {
+        match self {
+            Axis::Horizontal => &size.min_height,
+            Axis::Vertical => &size.min_width,
+        }
+    }
+
+    fn max_cross<'a>(&self, size: &'a crate::SizeStyle) -> &'a LengthOrAuto {
+        match self {
+            Axis::Horizontal => &size.max_height,
+            Axis::Vertical => &size.max_width,
+        }
+    }
+
+    fn padding_main<'a>(&self, spacing: &'a Spacing) -> (&'a Length, &'a Length) {
+        match self {
+            Axis::Horizontal => (&spacing.padding_left, &spacing.padding_right),
+            Axis::Vertical => (&spacing.padding_top, &spacing.padding_bottom),
+        }
+    }
+
+    fn padding_cross<'a>(&self, spacing: &'a Spacing) -> (&'a Length, &'a Length) {
+        match self {
+            Axis::Horizontal => (&spacing.padding_top, &spacing.padding_bottom),
+            Axis::Vertical => (&spacing.padding_left, &spacing.padding_right),
+        }
+    }
+
+    fn border_main<'a>(&self, spacing: &'a Spacing) -> (&'a Length, &'a Length) {
+        match self {
+            Axis::Horizontal => (&spacing.border_left, &spacing.border_right),
+            Axis::Vertical => (&spacing.border_top, &spacing.border_bottom),
+        }
+    }
+
+    fn border_cross<'a>(&self, spacing: &'a Spacing) -> (&'a Length, &'a Length) {
+        match self {
+            Axis::Horizontal => (&spacing.border_top, &spacing.border_bottom),
+            Axis::Vertical => (&spacing.border_left, &spacing.border_right),
+        }
+    }
+
+    fn margin_main_start<'a>(&self, s: &'a Spacing) -> &'a LengthOrAuto {
+        match self {
+            Axis::Horizontal => &s.margin_left,
+            Axis::Vertical => &s.margin_top,
+        }
+    }
+
+    fn margin_main_end<'a>(&self, s: &'a Spacing) -> &'a LengthOrAuto {
+        match self {
+            Axis::Horizontal => &s.margin_right,
+            Axis::Vertical => &s.margin_bottom,
+        }
+    }
+
+    fn margin_cross_start<'a>(&self, s: &'a Spacing) -> &'a LengthOrAuto {
+        match self {
+            Axis::Horizontal => &s.margin_top,
+            Axis::Vertical => &s.margin_left,
+        }
+    }
+
+    fn margin_cross_end<'a>(&self, s: &'a Spacing) -> &'a LengthOrAuto {
+        match self {
+            Axis::Horizontal => &s.margin_bottom,
+            Axis::Vertical => &s.margin_right,
+        }
+    }
+
+    fn gap<'a>(&self, style: &'a Style) -> &'a LengthOrAuto {
+        match self {
+            Axis::Horizontal => &style.column_gap,
+            Axis::Vertical => &style.row_gap,
         }
     }
 }
