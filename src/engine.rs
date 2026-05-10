@@ -178,6 +178,11 @@ impl LayoutEngine {
         }
     }
 
+    /// TODO:
+    /// Optimize for layout contexts.
+    /// - Avoid allocate unnecessary.
+    /// Fixes child height calculation.
+    /// - Needs to account for the line layout algorithm.
     fn layout_flow(
         node: &mut LayoutNode,
         ctx: &LayoutContext,
@@ -192,6 +197,8 @@ impl LayoutEngine {
         let mut line_index = 0;
 
         let (content_width_opt, content_height_opt) = content_size_opt;
+
+        let (mut children_width, mut children_height) = (0.0_f32, 0.0_f32);
 
         let border = resolve_border(&node.style.spacing, ctx);
         let padding = resolve_padding(&node.style.spacing, ctx);
@@ -292,6 +299,10 @@ impl LayoutEngine {
 
                     // Collect child's line_spans if the outer display is Inline.
                     if child_node.style.display.outer == OuterDisplay::Inline {}
+
+                    // Update children_width and children_height
+                    children_width = children_width.max(child_node.layout_box.width_box());
+                    children_height += child_node.layout_box.height_box();
                 }
             }
         }
@@ -328,7 +339,19 @@ impl LayoutEngine {
             // Set current_x to zero so it won't propagate to the parent.
             current_x = 0.0;
 
-            todo!()
+            let content_width = content_width_opt.unwrap_or(children_width);
+            let content_height = content_height_opt.unwrap_or(children_height);
+
+            let box_model = create_box_model(
+                content_width,
+                content_height,
+                children_width,
+                children_height,
+                padding,
+                border,
+            );
+
+            node.layout_box = LayoutBox::BlockBox(box_model);
         }
 
         (
