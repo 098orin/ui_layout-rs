@@ -308,7 +308,9 @@ impl LayoutEngine {
                     }
 
                     // Collect child's line_spans if the outer display is Inline.
-                    if child_node.style.display.outer == OuterDisplay::Inline {}
+                    if child_node.style.display.outer == OuterDisplay::Inline {
+                        todo!()
+                    }
 
                     // Update children_width and children_height
                     children_width = children_width.max(child_node.layout_box.width_box());
