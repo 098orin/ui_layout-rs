@@ -48,9 +48,9 @@ enum Axis {
 
 pub struct LayoutEngine;
 
-/// ((end_x, end_y), (current_x, prev_line_start_x), line_index)
+/// ((end_x, end_y), (parent_current_x, line_start_x), line_index)
 ///
-/// (current_x, line_start_x) will be zero for non-inline contexts.
+/// (parent_current_x, line_start_x) will be zero for non-inline contexts.
 pub(crate) type LineContext = ((f32, f32), (f32, f32), usize);
 
 pub(crate) const EMPTY_LINE_CONTEXT: LineContext = ((0.0, 0.0), (0.0, 0.0), 0);
