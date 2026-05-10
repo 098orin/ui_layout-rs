@@ -401,6 +401,30 @@ impl LayoutEngine {
         let axis = Axis::from_flex_direction(&node.style.flex_direction);
 
         let (content_width_opt, content_height_opt) = content_size_opt;
+
+        let (mut children_main, mut children_cross) =
+            if !intrinsic_pass || content_width_opt.is_none() || content_height_opt.is_none() {
+                let base_ctx_for_children = LayoutContext {
+                    containing_block_width: content_height_opt,
+                    containing_block_height: content_height_opt,
+                    available_width: None,
+                    parent_assigned_border_width: None,
+                    parent_assigned_border_height: None,
+                };
+                self.layout_flex_children(node, axis, intrinsic_pass, &base_ctx_for_children)
+            } else {
+                (0.0, 0.0)
+            };
+        todo!()
+    }
+
+    fn layout_flex_children(
+        &self,
+        node: &mut LayoutNode,
+        axis: Axis,
+        intrinsic_pass: bool,
+        base_ctx_for_children: &LayoutContext,
+    ) -> (f32, f32) {
         todo!()
     }
 
