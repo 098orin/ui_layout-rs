@@ -120,7 +120,23 @@ impl LayoutBox {
         }
     }
 
-    /// Returns the maximum width among all boxes.
+    /// Returns the maximum width among all boxes via [`LineSpan::width`] or[`BoxModel::width`].
+    /// For [`LayoutBox::InlineBox`], width is calclated via [`LineSpan::width`]
+    pub fn width_box(&self) -> f32 {
+        match self {
+            LayoutBox::None => 0.0,
+            LayoutBox::BlockBox(b) => b.width(),
+            LayoutBox::InlineBox(l) => l
+                .line_spans
+                .iter()
+                .map(|s| s.width())
+                .filter(|v| !v.is_nan())
+                .max_by(f32::total_cmp)
+                .unwrap_or(0.0),
+        }
+    }
+
+    /// Returns the width of box.
     /// See [`BoxModel::width`].
     pub fn width(&self) -> f32 {
         match self {
