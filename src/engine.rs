@@ -323,7 +323,8 @@ impl LayoutEngine {
             };
             node.layout_box = LayoutBox::InlineBox(inline_box);
         } else {
-            current_x = line_ctx.1.0;
+            // Set current_x to zero so it won't propagate to the parent.
+            current_x = 0.0;
 
             todo!()
         }
