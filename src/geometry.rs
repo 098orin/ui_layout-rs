@@ -146,6 +146,16 @@ impl LayoutBox {
         }
     }
 
+    /// Returns the maximum width among all boxes via [`BoxModel::height`].
+    /// For [`LayoutBox::InlineBox`], height is calclated via sum of height for every line.
+    pub fn height_box(&self) -> f32 {
+        match self {
+            LayoutBox::None => 0.0,
+            LayoutBox::BlockBox(b) => b.width(),
+            LayoutBox::InlineBox(l) => l.box_model.content_box.height * (l.line_spans.len() as f32),
+        }
+    }
+
     /// Returns the total height.
     /// See [`BoxModel::height`].
     pub fn height(&self) -> f32 {
