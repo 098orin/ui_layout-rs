@@ -20,6 +20,17 @@ pub struct EdgeOption {
     pub bottom: Option<f32>,
 }
 
+impl EdgeOption {
+    pub fn unwrap_or_default(self) -> Edge {
+        Edge {
+            top: self.top.unwrap_or_default(),
+            right: self.right.unwrap_or_default(),
+            bottom: self.bottom.unwrap_or_default(),
+            left: self.left.unwrap_or_default(),
+        }
+    }
+}
+
 /// The difference between containing_block_* and available_* is:
 ///
 /// - containing_block_*:
