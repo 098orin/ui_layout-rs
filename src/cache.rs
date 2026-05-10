@@ -1,12 +1,12 @@
-pub fn make_layout_key(ctx: &crate::engine::LayoutContext) -> u32 {
+pub fn make_layout_key(ctx: &crate::engine::LayoutContext, engine: &crate::LayoutEngine) -> u32 {
     use std::hash::{Hash, Hasher};
 
     let mut h = self::LayoutHasher::default();
 
     ctx.containing_block_width.map(f32::to_bits).hash(&mut h);
     ctx.containing_block_height.map(f32::to_bits).hash(&mut h);
-    f32::to_bits(ctx.viewport_width).hash(&mut h);
-    f32::to_bits(ctx.viewport_height).hash(&mut h);
+    f32::to_bits(engine.viewport_width).hash(&mut h);
+    f32::to_bits(engine.viewport_height).hash(&mut h);
 
     h.finish() as u32
 }

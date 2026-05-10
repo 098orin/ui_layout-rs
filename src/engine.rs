@@ -35,8 +35,6 @@ pub(crate) struct LayoutContext {
     pub(crate) containing_block_width: Option<f32>,
     pub(crate) containing_block_height: Option<f32>,
     pub(crate) available_width: Option<f32>,
-    pub(crate) viewport_width: f32,
-    pub(crate) viewport_height: f32,
     pub(crate) parent_assigned_border_width: Option<f32>,
     pub(crate) parent_assigned_border_height: Option<f32>,
 }
@@ -60,7 +58,10 @@ impl Axis {
     }
 }
 
-pub struct LayoutEngine;
+pub struct LayoutEngine {
+    pub(crate) viewport_width: f32,
+    pub(crate) viewport_height: f32,
+}
 
 /// ((end_x, end_y), (parent_current_x, line_start_x), line_index)
 ///
@@ -78,19 +79,23 @@ impl LayoutEngine {
             containing_block_width: Some(width),
             containing_block_height: Some(height),
             available_width: Some(width),
-            viewport_width: width,
-            viewport_height: height,
             parent_assigned_border_width: None,
             parent_assigned_border_height: None,
         };
 
-        let _ = Self::layout_node(root, &ctx, EMPTY_LINE_CONTEXT, false);
+        let engine = LayoutEngine {
+            viewport_width: width,
+            viewport_height: height,
+        };
+
+        let _ = engine.layout_node(root, &ctx, EMPTY_LINE_CONTEXT, false);
     }
 
     /// Internal method for layout a node.
     /// Layouts a single node and its descendants.
     #[must_use]
     fn layout_node(
+        &self,
         node: &mut LayoutNode,
         ctx: &LayoutContext,
         line_ctx: LineContext,
@@ -98,16 +103,16 @@ impl LayoutEngine {
     ) -> LineContext {
         if intrinsic_pass {
             let (key, (layout_box, line_ctx)) = &node.layout_box_cache;
-            if *key == crate::cache::make_layout_key(ctx) {
+            if *key == crate::cache::make_layout_key(ctx, self) {
                 node.layout_box = layout_box.clone();
                 return *line_ctx;
             }
         }
 
-        let out = Self::layout_by_display(node, ctx, line_ctx, intrinsic_pass);
+        let out = self.layout_by_display(node, ctx, line_ctx, intrinsic_pass);
 
         if intrinsic_pass {
-            let key = crate::cache::make_layout_key(ctx);
+            let key = crate::cache::make_layout_key(ctx, self);
             node.layout_box_cache = (key, (node.layout_box.clone(), out));
         }
 
@@ -115,6 +120,7 @@ impl LayoutEngine {
     }
 
     fn layout_by_display(
+        &self,
         node: &mut LayoutNode,
         ctx: &LayoutContext,
         line_ctx: LineContext,
@@ -125,19 +131,20 @@ impl LayoutEngine {
                 node.layout_box = LayoutBox::None;
                 line_ctx
             }
-            OuterDisplay::Block => Self::layout_block_level(node, ctx, line_ctx, intrinsic_pass),
-            OuterDisplay::Inline => Self::layout_inline_level(node, ctx, line_ctx, intrinsic_pass),
+            OuterDisplay::Block => self.layout_block_level(node, ctx, line_ctx, intrinsic_pass),
+            OuterDisplay::Inline => self.layout_inline_level(node, ctx, line_ctx, intrinsic_pass),
         }
     }
 
     fn layout_block_level(
+        &self,
         node: &mut LayoutNode,
         ctx: &LayoutContext,
         line_ctx: LineContext,
         intrinsic_pass: bool,
     ) -> LineContext {
-        let ((content_width_opt, content_height_opt), border, padding) =
-            resolve_base_content_size_and_spacing(
+        let ((content_width_opt, content_height_opt), border, padding) = self
+            .resolve_base_content_size_and_spacing(
                 &node.style.size,
                 &node.style.spacing,
                 &node.style.box_sizing,
@@ -148,7 +155,7 @@ impl LayoutEngine {
             .available_width
             .map(|v| v - border.left - border.right - padding.left - padding.right));
 
-        Self::layout_by_inner_display(
+        self.layout_by_inner_display(
             node,
             ctx,
             line_ctx,
@@ -158,19 +165,21 @@ impl LayoutEngine {
     }
 
     fn layout_inline_level(
+        &self,
         node: &mut LayoutNode,
         ctx: &LayoutContext,
         line_ctx: LineContext,
         intrinsic_pass: bool,
     ) -> LineContext {
-        let ((content_width_opt, content_height_opt), _, _) = resolve_base_content_size_and_spacing(
-            &node.style.size,
-            &node.style.spacing,
-            &node.style.box_sizing,
-            ctx,
-        );
+        let ((content_width_opt, content_height_opt), _, _) = self
+            .resolve_base_content_size_and_spacing(
+                &node.style.size,
+                &node.style.spacing,
+                &node.style.box_sizing,
+                ctx,
+            );
 
-        Self::layout_by_inner_display(
+        self.layout_by_inner_display(
             node,
             ctx,
             line_ctx,
@@ -180,6 +189,7 @@ impl LayoutEngine {
     }
 
     fn layout_by_inner_display(
+        &self,
         node: &mut LayoutNode,
         ctx: &LayoutContext,
         line_ctx: LineContext,
@@ -187,8 +197,8 @@ impl LayoutEngine {
         intrinsic_pass: bool,
     ) -> LineContext {
         match node.style.display.inner {
-            InnerDisplay::Flow => Self::layout_flow(node, ctx, line_ctx, size_opt, intrinsic_pass),
-            InnerDisplay::Flex => Self::layout_flex(node, ctx, line_ctx, size_opt, intrinsic_pass),
+            InnerDisplay::Flow => self.layout_flow(node, ctx, line_ctx, size_opt, intrinsic_pass),
+            InnerDisplay::Flex => self.layout_flex(node, ctx, line_ctx, size_opt, intrinsic_pass),
         }
     }
 
@@ -199,6 +209,7 @@ impl LayoutEngine {
     /// Fixes child height calculation.
     /// - Needs to account for the line layout algorithm.
     fn layout_flow(
+        &self,
         node: &mut LayoutNode,
         ctx: &LayoutContext,
         line_ctx: LineContext,
@@ -215,8 +226,8 @@ impl LayoutEngine {
 
         let (mut children_width, mut children_height) = (0.0_f32, 0.0_f32);
 
-        let border = resolve_border(&node.style.spacing, ctx);
-        let padding = resolve_padding(&node.style.spacing, ctx);
+        let border = self.resolve_border(&node.style.spacing, ctx);
+        let padding = self.resolve_padding(&node.style.spacing, ctx);
 
         let base_ctx_for_child = LayoutContext {
             containing_block_width: content_width_opt,
@@ -224,14 +235,13 @@ impl LayoutEngine {
             available_width: content_width_opt,
             parent_assigned_border_width: None,
             parent_assigned_border_height: None,
-            ..*ctx
         };
 
         let mut line_span_buf = Vec::new();
         let line_height = node
             .style
             .line_height
-            .resolve_with(None, ctx.viewport_width, ctx.viewport_height)
+            .resolve_with(None, self.viewport_width, self.viewport_height)
             .unwrap_or_default();
         let mut fragment_node_buffer = Vec::with_capacity(node.children.len());
 
@@ -248,14 +258,14 @@ impl LayoutEngine {
                             &mut std::mem::take(&mut fragment_node_buffer),
                             line_ctx_for_child,
                             line_height,
-                            content_width_opt.unwrap_or(ctx.viewport_width),
+                            content_width_opt.unwrap_or(self.viewport_width),
                         );
                         ((cursor_x, cursor_y), (current_x, line_start_x), line_index) =
                             updated_line_ctx;
                         line_span_buf.extend_from_slice(&line_spans);
                     }
 
-                    let child_margin = resolve_margins(&child_node.style.spacing, ctx);
+                    let child_margin = self.resolve_margins(&child_node.style.spacing, ctx);
 
                     let ctx_for_child = LayoutContext {
                         available_width: content_width_opt.map(|v| {
@@ -267,8 +277,8 @@ impl LayoutEngine {
                     // Layout Node
                     let line_ctx_for_child =
                         ((cursor_x, cursor_y), (current_x, line_start_x), line_index);
-                    ((cursor_x, cursor_y), (current_x, line_start_x), line_index) =
-                        Self::layout_node(
+                    ((cursor_x, cursor_y), (current_x, line_start_x), line_index) = self
+                        .layout_node(
                             child_node,
                             &ctx_for_child,
                             line_ctx_for_child,
@@ -332,7 +342,7 @@ impl LayoutEngine {
                 &mut std::mem::take(&mut fragment_node_buffer),
                 line_ctx_for_child,
                 line_height,
-                content_width_opt.unwrap_or(ctx.viewport_width),
+                content_width_opt.unwrap_or(self.viewport_width),
             );
             ((cursor_x, cursor_y), (current_x, line_start_x), line_index) = updated_line_ctx;
             line_span_buf.extend_from_slice(&line_spans);
@@ -381,6 +391,7 @@ impl LayoutEngine {
     }
 
     fn layout_flex(
+        &self,
         node: &mut LayoutNode,
         ctx: &LayoutContext,
         line_ctx: LineContext,
@@ -472,47 +483,153 @@ impl LayoutEngine {
             ((cursor_x, cursor_y), (current_x, line_start_x), line_index),
         )
     }
+
+    /// ((content_width_opt, content_height_opt), border, padding)
+    fn resolve_base_content_size_and_spacing(
+        &self,
+        size_style: &crate::SizeStyle,
+        spacing: &crate::Spacing,
+        box_sizing: &BoxSizing,
+        ctx: &LayoutContext,
+    ) -> ((Option<f32>, Option<f32>), Edge, Edge) {
+        let border = self.resolve_border(spacing, ctx);
+        let padding = self.resolve_padding(spacing, ctx);
+
+        let vw = self.viewport_width;
+        let vh = self.viewport_height;
+
+        // --- width ---
+        let content_width = size_style
+            .width
+            .resolve_with(ctx.containing_block_width, vw, vh)
+            .map(|width| {
+                let padding_edge = (padding.left, padding.right);
+                let border_edge = (border.left, border.right);
+                resolve_content_size_with_box_sizing(box_sizing, width, padding_edge, border_edge)
+            })
+            .map(|width| self.apply_size_constraints(width, size_style, ctx, true));
+
+        // --- height ---
+        let content_height = size_style
+            .height
+            .resolve_with(ctx.containing_block_height, vw, vh)
+            .map(|height| {
+                let padding_edge = (padding.top, padding.bottom);
+                let border_edge = (border.top, border.bottom);
+                resolve_content_size_with_box_sizing(box_sizing, height, padding_edge, border_edge)
+            })
+            .map(|height| self.apply_size_constraints(height, size_style, ctx, false));
+
+        ((content_width, content_height), border, padding)
+    }
+
+    /// Applies min/max size constraints to a dimension value.
+    fn apply_size_constraints(
+        &self,
+        value: f32,
+        size_style: &crate::SizeStyle,
+        ctx: &LayoutContext,
+        is_width: bool,
+    ) -> f32 {
+        let vw = self.viewport_width;
+        let vh = self.viewport_height;
+
+        let (min_constraint, max_constraint) = if is_width {
+            (
+                size_style
+                    .min_width
+                    .resolve_with(ctx.containing_block_width, vw, vh),
+                size_style
+                    .max_width
+                    .resolve_with(ctx.containing_block_width, vw, vh),
+            )
+        } else {
+            (
+                size_style
+                    .min_height
+                    .resolve_with(ctx.containing_block_height, vw, vh),
+                size_style
+                    .max_height
+                    .resolve_with(ctx.containing_block_height, vw, vh),
+            )
+        };
+
+        clamp(value, min_constraint, max_constraint)
+    }
+
+    fn resolve_padding(&self, spacing: &Spacing, ctx: &LayoutContext) -> Edge {
+        let containing_width = ctx.containing_block_width;
+        let vw = self.viewport_width;
+        let vh = self.viewport_height;
+
+        Edge {
+            left: spacing
+                .padding_left
+                .resolve_with(containing_width, vw, vh)
+                .unwrap_or(0.0),
+            top: spacing
+                .padding_top
+                .resolve_with(containing_width, vw, vh)
+                .unwrap_or(0.0),
+            right: spacing
+                .padding_right
+                .resolve_with(containing_width, vw, vh)
+                .unwrap_or(0.0),
+            bottom: spacing
+                .padding_bottom
+                .resolve_with(containing_width, vw, vh)
+                .unwrap_or(0.0),
+        }
+    }
+
+    fn resolve_border(&self, spacing: &Spacing, ctx: &LayoutContext) -> Edge {
+        let containing_width = ctx.containing_block_width;
+        let vw = self.viewport_width;
+        let vh = self.viewport_height;
+
+        Edge {
+            left: spacing
+                .border_left
+                .resolve_with(containing_width, vw, vh)
+                .unwrap_or(0.0),
+            top: spacing
+                .border_top
+                .resolve_with(containing_width, vw, vh)
+                .unwrap_or(0.0),
+            right: spacing
+                .border_right
+                .resolve_with(containing_width, vw, vh)
+                .unwrap_or(0.0),
+            bottom: spacing
+                .border_bottom
+                .resolve_with(containing_width, vw, vh)
+                .unwrap_or(0.0),
+        }
+    }
+
+    fn resolve_margins(&self, spacing: &Spacing, ctx: &LayoutContext) -> EdgeOption {
+        let containing_width = ctx.containing_block_width.unwrap_or(self.viewport_width);
+        let vw = self.viewport_width;
+        let vh = self.viewport_height;
+
+        EdgeOption {
+            left: spacing
+                .margin_left
+                .resolve_with(ctx.containing_block_width, vw, vh),
+            top: spacing
+                .margin_top
+                .resolve_with(Some(containing_width), vw, vh),
+            right: spacing
+                .margin_right
+                .resolve_with(ctx.containing_block_width, vw, vh),
+            bottom: spacing
+                .margin_bottom
+                .resolve_with(Some(containing_width), vw, vh),
+        }
+    }
 }
 
 // ==========================================
-
-/// ((content_width_opt, content_height_opt), border, padding)
-fn resolve_base_content_size_and_spacing(
-    size_style: &crate::SizeStyle,
-    spacing: &crate::Spacing,
-    box_sizing: &BoxSizing,
-    ctx: &LayoutContext,
-) -> ((Option<f32>, Option<f32>), Edge, Edge) {
-    let border = resolve_border(spacing, ctx);
-    let padding = resolve_padding(spacing, ctx);
-
-    let vw = ctx.viewport_width;
-    let vh = ctx.viewport_height;
-
-    // --- width ---
-    let content_width = size_style
-        .width
-        .resolve_with(ctx.containing_block_width, vw, vh)
-        .map(|width| {
-            let padding_edge = (padding.left, padding.right);
-            let border_edge = (border.left, border.right);
-            resolve_content_size_with_box_sizing(box_sizing, width, padding_edge, border_edge)
-        })
-        .map(|width| apply_size_constraints(width, size_style, ctx, true));
-
-    // --- height ---
-    let content_height = size_style
-        .height
-        .resolve_with(ctx.containing_block_height, vw, vh)
-        .map(|height| {
-            let padding_edge = (padding.top, padding.bottom);
-            let border_edge = (border.top, border.bottom);
-            resolve_content_size_with_box_sizing(box_sizing, height, padding_edge, border_edge)
-        })
-        .map(|height| apply_size_constraints(height, size_style, ctx, false));
-
-    ((content_width, content_height), border, padding)
-}
 
 /// Resolves content size based on the box-sizing property.
 ///
@@ -536,114 +653,10 @@ fn resolve_content_size_with_box_sizing(
     .max(0.0)
 }
 
-/// Applies min/max size constraints to a dimension value.
-fn apply_size_constraints(
-    value: f32,
-    size_style: &crate::SizeStyle,
-    ctx: &LayoutContext,
-    is_width: bool,
-) -> f32 {
-    let vw = ctx.viewport_width;
-    let vh = ctx.viewport_height;
-
-    let (min_constraint, max_constraint) = if is_width {
-        (
-            size_style
-                .min_width
-                .resolve_with(ctx.containing_block_width, vw, vh),
-            size_style
-                .max_width
-                .resolve_with(ctx.containing_block_width, vw, vh),
-        )
-    } else {
-        (
-            size_style
-                .min_height
-                .resolve_with(ctx.containing_block_height, vw, vh),
-            size_style
-                .max_height
-                .resolve_with(ctx.containing_block_height, vw, vh),
-        )
-    };
-
-    clamp(value, min_constraint, max_constraint)
-}
-
 /// Clamps a value between optional minimum and maximum bounds.
 fn clamp(value: f32, min: Option<f32>, max: Option<f32>) -> f32 {
     let v = min.map_or(value, |m| value.max(m));
     max.map_or(v, |m| v.min(m))
-}
-
-fn resolve_padding(spacing: &Spacing, ctx: &LayoutContext) -> Edge {
-    let containing_width = ctx.containing_block_width;
-    let vw = ctx.viewport_width;
-    let vh = ctx.viewport_height;
-
-    Edge {
-        left: spacing
-            .padding_left
-            .resolve_with(containing_width, vw, vh)
-            .unwrap_or(0.0),
-        top: spacing
-            .padding_top
-            .resolve_with(containing_width, vw, vh)
-            .unwrap_or(0.0),
-        right: spacing
-            .padding_right
-            .resolve_with(containing_width, vw, vh)
-            .unwrap_or(0.0),
-        bottom: spacing
-            .padding_bottom
-            .resolve_with(containing_width, vw, vh)
-            .unwrap_or(0.0),
-    }
-}
-
-fn resolve_border(spacing: &Spacing, ctx: &LayoutContext) -> Edge {
-    let containing_width = ctx.containing_block_width;
-    let vw = ctx.viewport_width;
-    let vh = ctx.viewport_height;
-
-    Edge {
-        left: spacing
-            .border_left
-            .resolve_with(containing_width, vw, vh)
-            .unwrap_or(0.0),
-        top: spacing
-            .border_top
-            .resolve_with(containing_width, vw, vh)
-            .unwrap_or(0.0),
-        right: spacing
-            .border_right
-            .resolve_with(containing_width, vw, vh)
-            .unwrap_or(0.0),
-        bottom: spacing
-            .border_bottom
-            .resolve_with(containing_width, vw, vh)
-            .unwrap_or(0.0),
-    }
-}
-
-fn resolve_margins(spacing: &Spacing, ctx: &LayoutContext) -> EdgeOption {
-    let containing_width = ctx.containing_block_width.unwrap_or(ctx.viewport_width);
-    let vw = ctx.viewport_width;
-    let vh = ctx.viewport_height;
-
-    EdgeOption {
-        left: spacing
-            .margin_left
-            .resolve_with(ctx.containing_block_width, vw, vh),
-        top: spacing
-            .margin_top
-            .resolve_with(Some(containing_width), vw, vh),
-        right: spacing
-            .margin_right
-            .resolve_with(ctx.containing_block_width, vw, vh),
-        bottom: spacing
-            .margin_bottom
-            .resolve_with(Some(containing_width), vw, vh),
-    }
 }
 
 /// Creates a box model with specified dimensions and spacing.
