@@ -1,7 +1,7 @@
 use crate::{
-    BoxModel, BoxSizing, FlexDirection, FragmentNode, InlineBox, InnerDisplay, ItemFragment,
-    LayoutBox, LayoutChild, LayoutNode, Length, LengthOrAuto, LineSpan, OuterDisplay, Placement,
-    Rect, Spacing, Style,
+    AlignItems, BoxModel, BoxSizing, FlexDirection, FragmentNode, InlineBox, InnerDisplay,
+    ItemFragment, LayoutBox, LayoutChild, LayoutNode, LengthOrAuto, LineSpan, OuterDisplay,
+    Placement, Rect, Spacing, Style,
 };
 
 #[derive(Clone, Copy, Default)]
@@ -27,6 +27,47 @@ impl EdgeOption {
             right: self.right.unwrap_or_default(),
             bottom: self.bottom.unwrap_or_default(),
             left: self.left.unwrap_or_default(),
+        }
+    }
+}
+
+pub enum FlexItem {
+    Node(usize),
+    Fragments(std::ops::Range<usize>),
+}
+
+#[derive(Clone)]
+struct FlexItemState {
+    frozen_grow: bool,
+    frozen_shrink: bool,
+
+    // content-box main size (base or current)
+    main_size: f32,
+
+    main_padding: (f32, f32),
+    main_border: (f32, f32),
+    main_margin: (f32, f32),
+
+    main_min: Option<f32>,
+    main_max: Option<f32>,
+
+    grow: f32,
+    shrink: f32,
+}
+
+impl Default for FlexItemState {
+    fn default() -> Self {
+        Self {
+            frozen_grow: true,
+            frozen_shrink: true,
+            main_size: 0.0,
+            main_padding: (0.0, 0.0),
+            main_border: (0.0, 0.0),
+            main_margin: (0.0, 0.0),
+            main_min: None,
+            main_max: None,
+            grow: 0.0,
+            shrink: 1.0,
         }
     }
 }
@@ -110,6 +151,20 @@ impl Axis {
         }
     }
 
+    fn rect_main(&self, rect: &Rect) -> f32 {
+        match self {
+            Axis::Horizontal => rect.width,
+            Axis::Vertical => rect.height,
+        }
+    }
+
+    fn rect_cross(&self, rect: &Rect) -> f32 {
+        match self {
+            Axis::Horizontal => rect.height,
+            Axis::Vertical => rect.width,
+        }
+    }
+
     fn size_main<'a>(&self, size: &'a crate::SizeStyle) -> &'a LengthOrAuto {
         match self {
             Axis::Horizontal => &size.width,
@@ -135,62 +190,6 @@ impl Axis {
         match self {
             Axis::Horizontal => &size.max_width,
             Axis::Vertical => &size.max_height,
-        }
-    }
-
-    fn min_cross<'a>(&self, size: &'a crate::SizeStyle) -> &'a LengthOrAuto {
-        match self {
-            Axis::Horizontal => &size.min_height,
-            Axis::Vertical => &size.min_width,
-        }
-    }
-
-    fn max_cross<'a>(&self, size: &'a crate::SizeStyle) -> &'a LengthOrAuto {
-        match self {
-            Axis::Horizontal => &size.max_height,
-            Axis::Vertical => &size.max_width,
-        }
-    }
-
-    fn padding_main<'a>(&self, spacing: &'a Spacing) -> (&'a Length, &'a Length) {
-        match self {
-            Axis::Horizontal => (&spacing.padding_left, &spacing.padding_right),
-            Axis::Vertical => (&spacing.padding_top, &spacing.padding_bottom),
-        }
-    }
-
-    fn padding_cross<'a>(&self, spacing: &'a Spacing) -> (&'a Length, &'a Length) {
-        match self {
-            Axis::Horizontal => (&spacing.padding_top, &spacing.padding_bottom),
-            Axis::Vertical => (&spacing.padding_left, &spacing.padding_right),
-        }
-    }
-
-    fn border_main<'a>(&self, spacing: &'a Spacing) -> (&'a Length, &'a Length) {
-        match self {
-            Axis::Horizontal => (&spacing.border_left, &spacing.border_right),
-            Axis::Vertical => (&spacing.border_top, &spacing.border_bottom),
-        }
-    }
-
-    fn border_cross<'a>(&self, spacing: &'a Spacing) -> (&'a Length, &'a Length) {
-        match self {
-            Axis::Horizontal => (&spacing.border_top, &spacing.border_bottom),
-            Axis::Vertical => (&spacing.border_left, &spacing.border_right),
-        }
-    }
-
-    fn margin_main_start<'a>(&self, s: &'a Spacing) -> &'a LengthOrAuto {
-        match self {
-            Axis::Horizontal => &s.margin_left,
-            Axis::Vertical => &s.margin_top,
-        }
-    }
-
-    fn margin_main_end<'a>(&self, s: &'a Spacing) -> &'a LengthOrAuto {
-        match self {
-            Axis::Horizontal => &s.margin_right,
-            Axis::Vertical => &s.margin_bottom,
         }
     }
 
@@ -576,6 +575,8 @@ impl LayoutEngine {
         todo!()
     }
 
+    /// Layout of Flex child elements
+    /// Layouts flex children with flex algorithm.
     fn layout_flex_children(
         &self,
         node: &mut LayoutNode,
@@ -583,7 +584,409 @@ impl LayoutEngine {
         intrinsic_pass: bool,
         base_ctx_for_children: &LayoutContext,
     ) -> (f32, f32) {
-        todo!()
+        let children_count = node.children.len();
+        if children_count == 0 {
+            return (0.0, 0.0);
+        }
+
+        let cbm = base_ctx_for_children.containing_block_main(axis);
+        let cbc = base_ctx_for_children.containing_block_cross(axis);
+        let vw = self.viewport_width;
+        let vh = self.viewport_height;
+
+        let gap = axis
+            .gap(&node.style)
+            .resolve_with(cbm, vw, vh)
+            .unwrap_or(0.0)
+            .max(0.0);
+
+        // --------- Conver to FlexItem ----------
+        let mut flex_items = Vec::with_capacity(children_count);
+
+        let mut iter = node.children.iter().enumerate().peekable();
+
+        while let Some((i, child)) = iter.next() {
+            match child {
+                LayoutChild::Node(_) => {
+                    flex_items.push(FlexItem::Node(i));
+                }
+
+                LayoutChild::Fragment(_) => {
+                    let start = i;
+                    let mut end = i + 1;
+
+                    while let Some((next_i, LayoutChild::Fragment(_))) = iter.peek() {
+                        end = *next_i + 1;
+                        iter.next();
+                    }
+
+                    flex_items.push(FlexItem::Fragments(start..end));
+                }
+            }
+        }
+
+        // ---------- Intrinsic pass ----------
+        let item_len = flex_items.len();
+
+        let mut states = vec![FlexItemState::default(); item_len];
+        let mut total_grow = 0.0;
+
+        for (item, state) in flex_items.iter_mut().zip(states.iter_mut()) {
+            match item {
+                FlexItem::Node(index) => {
+                    let ctx = base_ctx_for_children;
+                    let node = node.children.get_mut(*index).unwrap().node_mut().unwrap();
+
+                    let padding = self.resolve_padding(&node.style.spacing, ctx);
+                    state.main_padding = axis.edge_main(&padding);
+
+                    let border = self.resolve_border(&node.style.spacing, ctx);
+                    state.main_border = axis.edge_main(&border);
+
+                    let margin = self
+                        .resolve_margin(&node.style.spacing, ctx)
+                        .unwrap_or_default();
+                    state.main_margin = axis.edge_main(&margin);
+
+                    state.main_min = axis.min_main(&node.style.size).resolve_with(cbm, vw, vh);
+
+                    state.main_max = axis.max_main(&node.style.size).resolve_with(cbm, vw, vh);
+
+                    let basis = node.style.item_style.flex_basis.resolve_with(cbm, vw, vh);
+
+                    let base_content_main = match basis {
+                        Some(v) => v,
+                        None => {
+                            let explicit = axis
+                                .size_main(&node.style.size)
+                                .resolve_with(cbm, vw, vh)
+                                .map(|s| {
+                                    resolve_content_size_with_box_sizing(
+                                        &node.style.box_sizing,
+                                        s,
+                                        state.main_padding,
+                                        state.main_border,
+                                    )
+                                });
+
+                            match explicit {
+                                None => {
+                                    let _ = self.layout_node(
+                                        node,
+                                        base_ctx_for_children,
+                                        EMPTY_LINE_CONTEXT,
+                                        true,
+                                    );
+
+                                    if let LayoutBox::BlockBox(ref box_model) = node.layout_box {
+                                        axis.rect_main(&box_model.content_box)
+                                    } else {
+                                        0.0
+                                    }
+                                }
+                                Some(v) => {
+                                    state.frozen_grow = true;
+                                    state.frozen_shrink = true;
+                                    v
+                                }
+                            }
+                        }
+                    };
+
+                    if !state.frozen_grow {
+                        total_grow += node.style.item_style.flex_grow;
+                        if node.style.item_style.flex_grow == 0.0 {
+                            state.frozen_grow = true;
+                        }
+                    }
+
+                    if node.style.item_style.flex_shrink == 0.0 {
+                        state.frozen_shrink = true;
+                    }
+
+                    state.main_size = base_content_main;
+
+                    state.grow = node.style.item_style.flex_grow;
+                    state.shrink = node.style.item_style.flex_shrink;
+                }
+                FlexItem::Fragments(range) => {
+                    state.main_size = match axis {
+                        Axis::Horizontal => node.children[range.clone()]
+                            .iter()
+                            .map(|f| f.fragment().unwrap().node.width())
+                            .sum(),
+                        Axis::Vertical => {
+                            let (spans, _) = Self::flow_fragments(
+                                &mut node.children[range.clone()]
+                                    .iter_mut()
+                                    .map(|f| f.fragment_mut().unwrap())
+                                    .collect(),
+                                EMPTY_LINE_CONTEXT,
+                                node.style
+                                    .line_height
+                                    .resolve_with(None, vw, vh)
+                                    .unwrap_or_default(),
+                                base_ctx_for_children.containing_block_width.unwrap_or(vw),
+                            );
+                            spans
+                                .iter()
+                                .map(|s| s.width())
+                                .filter(|v| !v.is_nan())
+                                .max_by(f32::total_cmp)
+                                .unwrap_or(0.0)
+                        }
+                    };
+                }
+            }
+        }
+
+        let total_base_main: f32 = states.iter().map(|i| i.main_size).sum();
+
+        let total_main_padding: f32 = states
+            .iter()
+            .map(|i| i.main_padding.0 + i.main_padding.1)
+            .sum();
+
+        let total_main_border: f32 = states
+            .iter()
+            .map(|i| i.main_border.0 + i.main_border.1)
+            .sum();
+
+        let total_main_margin: f32 = states
+            .iter()
+            .map(|i| i.main_margin.0 + i.main_margin.1)
+            .sum();
+
+        // number of gaps = items - 1 (if at least 2 items)
+        let gaps = gap * item_len.saturating_sub(1) as f32;
+
+        let mut remaining = cbm
+            .map(|m| {
+                m - (total_base_main
+                    + gaps
+                    + total_main_padding
+                    + total_main_border
+                    + total_main_margin)
+            })
+            .unwrap_or(0.0);
+
+        // ---------- redistribute loop ----------
+
+        loop {
+            if remaining > 0.0 {
+                if total_grow <= 0.0 {
+                    break;
+                }
+
+                let mut used = 0.0;
+
+                for i in 0..item_len {
+                    if states[i].frozen_grow {
+                        continue;
+                    }
+
+                    let item = &flex_items[i];
+                    let grow = states[i].grow;
+
+                    let delta = remaining * (grow / total_grow);
+
+                    let min = states[i].main_min;
+                    let max = states[i].main_max;
+
+                    let proposed_content = states[i].main_size + delta;
+                    let clamped_content = if let FlexItem::Node(index) = item {
+                        let item_box_sizing =
+                            node.children[*index].node().unwrap().style.box_sizing;
+                        match item_box_sizing {
+                            BoxSizing::ContentBox => clamp(proposed_content, min, max),
+                            BoxSizing::BorderBox => {
+                                let padding_border_main = states[i].main_padding.0
+                                    + states[i].main_padding.1
+                                    + states[i].main_border.0
+                                    + states[i].main_border.1;
+                                let proposed_border = proposed_content + padding_border_main;
+
+                                let clamped_border = clamp(proposed_border, min, max);
+
+                                (clamped_border - padding_border_main).max(0.0)
+                            }
+                        }
+                    } else {
+                        proposed_content
+                    };
+
+                    let actual = clamped_content - states[i].main_size;
+
+                    states[i].main_size = clamped_content;
+                    used += actual;
+
+                    if proposed_content != clamped_content {
+                        states[i].frozen_grow = true;
+                        total_grow -= grow;
+                    }
+                }
+
+                remaining -= used;
+
+                if used.abs() < 0.001 {
+                    break;
+                }
+            } else {
+                // negative remaining = overflow
+                let mut total_shrink_factor = 0.0;
+
+                for i in 0..item_len {
+                    if states[i].frozen_shrink {
+                        continue;
+                    }
+
+                    let shrink = states[i].shrink;
+                    total_shrink_factor += shrink * states[i].main_size;
+                }
+
+                if total_shrink_factor <= 0.0 {
+                    break;
+                }
+
+                let mut used = 0.0;
+
+                for i in 0..item_len {
+                    if states[i].frozen_shrink {
+                        continue;
+                    }
+
+                    let item = &flex_items[i];
+
+                    let shrink = states[i].shrink;
+                    let basis = states[i].main_size;
+
+                    let ratio = (shrink * basis) / total_shrink_factor;
+
+                    let delta = remaining * ratio; // remaining is negative
+                    let new_size = states[i].main_size + delta;
+
+                    let min = states[i].main_min;
+                    let max = states[i].main_max;
+
+                    let proposed_content = states[i].main_size + delta;
+                    let clamped_content = if let FlexItem::Node(index) = item {
+                        let item_box_sizing =
+                            node.children[*index].node().unwrap().style.box_sizing;
+                        match item_box_sizing {
+                            BoxSizing::ContentBox => clamp(proposed_content, min, max),
+                            BoxSizing::BorderBox => {
+                                let padding_border_main = states[i].main_padding.0
+                                    + states[i].main_padding.1
+                                    + states[i].main_border.0
+                                    + states[i].main_border.1;
+                                let proposed_border = proposed_content + padding_border_main;
+
+                                let clamped_border = clamp(proposed_border, min, max);
+
+                                (clamped_border - padding_border_main).max(0.0)
+                            }
+                        }
+                    } else {
+                        proposed_content
+                    };
+
+                    let actual = clamped_content - states[i].main_size;
+
+                    states[i].main_size = clamped_content;
+                    used += actual;
+
+                    if (clamped_content - new_size).abs() > 0.001 {
+                        states[i].frozen_shrink = true;
+                    }
+                }
+
+                remaining -= used;
+
+                if used.abs() < 0.001 {
+                    break;
+                }
+            }
+        }
+
+        // ---------- final layout ----------
+
+        let mut total_border_main: f32 = 0.0;
+        let mut max_cross: f32 = 0.0;
+
+        for (item, state) in flex_items.iter().zip(states) {
+            match item {
+                FlexItem::Node(index) => {
+                    let child = node.children.get_mut(*index).unwrap().node_mut().unwrap();
+
+                    let is_auto_margin = axis
+                        .margin_cross_start(&child.style.spacing)
+                        .resolve_with(cbc, vw, vh)
+                        .is_none()
+                        || axis
+                            .margin_cross_end(&child.style.spacing)
+                            .resolve_with(cbc, vw, vh)
+                            .is_none();
+
+                    let align = child
+                        .style
+                        .item_style
+                        .align_self
+                        .unwrap_or(node.style.align_items);
+
+                    let is_auto_cross = axis.size_cross(&child.style.size) == &LengthOrAuto::Auto;
+
+                    let stretched_cross =
+                        if !is_auto_margin && matches!(align, AlignItems::Stretch) && is_auto_cross
+                        {
+                            cbc.map(|v| {
+                                v - axis
+                                    .margin_cross_start(&child.style.spacing)
+                                    .resolve_with(cbc, vw, vh)
+                                    .unwrap_or(0.0)
+                                    - axis
+                                        .margin_cross_end(&child.style.spacing)
+                                        .resolve_with(cbc, vw, vh)
+                                        .unwrap_or(0.0)
+                            })
+                        } else {
+                            None
+                        };
+
+                    let (parent_assigned_border_width, parent_assigned_border_height) = {
+                        let main_bargin_box = state.main_size
+                            + state.main_padding.0
+                            + state.main_padding.1
+                            + state.main_border.0
+                            + state.main_border.1;
+                        match axis {
+                            Axis::Horizontal => (Some(main_bargin_box), stretched_cross),
+                            Axis::Vertical => (stretched_cross, Some(main_bargin_box)),
+                        }
+                    };
+
+                    let ctx_for_child = LayoutContext {
+                        parent_assigned_border_width,
+                        parent_assigned_border_height,
+                        ..*base_ctx_for_children
+                    };
+
+                    let _ =
+                        self.layout_node(child, &ctx_for_child, EMPTY_LINE_CONTEXT, intrinsic_pass);
+
+                    if let LayoutBox::BlockBox(box_model) = &child.layout_box {
+                        total_border_main += axis.rect_main(&box_model.border_box);
+                        max_cross = max_cross.max(axis.rect_cross(&box_model.border_box));
+                    }
+                }
+                FlexItem::Fragments(_) => {
+                    todo!()
+                }
+            }
+        }
+
+        let children_main = total_border_main + gaps;
+
+        (children_main, max_cross)
     }
 
     fn flow_fragments(
