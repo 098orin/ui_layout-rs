@@ -21,7 +21,7 @@ pub struct EdgeOption {
 }
 
 impl EdgeOption {
-    pub fn unwrap_or_default(self) -> Edge {
+    fn unwrap_or_default(self) -> Edge {
         Edge {
             top: self.top.unwrap_or_default(),
             right: self.right.unwrap_or_default(),
