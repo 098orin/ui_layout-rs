@@ -108,22 +108,6 @@ impl LayoutContext {
             Axis::Vertical => self.containing_block_width,
         }
     }
-
-    /// Returns parent-assigned border-box size along the main axis (for stretch/relative fallback).
-    fn parent_assigned_border_main(&self, axis: Axis) -> Option<f32> {
-        match axis {
-            Axis::Horizontal => self.parent_assigned_border_width,
-            Axis::Vertical => self.parent_assigned_border_height,
-        }
-    }
-
-    /// Returns parent-assigned border-box size along the cross axis.
-    fn parent_assigned_border_cross(&self, axis: Axis) -> Option<f32> {
-        match axis {
-            Axis::Horizontal => self.parent_assigned_border_height,
-            Axis::Vertical => self.parent_assigned_border_width,
-        }
-    }
 }
 
 /// Axis orientation
@@ -1070,6 +1054,9 @@ impl LayoutEngine {
     }
 
     /// ((content_width_opt, content_height_opt), border, padding)
+    ///
+    /// TODO:
+    /// - Handle min/max with box-sizing correctly.
     fn resolve_base_content_size_and_spacing(
         &self,
         size_style: &crate::SizeStyle,
@@ -1092,6 +1079,9 @@ impl LayoutEngine {
                 let border_edge = (border.left, border.right);
                 resolve_content_size_with_box_sizing(box_sizing, width, padding_edge, border_edge)
             })
+            .or(ctx
+                .parent_assigned_border_width
+                .map(|v| v - (padding.left + padding.right) - (border.left + border.right)))
             .map(|width| self.apply_size_constraints(width, size_style, ctx, true));
 
         // --- height ---
@@ -1103,6 +1093,9 @@ impl LayoutEngine {
                 let border_edge = (border.top, border.bottom);
                 resolve_content_size_with_box_sizing(box_sizing, height, padding_edge, border_edge)
             })
+            .or(ctx
+                .parent_assigned_border_height
+                .map(|v| v - (padding.top + padding.bottom) - (border.top + border.bottom)))
             .map(|height| self.apply_size_constraints(height, size_style, ctx, false));
 
         ((content_width, content_height), border, padding)
