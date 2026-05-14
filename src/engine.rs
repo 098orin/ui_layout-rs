@@ -543,7 +543,7 @@ impl LayoutEngine {
 
         let (content_width_opt, content_height_opt) = content_size_opt;
 
-        let (mut children_main, mut children_cross) =
+        let (children_main, children_cross) =
             if !intrinsic_pass || content_width_opt.is_none() || content_height_opt.is_none() {
                 let base_ctx_for_children = LayoutContext {
                     containing_block_width: content_height_opt,
@@ -556,7 +556,70 @@ impl LayoutEngine {
             } else {
                 (0.0, 0.0)
             };
-        todo!()
+
+        let (mut children_width, mut children_height) = match axis {
+            Axis::Horizontal => (children_main, children_cross),
+            Axis::Vertical => (children_cross, children_main),
+        };
+
+        // Fallback to children size
+        let width_before_constraints = content_width_opt.unwrap_or(children_width);
+
+        let height_before_constraints = content_height_opt.unwrap_or(children_height);
+
+        // Apply min/max
+        let final_width =
+            self.apply_size_constraints(width_before_constraints, &node.style.size, &ctx, true);
+
+        let final_height =
+            self.apply_size_constraints(height_before_constraints, &node.style.size, &ctx, false);
+
+        // Detect whether constraints changed size
+        let relayout_needed = (Some(final_width) != content_width_opt
+            || Some(final_height) != content_height_opt)
+            && !intrinsic_pass;
+
+        if relayout_needed {
+            // Update context
+            let base_ctx_for_children = LayoutContext {
+                containing_block_width: Some(final_width),
+                containing_block_height: Some(final_height),
+                available_width: None,
+                parent_assigned_border_width: None,
+                parent_assigned_border_height: None,
+            };
+
+            let (new_main, new_cross) =
+                self.layout_flex_children(node, axis, intrinsic_pass, &base_ctx_for_children);
+
+            (children_width, children_height) = match axis {
+                Axis::Horizontal => (new_main, new_cross),
+                Axis::Vertical => (new_cross, new_main),
+            };
+        }
+
+        // Create box model
+        node.layout_box = {
+            let padding = self.resolve_padding(&node.style.spacing, ctx);
+            let border = self.resolve_border(&node.style.spacing, ctx);
+
+            LayoutBox::BlockBox(create_box_model(
+                final_width,
+                final_height,
+                children_width,
+                children_height,
+                padding,
+                border,
+            ))
+        };
+
+        let ((end_x, end_y), (parent_current_x, line_start_x), parent_line_index) = line_ctx;
+
+        (
+            (end_x + node.layout_box.width(), end_y),
+            (parent_current_x + node.layout_box.width(), line_start_x),
+            parent_line_index,
+        )
     }
 
     /// Layout of Flex child elements
