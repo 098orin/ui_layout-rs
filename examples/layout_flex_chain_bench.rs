@@ -47,7 +47,7 @@ fn make_flex_chain(depth: usize, max_depth: usize) -> LayoutNode {
     // Block の中にさらに Flex
     block.children.push(LayoutChild::Node(Box::new(make_flex_chain(depth + 1, max_depth))));
 
-    root.children.push(block);
+    root.children.push(LayoutChild::Node(Box::new(block)));
     root
 }
 
