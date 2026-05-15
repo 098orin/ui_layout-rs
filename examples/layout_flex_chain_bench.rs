@@ -68,11 +68,11 @@ fn make_branch(depth: usize, max_depth: usize) -> LayoutNode {
             outer: OuterDisplay::Block,
             inner: InnerDisplay::Flex,
         });
-        side.children.push(node(Display {
+        side.children.push(LayoutChild::Node(Box::new(node(Display {
             outer: OuterDisplay::Block,
             inner: InnerDisplay::Flex,
-        }));
-        flex.children.push(side);
+        }))));
+        flex.children.push(LayoutChild::Node(Box::new(side)));
     }
 
     flex
