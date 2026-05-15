@@ -6,8 +6,8 @@ fn node(display: Display) -> LayoutNode {
     LayoutNode::new(Style {
         display,
         spacing: Spacing {
-            margin_left: Length::Px(2.0),
-            margin_right: Length::Px(2.0),
+            margin_left: LengthOrAuto::Length(Length::Px(2.0)),
+            margin_right: LengthOrAuto::Length(Length::Px(2.0)),
             padding_left: Length::Px(1.0),
             padding_right: Length::Px(1.0),
             border_left: Length::Px(1.0),
@@ -15,8 +15,8 @@ fn node(display: Display) -> LayoutNode {
             ..Default::default()
         },
         size: SizeStyle {
-            min_width: Length::Px(0.0),
-            max_width: Length::Px(10_000.0),
+            min_width: LengthOrAuto::Length(Length::Px(0.0)),
+            max_width: LengthOrAuto::Length(Length::Px(10_000.0)),
             ..Default::default()
         },
         ..Default::default()
@@ -31,10 +31,10 @@ fn make_flex_chain(depth: usize, max_depth: usize) -> LayoutNode {
     });
 
     if depth >= max_depth {
-        root.children.push(node(Display {
+        root.children.push(LayoutChild::Node(Box::new(node(Display {
             outer: OuterDisplay::Block,
             inner: InnerDisplay::Flow,
-        }));
+        }))));
         return root;
     }
 
@@ -45,9 +45,9 @@ fn make_flex_chain(depth: usize, max_depth: usize) -> LayoutNode {
     });
 
     // Block の中にさらに Flex
-    block.children.push(make_flex_chain(depth + 1, max_depth));
+    block.children.push(LayoutChild::Node(Box::new(make_flex_chain(depth + 1, max_depth))));
 
-    root.children.push(block);
+    root.children.push(LayoutChild::Node(Box::new(block)));
     root
 }
 
@@ -61,18 +61,18 @@ fn make_branch(depth: usize, max_depth: usize) -> LayoutNode {
     flex.style.flex_direction = FlexDirection::Column;
 
     // 子は少ない（1〜2）
-    flex.children.push(make_flex_chain(depth, max_depth));
+    flex.children.push(LayoutChild::Node(Box::new(make_flex_chain(depth, max_depth))));
 
-    if depth % 3 == 0 {
+    if depth.is_multiple_of(3) {
         let mut side = node(Display {
             outer: OuterDisplay::Block,
             inner: InnerDisplay::Flex,
         });
-        side.children.push(node(Display {
+        side.children.push(LayoutChild::Node(Box::new(node(Display {
             outer: OuterDisplay::Block,
             inner: InnerDisplay::Flex,
-        }));
-        flex.children.push(side);
+        }))));
+        flex.children.push(LayoutChild::Node(Box::new(side)));
     }
 
     flex
@@ -85,13 +85,13 @@ fn make_tree() -> LayoutNode {
     });
 
     // 上位は Block
-    root.children.push(node(Display {
+    root.children.push(LayoutChild::Node(Box::new(node(Display {
         outer: OuterDisplay::Block,
         inner: InnerDisplay::Flex,
-    }));
+    }))));
 
     // 問題の塊
-    root.children.push(make_branch(0, 20));
+    root.children.push(LayoutChild::Node(Box::new(make_branch(0, 20))));
 
     root
 }
