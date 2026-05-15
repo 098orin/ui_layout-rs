@@ -9,7 +9,7 @@ pub enum OuterDisplay {
     None,
 }
 
-/// Represents the inner display type of a box.
+/// Represents the inner display type of box.
 ///
 /// This defines how children are laid out inside the element.
 /// In CSS terms, this is the "inner display type".
