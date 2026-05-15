@@ -85,13 +85,13 @@ fn make_tree() -> LayoutNode {
     });
 
     // 上位は Block
-    root.children.push(node(Display {
+    root.children.push(LayoutChild::Node(Box::new(node(Display {
         outer: OuterDisplay::Block,
         inner: InnerDisplay::Flex,
-    }));
+    }))));
 
     // 問題の塊
-    root.children.push(make_branch(0, 20));
+    root.children.push(LayoutChild::Node(Box::new(make_branch(0, 20))));
 
     root
 }
