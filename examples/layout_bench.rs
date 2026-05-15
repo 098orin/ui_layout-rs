@@ -35,7 +35,6 @@ fn make_node(is_flex: bool) -> LayoutNode {
             border_right: Length::Px(1.0),
             border_top: Length::Px(1.0),
             border_bottom: Length::Px(1.0),
-            ..Default::default()
         },
         ..Default::default()
     })
