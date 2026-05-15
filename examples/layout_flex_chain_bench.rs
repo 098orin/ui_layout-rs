@@ -61,7 +61,7 @@ fn make_branch(depth: usize, max_depth: usize) -> LayoutNode {
     flex.style.flex_direction = FlexDirection::Column;
 
     // 子は少ない（1〜2）
-    flex.children.push(make_flex_chain(depth, max_depth));
+    flex.children.push(LayoutChild::Node(Box::new(make_flex_chain(depth, max_depth))));
 
     if depth % 3 == 0 {
         let mut side = node(Display {
