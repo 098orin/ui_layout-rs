@@ -41,7 +41,7 @@ fn make_node(is_flex: bool) -> LayoutNode {
 }
 
 fn make_tree(depth: usize, max_depth: usize, remaining: &mut usize) -> LayoutNode {
-    let is_flex = depth % 2 == 0; // Flex -> Block -> Flex -> ...
+    let is_flex = depth.is_multiple_of(2); // Flex -> Block -> Flex -> ...
     let mut node = make_node(is_flex);
 
     if depth >= max_depth || *remaining == 0 {
