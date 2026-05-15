@@ -31,10 +31,10 @@ fn make_flex_chain(depth: usize, max_depth: usize) -> LayoutNode {
     });
 
     if depth >= max_depth {
-        root.children.push(node(Display {
+        root.children.push(LayoutChild::Node(Box::new(node(Display {
             outer: OuterDisplay::Block,
             inner: InnerDisplay::Flow,
-        }));
+        }))));
         return root;
     }
 
