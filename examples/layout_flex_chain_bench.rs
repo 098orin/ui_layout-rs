@@ -63,7 +63,7 @@ fn make_branch(depth: usize, max_depth: usize) -> LayoutNode {
     // 子は少ない（1〜2）
     flex.children.push(LayoutChild::Node(Box::new(make_flex_chain(depth, max_depth))));
 
-    if depth % 3 == 0 {
+    if depth.is_multiple_of(3) {
         let mut side = node(Display {
             outer: OuterDisplay::Block,
             inner: InnerDisplay::Flex,
