@@ -69,8 +69,10 @@ fn make_tree(depth: usize, max_depth: usize, remaining: &mut usize) -> LayoutNod
         *remaining -= 1;
         children.push(make_tree(depth + 1, max_depth, remaining));
     }
-
-    node.children = children;
+    node.children = children
+        .into_iter()
+        .map(|n| LayoutChild::Node(Box::new(n)))
+        .collect();
     node
 }
 
