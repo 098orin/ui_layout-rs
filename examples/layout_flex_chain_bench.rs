@@ -6,8 +6,8 @@ fn node(display: Display) -> LayoutNode {
     LayoutNode::new(Style {
         display,
         spacing: Spacing {
-            margin_left: Length::Px(2.0),
-            margin_right: Length::Px(2.0),
+            margin_left: LengthOrAuto::Length(Length::Px(2.0)),
+            margin_right: LengthOrAuto::Length(Length::Px(2.0)),
             padding_left: Length::Px(1.0),
             padding_right: Length::Px(1.0),
             border_left: Length::Px(1.0),
@@ -15,8 +15,8 @@ fn node(display: Display) -> LayoutNode {
             ..Default::default()
         },
         size: SizeStyle {
-            min_width: Length::Px(0.0),
-            max_width: Length::Px(10_000.0),
+            min_width: LengthOrAuto::Length(Length::Px(0.0)),
+            max_width: LengthOrAuto::Length(Length::Px(10_000.0)),
             ..Default::default()
         },
         ..Default::default()
