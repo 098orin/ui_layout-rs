@@ -1,7 +1,7 @@
 use crate::{
     AlignItems, BoxModel, BoxSizing, FlexDirection, FragmentNode, InlineBox, InnerDisplay,
-    ItemFragment, LayoutBox, LayoutChild, LayoutNode, LengthOrAuto, LineSpan, OuterDisplay,
-    Placement, Rect, Spacing, Style,
+    ItemFragment, JustifyContent, LayoutBox, LayoutChild, LayoutNode, LengthOrAuto, LineSpan,
+    OuterDisplay, Placement, Rect, Spacing, Style,
 };
 
 #[derive(Clone, Copy, Default)]
@@ -1080,6 +1080,240 @@ impl LayoutEngine {
         (children_main, max_cross)
     }
 
+    /// Set child positions.
+    fn flow_flex_children(
+        &self,
+        node: &mut LayoutNode,
+        axis: Axis,
+        intrinsic_pass: bool,
+        ctx: &LayoutContext,
+    ) {
+        if intrinsic_pass {
+            return;
+        }
+
+        if node.children.is_empty() {
+            return;
+        }
+
+        // Only position children when we have a block box for the parent
+        let content_box = match &node.layout_box {
+            LayoutBox::BlockBox(box_model) => &box_model.content_box,
+            _ => return,
+        };
+
+        // Resolve gap between flex items
+        let vw = self.viewport_width;
+        let vh = self.viewport_height;
+        let gap = axis
+            .gap(&node.style)
+            .resolve_with(ctx.containing_block_main(axis), vw, vh)
+            .unwrap_or(0.0)
+            .max(0.0);
+
+        // Calculate total size of all flex children along the main axis
+        let children_main_total: f32 = node
+            .children
+            .iter()
+            .map(|child| match child {
+                crate::LayoutChild::Node(n) => match &n.layout_box {
+                    LayoutBox::BlockBox(box_model) => axis.rect_main(&box_model.border_box),
+                    _ => 0.0,
+                },
+                crate::LayoutChild::Fragment(_) => 0.0,
+            })
+            .sum();
+
+        // Calculate total gap between items
+        let gaps_total = if node.children.len() > 1 {
+            gap * (node.children.len() as f32 - 1.0)
+        } else {
+            0.0
+        };
+
+        // Remaining space for justify-content distribution
+        let remaining_space = axis.rect_main(content_box) - children_main_total - gaps_total;
+
+        // Count auto margins on main axis
+        let mut auto_margin_count = 0usize;
+
+        for child in &node.children {
+            if let crate::LayoutChild::Node(n) = child {
+                let spacing = &n.style.spacing;
+                match axis {
+                    Axis::Horizontal => {
+                        if spacing.margin_left == crate::LengthOrAuto::Auto {
+                            auto_margin_count += 1;
+                        }
+                        if spacing.margin_right == crate::LengthOrAuto::Auto {
+                            auto_margin_count += 1;
+                        }
+                    }
+                    Axis::Vertical => {
+                        if spacing.margin_top == crate::LengthOrAuto::Auto {
+                            auto_margin_count += 1;
+                        }
+                        if spacing.margin_bottom == crate::LengthOrAuto::Auto {
+                            auto_margin_count += 1;
+                        }
+                    }
+                }
+            }
+        }
+
+        let has_auto_margins = auto_margin_count > 0;
+        let remaining_space_for_auto = if has_auto_margins {
+            remaining_space.max(0.0)
+        } else {
+            remaining_space
+        };
+
+        let auto_unit = if has_auto_margins && auto_margin_count > 0 {
+            remaining_space_for_auto / (auto_margin_count as f32)
+        } else {
+            0.0
+        };
+
+        // Auto margins take precedence over justify-content
+        let (start_offset, gap_between) = if has_auto_margins {
+            (0.0, 0.0)
+        } else {
+            resolve_justify_content(
+                node.style.justify_content,
+                remaining_space.max(0.0),
+                node.children.len(),
+            )
+        };
+
+        // Position each flex child
+        let mut cursor_main = start_offset;
+
+        for child in &mut node.children {
+            match child {
+                crate::LayoutChild::Node(n) => {
+                    let child_node = n.as_mut();
+
+                    // Resolved numeric margins (fall back to 0.0 for auto; we'll handle autos separately)
+                    let child_margin = self
+                        .resolve_margin(&child_node.style.spacing, ctx)
+                        .unwrap_or_default();
+                    let (mut margin_start_resolved, mut margin_end_resolved) =
+                        axis.edge_main(&child_margin);
+
+                    // Detect auto margins on main axis
+                    let (margin_start_auto, margin_end_auto) = match axis {
+                        Axis::Horizontal => (
+                            child_node.style.spacing.margin_left == crate::LengthOrAuto::Auto,
+                            child_node.style.spacing.margin_right == crate::LengthOrAuto::Auto,
+                        ),
+                        Axis::Vertical => (
+                            child_node.style.spacing.margin_top == crate::LengthOrAuto::Auto,
+                            child_node.style.spacing.margin_bottom == crate::LengthOrAuto::Auto,
+                        ),
+                    };
+
+                    // Compute auto margin widths
+                    let mut margin_start = if margin_start_auto {
+                        auto_unit
+                    } else {
+                        margin_start_resolved
+                    };
+                    let mut margin_end = if margin_end_auto {
+                        auto_unit
+                    } else {
+                        margin_end_resolved
+                    };
+
+                    cursor_main += margin_start;
+
+                    // Position child along main axis
+                    let child_main_pos = match axis {
+                        Axis::Horizontal => content_box.x + cursor_main,
+                        Axis::Vertical => content_box.y + cursor_main,
+                    };
+
+                    // Position child along cross axis (align-items / align-self)
+                    let child_cross_size = match &child_node.layout_box {
+                        LayoutBox::BlockBox(box_model) => axis.rect_cross(&box_model.border_box),
+                        _ => 0.0,
+                    };
+                    let available_cross = axis.rect_cross(content_box);
+
+                    // --- Cross-axis auto margin handling ---
+                    let margin_cross_start_auto = match axis {
+                        Axis::Horizontal => {
+                            child_node.style.spacing.margin_top == crate::LengthOrAuto::Auto
+                        }
+                        Axis::Vertical => {
+                            child_node.style.spacing.margin_left == crate::LengthOrAuto::Auto
+                        }
+                    };
+                    let margin_cross_end_auto = match axis {
+                        Axis::Horizontal => {
+                            child_node.style.spacing.margin_bottom == crate::LengthOrAuto::Auto
+                        }
+                        Axis::Vertical => {
+                            child_node.style.spacing.margin_right == crate::LengthOrAuto::Auto
+                        }
+                    };
+
+                    let cross_offset = if margin_cross_start_auto || margin_cross_end_auto {
+                        let free_cross_space = (available_cross - child_cross_size).max(0.0);
+
+                        if margin_cross_start_auto && margin_cross_end_auto {
+                            free_cross_space / 2.0
+                        } else if margin_cross_start_auto {
+                            free_cross_space
+                        } else {
+                            0.0
+                        }
+                    } else {
+                        // fallback to align-self / align-items
+                        resolve_align_position(
+                            child_node
+                                .style
+                                .item_style
+                                .align_self
+                                .unwrap_or(node.style.align_items),
+                            child_cross_size,
+                            available_cross,
+                        )
+                    };
+
+                    let child_cross_pos = match axis {
+                        Axis::Horizontal => content_box.y + cross_offset,
+                        Axis::Vertical => content_box.x + cross_offset,
+                    };
+
+                    // Compute final child position based on axis orientation
+                    let child_origin = match axis {
+                        Axis::Horizontal => (child_main_pos, child_cross_pos),
+                        Axis::Vertical => (child_cross_pos, child_main_pos),
+                    };
+
+                    // Shift child to final position relative to parent content box
+                    let relative_x = child_origin.0 - content_box.x;
+                    let relative_y = child_origin.1 - content_box.y;
+                    child_node.layout_box.shift(relative_x, relative_y);
+
+                    // Move cursor forward for next child
+                    let child_main_size = match &child_node.layout_box {
+                        LayoutBox::BlockBox(box_model) => axis.rect_main(&box_model.border_box),
+                        _ => 0.0,
+                    };
+
+                    cursor_main += child_main_size + margin_end + gap + gap_between;
+                }
+
+                crate::LayoutChild::Fragment(_) => {
+                    // Fragment placement inside a flex container is not implemented yet.
+                    // For now we skip positioning fragments.
+                    todo!()
+                }
+            }
+        }
+    }
+
     fn flow_fragments(
         fragments: &mut Vec<&mut FragmentNode>,
         line_ctx: LineContext,
@@ -1408,5 +1642,49 @@ fn create_box_model(
         padding_box,
         border_box,
         children_box,
+    }
+}
+
+fn resolve_justify_content(
+    justify: JustifyContent,
+    remaining_space: f32,
+    items: usize,
+) -> (f32, f32) {
+    match justify {
+        JustifyContent::Start => (0.0, 0.0),
+        JustifyContent::Center => (remaining_space / 2.0, 0.0),
+        JustifyContent::End => (remaining_space, 0.0),
+        JustifyContent::SpaceBetween => {
+            if items > 1 {
+                (0.0, remaining_space / (items - 1) as f32)
+            } else {
+                (0.0, 0.0)
+            }
+        }
+        JustifyContent::SpaceAround => {
+            if items > 0 {
+                let gap = remaining_space / items as f32;
+                (gap / 2.0, gap)
+            } else {
+                (0.0, 0.0)
+            }
+        }
+        JustifyContent::SpaceEvenly => {
+            if items > 0 {
+                let gap = remaining_space / (items + 1) as f32;
+                (gap, gap)
+            } else {
+                (0.0, 0.0)
+            }
+        }
+    }
+}
+
+fn resolve_align_position(align: AlignItems, child_size: f32, available: f32) -> f32 {
+    match align {
+        AlignItems::Start => 0.0,
+        AlignItems::Center => ((available - child_size) / 2.0).max(0.0),
+        AlignItems::End => (available - child_size).max(0.0),
+        AlignItems::Stretch => 0.0,
     }
 }
