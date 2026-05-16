@@ -2,7 +2,7 @@ use ui_layout::*;
 
 #[test]
 fn layout_box_into_iter_block_single() {
-    let mut child = LayoutNode::new(Style {
+    let child = LayoutNode::new(Style {
         size: SizeStyle {
             width: LengthOrAuto::Length(Length::Px(60.0)),
             height: LengthOrAuto::Length(Length::Px(30.0)),
