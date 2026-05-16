@@ -58,8 +58,9 @@ struct FlexItemState {
 impl Default for FlexItemState {
     fn default() -> Self {
         Self {
-            frozen_grow: true,
-            frozen_shrink: true,
+            // Initially items are not frozen — they can grow/shrink.
+            frozen_grow: false,
+            frozen_shrink: false,
             main_size: 0.0,
             main_padding: (0.0, 0.0),
             main_border: (0.0, 0.0),
