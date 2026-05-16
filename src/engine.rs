@@ -1198,7 +1198,7 @@ impl LayoutEngine {
                     let child_margin = self
                         .resolve_margin(&child_node.style.spacing, ctx)
                         .unwrap_or_default();
-                    let (mut margin_start_resolved, mut margin_end_resolved) =
+                    let (margin_start_resolved, margin_end_resolved) =
                         axis.edge_main(&child_margin);
 
                     // Detect auto margins on main axis
@@ -1214,12 +1214,12 @@ impl LayoutEngine {
                     };
 
                     // Compute auto margin widths
-                    let mut margin_start = if margin_start_auto {
+                    let margin_start = if margin_start_auto {
                         auto_unit
                     } else {
                         margin_start_resolved
                     };
-                    let mut margin_end = if margin_end_auto {
+                    let margin_end = if margin_end_auto {
                         auto_unit
                     } else {
                         margin_end_resolved
