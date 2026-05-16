@@ -651,7 +651,7 @@ impl LayoutEngine {
             ))
         };
 
-        todo!("TODO: Implment placing children.");
+        self.flow_flex_children(node, axis, intrinsic_pass, ctx);
 
         LineContext {
             end_pos: (
