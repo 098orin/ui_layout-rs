@@ -43,12 +43,12 @@ fn test_child_coordinates_relative_to_parent_content_box() {
 
     let parent_box = match &parent.layout_box {
         LayoutBox::BlockBox(box_model) => box_model,
-        _ => panic!("Expected single box model for parent"),
+        _ => panic!("Expected block box model for parent"),
     };
 
     let child_box = match &node(&parent, 0).layout_box {
         LayoutBox::BlockBox(box_model) => box_model,
-        _ => panic!("Expected single box model for child"),
+        _ => panic!("Expected block box model for child"),
     };
 
     // Parent content box should start at border + padding
@@ -118,17 +118,17 @@ fn test_nested_coordinate_system() {
 
     let root_box = match &root.layout_box {
         LayoutBox::BlockBox(box_model) => box_model,
-        _ => panic!("Expected single box model for root"),
+        _ => panic!("Expected block box model for root"),
     };
 
     let child_box = match &node(&root, 0).layout_box {
         LayoutBox::BlockBox(box_model) => box_model,
-        _ => panic!("Expected single box model for child"),
+        _ => panic!("Expected block box model for child"),
     };
 
     let grandchild_box = match &node(node(&root, 0), 0).layout_box {
         LayoutBox::BlockBox(box_model) => box_model,
-        _ => panic!("Expected single box model for grandchild"),
+        _ => panic!("Expected block box model for grandchild"),
     };
 
     // Root content box
@@ -199,17 +199,17 @@ fn test_flex_children_coordinates() {
 
     let container_box = match &flex_container.layout_box {
         LayoutBox::BlockBox(box_model) => box_model,
-        _ => panic!("Expected single box model for flex container"),
+        _ => panic!("Expected block box model for flex container"),
     };
 
     let child1_box = match &node(&flex_container, 0).layout_box {
         LayoutBox::BlockBox(box_model) => box_model,
-        _ => panic!("Expected single box model for child1"),
+        _ => panic!("Expected block box model for child1"),
     };
 
     let child2_box = match &node(&flex_container, 1).layout_box {
         LayoutBox::BlockBox(box_model) => box_model,
-        _ => panic!("Expected single box model for child2"),
+        _ => panic!("Expected block box model for child2"),
     };
 
     // Container content box
@@ -274,17 +274,17 @@ fn test_block_children_coordinates_with_margins() {
 
     let parent_box = match &parent.layout_box {
         LayoutBox::BlockBox(box_model) => box_model,
-        _ => panic!("Expected single box model for parent"),
+        _ => panic!("Expected block box model for parent"),
     };
 
     let child1_box = match &node(&parent, 0).layout_box {
         LayoutBox::BlockBox(box_model) => box_model,
-        _ => panic!("Expected single box model for child1"),
+        _ => panic!("Expected block box model for child1"),
     };
 
     let child2_box = match &node(&parent, 1).layout_box {
         LayoutBox::BlockBox(box_model) => box_model,
-        _ => panic!("Expected single box model for child2"),
+        _ => panic!("Expected block box model for child2"),
     };
 
     // Parent content box
@@ -339,12 +339,12 @@ fn test_coordinate_system_with_auto_margins() {
 
     let parent_box = match &parent.layout_box {
         LayoutBox::BlockBox(box_model) => box_model,
-        _ => panic!("Expected single box model for parent"),
+        _ => panic!("Expected block box model for parent"),
     };
 
     let child_box = match &node(&parent, 0).layout_box {
         LayoutBox::BlockBox(box_model) => box_model,
-        _ => panic!("Expected single box model for child"),
+        _ => panic!("Expected block box model for child"),
     };
 
     // Parent content box

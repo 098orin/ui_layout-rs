@@ -37,7 +37,7 @@ fn block_basic_box_model() {
             assert_eq!(box_model.border_box.width, 224.0);
             assert_eq!(box_model.border_box.height, 112.0);
         }
-        _ => panic!("Expected single box model"),
+        _ => panic!("Expected block box model"),
     }
 }
 
@@ -69,7 +69,7 @@ fn block_auto_height_from_children() {
         LayoutBox::BlockBox(box_model) => {
             assert_eq!(box_model.content_box.height, 40.0);
         }
-        _ => panic!("Expected single box model"),
+        _ => panic!("Expected block box model"),
     }
 }
 
@@ -112,12 +112,12 @@ fn flex_row_grow() {
 
     let c1_box = match &node(&root, 0).layout_box {
         LayoutBox::BlockBox(box_model) => box_model,
-        _ => panic!("Expected single box model"),
+        _ => panic!("Expected block box model"),
     };
 
     let c2_box = match &node(&root, 1).layout_box {
         LayoutBox::BlockBox(box_model) => box_model,
-        _ => panic!("Expected single box model"),
+        _ => panic!("Expected block box model"),
     };
 
     assert_eq!(c1_box.content_box.width, 150.0);
@@ -165,17 +165,17 @@ fn flex_gap_affects_children_box() {
 
     let root_box = match &root.layout_box {
         LayoutBox::BlockBox(box_model) => box_model,
-        _ => panic!("Expected single box model"),
+        _ => panic!("Expected block box model"),
     };
 
     let child0_box = match &node(&root, 0).layout_box {
         LayoutBox::BlockBox(box_model) => box_model,
-        _ => panic!("Expected single box model"),
+        _ => panic!("Expected block box model"),
     };
 
     let child1_box = match &node(&root, 1).layout_box {
         LayoutBox::BlockBox(box_model) => box_model,
-        _ => panic!("Expected single box model"),
+        _ => panic!("Expected block box model"),
     };
 
     assert_eq!(root_box.children_box.width, 15.0 + 10.0 + 20.0);
@@ -218,7 +218,7 @@ fn flex_align_items_stretch() {
         LayoutBox::BlockBox(box_model) => {
             assert_eq!(box_model.content_box.height, 80.0);
         }
-        _ => panic!("Expected single box model"),
+        _ => panic!("Expected block box model"),
     }
 }
 
@@ -253,7 +253,7 @@ fn block_margin_auto_centering() {
 
     let child_box = match &node(&root, 0).layout_box {
         LayoutBox::BlockBox(box_model) => box_model,
-        _ => panic!("Expected single box model"),
+        _ => panic!("Expected block box model"),
     };
 
     assert_eq!(child_box.border_box.x, 100.0); // (300 - 100) / 2

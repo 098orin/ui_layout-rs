@@ -46,12 +46,12 @@ fn block_vertical_margin_collapsing_between_siblings() {
 
     let c1_box = match &node(&root, 0).layout_box {
         LayoutBox::BlockBox(box_model) => box_model,
-        _ => panic!("Expected single box model"),
+        _ => panic!("Expected block box model"),
     };
 
     let c2_box = match &node(&root, 1).layout_box {
         LayoutBox::BlockBox(box_model) => box_model,
-        _ => panic!("Expected single box model"),
+        _ => panic!("Expected block box model"),
     };
 
     // child1 is at the top so y = 0

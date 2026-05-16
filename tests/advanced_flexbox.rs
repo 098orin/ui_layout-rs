@@ -54,7 +54,7 @@ fn flex_column_layout() {
             assert_eq!(box_model.content_box.height, 40.0);
             assert_eq!(box_model.content_box.width, 200.0);
         }
-        _ => panic!("Expected single box model"),
+        _ => panic!("Expected block box model"),
     }
 
     match &node(&root, 1).layout_box {
@@ -62,7 +62,7 @@ fn flex_column_layout() {
             assert_eq!(box_model.content_box.height, 80.0); // 150 - 40 - 30 = 80
             assert_eq!(box_model.content_box.width, 200.0);
         }
-        _ => panic!("Expected single box model"),
+        _ => panic!("Expected block box model"),
     }
 
     match &node(&root, 2).layout_box {
@@ -70,7 +70,7 @@ fn flex_column_layout() {
             assert_eq!(box_model.content_box.height, 30.0);
             assert_eq!(box_model.content_box.width, 200.0);
         }
-        _ => panic!("Expected single box model"),
+        _ => panic!("Expected block box model"),
     }
 }
 
@@ -128,21 +128,21 @@ fn flex_justify_content_space_evenly() {
         LayoutBox::BlockBox(box_model) => {
             assert!((box_model.border_box.x - 37.5).abs() < 0.1);
         }
-        _ => panic!("Expected single box model"),
+        _ => panic!("Expected block box model"),
     }
 
     match &node(&root, 1).layout_box {
         LayoutBox::BlockBox(box_model) => {
             assert!((box_model.border_box.x - 125.0).abs() < 0.1);
         }
-        _ => panic!("Expected single box model"),
+        _ => panic!("Expected block box model"),
     }
 
     match &node(&root, 2).layout_box {
         LayoutBox::BlockBox(box_model) => {
             assert!((box_model.border_box.x - 222.5).abs() < 0.1);
         }
-        _ => panic!("Expected single box model"),
+        _ => panic!("Expected block box model"),
     }
 }
 
@@ -212,7 +212,7 @@ fn flex_align_items_different_values() {
         LayoutBox::BlockBox(box_model) => {
             assert_eq!(box_model.border_box.y, 0.0);
         }
-        _ => panic!("Expected single box model"),
+        _ => panic!("Expected block box model"),
     }
 
     // Child2: align-self: center -> y = (100 - 40) / 2 = 30
@@ -220,7 +220,7 @@ fn flex_align_items_different_values() {
         LayoutBox::BlockBox(box_model) => {
             assert_eq!(box_model.border_box.y, 30.0);
         }
-        _ => panic!("Expected single box model"),
+        _ => panic!("Expected block box model"),
     }
 
     // Child3: align-self: end -> y = 100 - 20 = 80
@@ -228,7 +228,7 @@ fn flex_align_items_different_values() {
         LayoutBox::BlockBox(box_model) => {
             assert_eq!(box_model.border_box.y, 80.0);
         }
-        _ => panic!("Expected single box model"),
+        _ => panic!("Expected block box model"),
     }
 }
 
@@ -312,7 +312,7 @@ fn nested_flex_containers() {
             assert_eq!(box_model.border_box.x, 0.0);
             assert_eq!(box_model.content_box.width, 120.0);
         }
-        _ => panic!("Expected single box model"),
+        _ => panic!("Expected block box model"),
     }
 
     match &node(&root, 1).layout_box {
@@ -320,7 +320,7 @@ fn nested_flex_containers() {
             assert_eq!(box_model.border_box.x, 130.0); // 120 + 10 (gap)
             assert_eq!(box_model.content_box.width, 80.0);
         }
-        _ => panic!("Expected single box model"),
+        _ => panic!("Expected block box model"),
     }
 
     // Check inner flex container children
@@ -328,14 +328,14 @@ fn nested_flex_containers() {
         LayoutBox::BlockBox(box_model) => {
             assert_eq!(box_model.content_box.width, 40.0); // 120 * 1/3
         }
-        _ => panic!("Expected single box model"),
+        _ => panic!("Expected block box model"),
     }
 
     match &node(node(&root, 0), 1).layout_box {
         LayoutBox::BlockBox(box_model) => {
             assert_eq!(box_model.content_box.width, 80.0); // 120 * 2/3
         }
-        _ => panic!("Expected single box model"),
+        _ => panic!("Expected block box model"),
     }
 }
 
@@ -382,7 +382,7 @@ fn flex_with_percentage_basis() {
         LayoutBox::BlockBox(box_model) => {
             assert_eq!(box_model.content_box.width, 90.0); // 30% of 300px
         }
-        _ => panic!("Expected single box model"),
+        _ => panic!("Expected block box model"),
     }
 
     match &node(&root, 1).layout_box {
@@ -390,7 +390,7 @@ fn flex_with_percentage_basis() {
             // flex_basis: 60px + remaining space (300 - 90 - 60 = 150px)
             assert_eq!(box_model.content_box.width, 210.0);
         }
-        _ => panic!("Expected single box model"),
+        _ => panic!("Expected block box model"),
     }
 }
 
@@ -455,7 +455,7 @@ fn flex_auto_margins_override_justify_content() {
         LayoutBox::BlockBox(box_model) => {
             assert_eq!(box_model.border_box.x, 0.0);
         }
-        _ => panic!("Expected single box model"),
+        _ => panic!("Expected block box model"),
     }
 
     // Child2: margin-left: auto pushes it right
@@ -522,21 +522,21 @@ fn flex_row_gap_column_gap() {
         LayoutBox::BlockBox(box_model) => {
             assert_eq!(box_model.border_box.x, 0.0);
         }
-        _ => panic!("Expected single box model"),
+        _ => panic!("Expected block box model"),
     }
 
     match &node(&root, 1).layout_box {
         LayoutBox::BlockBox(box_model) => {
             assert_eq!(box_model.border_box.x, 75.0);
         }
-        _ => panic!("Expected single box model"),
+        _ => panic!("Expected block box model"),
     }
 
     match &node(&root, 2).layout_box {
         LayoutBox::BlockBox(box_model) => {
             assert_eq!(box_model.border_box.x, 160.0);
         }
-        _ => panic!("Expected single box model"),
+        _ => panic!("Expected block box model"),
     }
 }
 
@@ -595,7 +595,7 @@ fn flex_min_max_constraints_with_grow() {
             assert!(box_model.content_box.width <= 120.0); // Respects max constraint
             assert!(box_model.content_box.width >= 80.0); // Respects min constraint
         }
-        _ => panic!("Expected single box model"),
+        _ => panic!("Expected block box model"),
     }
 
     match &node(&root, 1).layout_box {
@@ -603,6 +603,6 @@ fn flex_min_max_constraints_with_grow() {
             assert!(box_model.content_box.width <= 100.0); // Respects max constraint
             assert!(box_model.content_box.width >= 60.0); // Respects min constraint
         }
-        _ => panic!("Expected single box model"),
+        _ => panic!("Expected block box model"),
     }
 }
