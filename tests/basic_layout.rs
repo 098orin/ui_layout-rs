@@ -1,5 +1,9 @@
 use ui_layout::*;
 
+fn node<'a>(n: &'a LayoutNode, idx: usize) -> &'a LayoutNode {
+    n.children[idx].node().expect("expected node child")
+}
+
 #[test]
 fn block_basic_box_model() {
     let mut root = LayoutNode::new(Style {
@@ -61,7 +65,7 @@ fn block_auto_height_from_children() {
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
-    match &root.children[0].layout_box {
+    match &node(&root, 0).layout_box {
         LayoutBox::BlockBox(box_model) => {
             assert_eq!(box_model.content_box.height, 40.0);
         }
@@ -106,12 +110,12 @@ fn flex_row_grow() {
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
-    let c1_box = match &root.children[0].layout_box {
+    let c1_box = match &node(&root, 0).layout_box {
         LayoutBox::BlockBox(box_model) => box_model,
         _ => panic!("Expected single box model"),
     };
 
-    let c2_box = match &root.children[1].layout_box {
+    let c2_box = match &node(&root, 1).layout_box {
         LayoutBox::BlockBox(box_model) => box_model,
         _ => panic!("Expected single box model"),
     };
@@ -164,12 +168,12 @@ fn flex_gap_affects_children_box() {
         _ => panic!("Expected single box model"),
     };
 
-    let child0_box = match &root.children[0].layout_box {
+    let child0_box = match &node(&root, 0).layout_box {
         LayoutBox::BlockBox(box_model) => box_model,
         _ => panic!("Expected single box model"),
     };
 
-    let child1_box = match &root.children[1].layout_box {
+    let child1_box = match &node(&root, 1).layout_box {
         LayoutBox::BlockBox(box_model) => box_model,
         _ => panic!("Expected single box model"),
     };
@@ -210,7 +214,7 @@ fn flex_align_items_stretch() {
 
     dbg!(root.layout_box.height());
 
-    match &root.children[0].layout_box {
+    match &node(&root, 0).layout_box {
         LayoutBox::BlockBox(box_model) => {
             assert_eq!(box_model.content_box.height, 80.0);
         }
@@ -247,7 +251,7 @@ fn block_margin_auto_centering() {
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
-    let child_box = match &root.children[0].layout_box {
+    let child_box = match &node(&root, 0).layout_box {
         LayoutBox::BlockBox(box_model) => box_model,
         _ => panic!("Expected single box model"),
     };

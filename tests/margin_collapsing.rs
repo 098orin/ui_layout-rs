@@ -1,5 +1,9 @@
 use ui_layout::*;
 
+fn node<'a>(n: &'a LayoutNode, idx: usize) -> &'a LayoutNode {
+    n.children[idx].node().expect("expected node child")
+}
+
 #[test]
 fn block_vertical_margin_collapsing_between_siblings() {
     let child1 = LayoutNode::new(Style {
@@ -40,12 +44,12 @@ fn block_vertical_margin_collapsing_between_siblings() {
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
-    let c1_box = match &root.children[0].layout_box {
+    let c1_box = match &node(&root, 0).layout_box {
         LayoutBox::BlockBox(box_model) => box_model,
         _ => panic!("Expected single box model"),
     };
 
-    let c2_box = match &root.children[1].layout_box {
+    let c2_box = match &node(&root, 1).layout_box {
         LayoutBox::BlockBox(box_model) => box_model,
         _ => panic!("Expected single box model"),
     };

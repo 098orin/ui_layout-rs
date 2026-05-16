@@ -1,5 +1,9 @@
 use ui_layout::*;
 
+fn node<'a>(n: &'a LayoutNode, idx: usize) -> &'a LayoutNode {
+    n.children[idx].node().expect("expected node child")
+}
+
 #[test]
 fn test_child_coordinates_relative_to_parent_content_box() {
     // Parent with padding and border
@@ -42,7 +46,7 @@ fn test_child_coordinates_relative_to_parent_content_box() {
         _ => panic!("Expected single box model for parent"),
     };
 
-    let child_box = match &parent.children[0].layout_box {
+    let child_box = match &node(&parent, 0).layout_box {
         LayoutBox::BlockBox(box_model) => box_model,
         _ => panic!("Expected single box model for child"),
     };
@@ -117,12 +121,12 @@ fn test_nested_coordinate_system() {
         _ => panic!("Expected single box model for root"),
     };
 
-    let child_box = match &root.children[0].layout_box {
+    let child_box = match &node(&root, 0).layout_box {
         LayoutBox::BlockBox(box_model) => box_model,
         _ => panic!("Expected single box model for child"),
     };
 
-    let grandchild_box = match &root.children[0].children[0].layout_box {
+    let grandchild_box = match &node(node(&root, 0), 0).layout_box {
         LayoutBox::BlockBox(box_model) => box_model,
         _ => panic!("Expected single box model for grandchild"),
     };
@@ -198,12 +202,12 @@ fn test_flex_children_coordinates() {
         _ => panic!("Expected single box model for flex container"),
     };
 
-    let child1_box = match &flex_container.children[0].layout_box {
+    let child1_box = match &node(&flex_container, 0).layout_box {
         LayoutBox::BlockBox(box_model) => box_model,
         _ => panic!("Expected single box model for child1"),
     };
 
-    let child2_box = match &flex_container.children[1].layout_box {
+    let child2_box = match &node(&flex_container, 1).layout_box {
         LayoutBox::BlockBox(box_model) => box_model,
         _ => panic!("Expected single box model for child2"),
     };
@@ -273,12 +277,12 @@ fn test_block_children_coordinates_with_margins() {
         _ => panic!("Expected single box model for parent"),
     };
 
-    let child1_box = match &parent.children[0].layout_box {
+    let child1_box = match &node(&parent, 0).layout_box {
         LayoutBox::BlockBox(box_model) => box_model,
         _ => panic!("Expected single box model for child1"),
     };
 
-    let child2_box = match &parent.children[1].layout_box {
+    let child2_box = match &node(&parent, 1).layout_box {
         LayoutBox::BlockBox(box_model) => box_model,
         _ => panic!("Expected single box model for child2"),
     };
@@ -338,7 +342,7 @@ fn test_coordinate_system_with_auto_margins() {
         _ => panic!("Expected single box model for parent"),
     };
 
-    let child_box = match &parent.children[0].layout_box {
+    let child_box = match &node(&parent, 0).layout_box {
         LayoutBox::BlockBox(box_model) => box_model,
         _ => panic!("Expected single box model for child"),
     };
