@@ -96,6 +96,8 @@ impl Display {
     ///
     /// Example:
     /// ```
+    /// # use ui_layout::{Display, OuterDisplay, InnerDisplay};
+    ///
     /// let (outer, inner) = Display::from_css("inline flex");
     /// assert_eq!(outer, Some(OuterDisplay::Inline));
     /// assert_eq!(inner, Some(InnerDisplay::Flex));
