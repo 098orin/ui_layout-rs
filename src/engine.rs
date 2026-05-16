@@ -584,7 +584,7 @@ impl LayoutEngine {
         let (children_main, children_cross) =
             if !intrinsic_pass || content_width_opt.is_none() || content_height_opt.is_none() {
                 let base_ctx_for_children = LayoutContext {
-                    containing_block_width: content_height_opt,
+                    containing_block_width: content_width_opt,
                     containing_block_height: content_height_opt,
                     available_width: None,
                     parent_assigned_border_width: None,
