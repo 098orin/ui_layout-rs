@@ -4,8 +4,8 @@ use ui_layout::*;
 fn block_basic_box_model() {
     let mut root = LayoutNode::new(Style {
         size: SizeStyle {
-            width: Length::Px(200.0),
-            height: Length::Px(100.0),
+            width: LengthOrAuto::Length(Length::Px(200.0)),
+            height: LengthOrAuto::Length(Length::Px(100.0)),
             ..Default::default()
         },
         spacing: Spacing {
@@ -24,8 +24,8 @@ fn block_basic_box_model() {
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
-    match &root.layout_boxes {
-        LayoutBoxes::Single(box_model) => {
+    match &root.layout_box {
+        LayoutBox::BlockBox(box_model) => {
             assert_eq!(box_model.content_box.width, 200.0);
             assert_eq!(box_model.content_box.height, 100.0);
             assert_eq!(box_model.padding_box.width, 220.0);
@@ -41,7 +41,7 @@ fn block_basic_box_model() {
 fn block_auto_height_from_children() {
     let child = LayoutNode::new(Style {
         size: SizeStyle {
-            height: Length::Px(40.0),
+            height: LengthOrAuto::Length(Length::Px(40.0)),
             ..Default::default()
         },
         ..Default::default()
@@ -50,8 +50,8 @@ fn block_auto_height_from_children() {
     let mut root = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
-                width: Length::Px(100.0),
-                height: Length::Auto,
+                width: LengthOrAuto::Length(Length::Px(100.0)),
+                height: LengthOrAuto::Auto,
                 ..Default::default()
             },
             ..Default::default()
@@ -61,8 +61,8 @@ fn block_auto_height_from_children() {
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
-    match &root.children[0].layout_boxes {
-        LayoutBoxes::Single(box_model) => {
+    match &root.children[0].layout_box {
+        LayoutBox::BlockBox(box_model) => {
             assert_eq!(box_model.content_box.height, 40.0);
         }
         _ => panic!("Expected single box model"),
@@ -94,8 +94,8 @@ fn flex_row_grow() {
                 inner: InnerDisplay::Flex,
             },
             size: SizeStyle {
-                width: Length::Px(300.0),
-                height: Length::Px(50.0),
+                width: LengthOrAuto::Length(Length::Px(300.0)),
+                height: LengthOrAuto::Length(Length::Px(50.0)),
                 ..Default::default()
             },
             flex_direction: FlexDirection::Row,
@@ -106,13 +106,13 @@ fn flex_row_grow() {
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
-    let c1_box = match &root.children[0].layout_boxes {
-        LayoutBoxes::Single(box_model) => box_model,
+    let c1_box = match &root.children[0].layout_box {
+        LayoutBox::BlockBox(box_model) => box_model,
         _ => panic!("Expected single box model"),
     };
 
-    let c2_box = match &root.children[1].layout_boxes {
-        LayoutBoxes::Single(box_model) => box_model,
+    let c2_box = match &root.children[1].layout_box {
+        LayoutBox::BlockBox(box_model) => box_model,
         _ => panic!("Expected single box model"),
     };
 
@@ -124,16 +124,16 @@ fn flex_row_grow() {
 fn flex_gap_affects_children_box() {
     let child1 = LayoutNode::new(Style {
         size: SizeStyle {
-            width: Length::Px(15.0),
-            height: Length::Px(50.0),
+            width: LengthOrAuto::Length(Length::Px(15.0)),
+            height: LengthOrAuto::Length(Length::Px(50.0)),
             ..Default::default()
         },
         ..Default::default()
     });
     let child2 = LayoutNode::new(Style {
         size: SizeStyle {
-            width: Length::Px(10.0),
-            height: Length::Px(30.0),
+            width: LengthOrAuto::Length(Length::Px(10.0)),
+            height: LengthOrAuto::Length(Length::Px(30.0)),
             ..Default::default()
         },
         ..Default::default()
@@ -146,12 +146,12 @@ fn flex_gap_affects_children_box() {
                 inner: InnerDisplay::Flex,
             },
             size: SizeStyle {
-                width: Length::Px(200.0),
-                height: Length::Px(50.0),
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Length(Length::Px(50.0)),
                 ..Default::default()
             },
             flex_direction: FlexDirection::Row,
-            column_gap: Length::Px(20.0),
+            column_gap: LengthOrAuto::Length(Length::Px(20.0)),
             ..Default::default()
         },
         vec![child1, child2],
@@ -159,18 +159,18 @@ fn flex_gap_affects_children_box() {
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
-    let root_box = match &root.layout_boxes {
-        LayoutBoxes::Single(box_model) => box_model,
+    let root_box = match &root.layout_box {
+        LayoutBox::BlockBox(box_model) => box_model,
         _ => panic!("Expected single box model"),
     };
 
-    let child0_box = match &root.children[0].layout_boxes {
-        LayoutBoxes::Single(box_model) => box_model,
+    let child0_box = match &root.children[0].layout_box {
+        LayoutBox::BlockBox(box_model) => box_model,
         _ => panic!("Expected single box model"),
     };
 
-    let child1_box = match &root.children[1].layout_boxes {
-        LayoutBoxes::Single(box_model) => box_model,
+    let child1_box = match &root.children[1].layout_box {
+        LayoutBox::BlockBox(box_model) => box_model,
         _ => panic!("Expected single box model"),
     };
 
@@ -182,7 +182,7 @@ fn flex_gap_affects_children_box() {
 fn flex_align_items_stretch() {
     let child = LayoutNode::new(Style {
         size: SizeStyle {
-            height: Length::Auto,
+            height: LengthOrAuto::Auto,
             ..Default::default()
         },
         ..Default::default()
@@ -195,8 +195,8 @@ fn flex_align_items_stretch() {
                 inner: InnerDisplay::Flex,
             },
             size: SizeStyle {
-                width: Length::Px(100.0),
-                height: Length::Px(80.0),
+                width: LengthOrAuto::Length(Length::Px(100.0)),
+                height: LengthOrAuto::Length(Length::Px(80.0)),
                 ..Default::default()
             },
             flex_direction: FlexDirection::Row,
@@ -208,10 +208,10 @@ fn flex_align_items_stretch() {
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
-    dbg!(root.layout_boxes.height());
+    dbg!(root.layout_box.height());
 
-    match &root.children[0].layout_boxes {
-        LayoutBoxes::Single(box_model) => {
+    match &root.children[0].layout_box {
+        LayoutBox::BlockBox(box_model) => {
             assert_eq!(box_model.content_box.height, 80.0);
         }
         _ => panic!("Expected single box model"),
@@ -222,12 +222,12 @@ fn flex_align_items_stretch() {
 fn block_margin_auto_centering() {
     let child = LayoutNode::new(Style {
         size: SizeStyle {
-            width: Length::Px(100.0),
+            width: LengthOrAuto::Length(Length::Px(100.0)),
             ..Default::default()
         },
         spacing: Spacing {
-            margin_left: Length::Auto,
-            margin_right: Length::Auto,
+            margin_left: LengthOrAuto::Auto,
+            margin_right: LengthOrAuto::Auto,
             ..Default::default()
         },
         ..Default::default()
@@ -236,8 +236,8 @@ fn block_margin_auto_centering() {
     let mut root = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
-                width: Length::Px(300.0),
-                height: Length::Auto,
+                width: LengthOrAuto::Length(Length::Px(300.0)),
+                height: LengthOrAuto::Auto,
                 ..Default::default()
             },
             ..Default::default()
@@ -247,8 +247,8 @@ fn block_margin_auto_centering() {
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
-    let child_box = match &root.children[0].layout_boxes {
-        LayoutBoxes::Single(box_model) => box_model,
+    let child_box = match &root.children[0].layout_box {
+        LayoutBox::BlockBox(box_model) => box_model,
         _ => panic!("Expected single box model"),
     };
 

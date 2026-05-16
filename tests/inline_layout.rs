@@ -18,7 +18,10 @@ fn inline_basic_flow() {
     });
 
     let mut inline_node = LayoutNode::new(Style {
-        display: Display::Inline,
+        display: Display {
+            outer: OuterDisplay::Inline,
+            inner: InnerDisplay::Flow,
+        },
         ..Default::default()
     });
     inline_node.set_fragments(vec![fragment1, fragment2, fragment3]);
@@ -26,8 +29,8 @@ fn inline_basic_flow() {
     let mut root = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
-                width: Length::Px(200.0),
-                height: Length::Auto,
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Auto,
                 ..Default::default()
             },
             ..Default::default()
@@ -51,16 +54,12 @@ fn inline_basic_flow() {
     assert_eq!(root.children[0].placements[2].offset.0, 70.0); // Third after second
 
     // Check that inline node has correct layout boxes
-    match &root.children[0].layout_boxes {
-        LayoutBoxes::Multiple(boxes) => {
-            assert_eq!(boxes.len(), 1);
+    let boxes: Vec<BoxModel> = (&root.children[0].layout_box).into_iter().collect();
+    assert_eq!(boxes.len(), 1);
 
-            let box_model = &boxes[0];
-            assert_eq!(box_model.content_box.width, 105.0);
-            assert_eq!(box_model.content_box.height, 25.0);
-        }
-        _ => panic!("Expected multiple box model"),
-    }
+    let box_model = &boxes[0];
+    assert_eq!(box_model.content_box.width, 105.0);
+    assert_eq!(box_model.content_box.height, 25.0);
 }
 
 #[test]
@@ -81,7 +80,10 @@ fn inline_line_wrapping() {
     });
 
     let mut inline_node = LayoutNode::new(Style {
-        display: Display::Inline,
+        display: Display {
+            outer: OuterDisplay::Inline,
+            inner: InnerDisplay::Flow,
+        },
         ..Default::default()
     });
     inline_node.set_fragments(vec![fragment1, fragment2, fragment3]);
@@ -89,8 +91,8 @@ fn inline_line_wrapping() {
     let mut root = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
-                width: Length::Px(120.0), // Force wrapping
-                height: Length::Auto,
+                width: LengthOrAuto::Length(Length::Px(120.0)), // Force wrapping
+                height: LengthOrAuto::Auto,
                 ..Default::default()
             },
             ..Default::default()
@@ -116,20 +118,16 @@ fn inline_line_wrapping() {
     assert_eq!(root.children[0].placements[2].offset.0, 0.0);
 
     // Check total height accounts for multiple lines
-    match &root.children[0].layout_boxes {
-        LayoutBoxes::Multiple(boxes) => {
-            assert_eq!(boxes.len(), 3);
+    let boxes: Vec<BoxModel> = (&root.children[0].layout_box).into_iter().collect();
+    assert_eq!(boxes.len(), 3);
 
-            assert_eq!(boxes[0].content_box.height, 20.0);
-            assert_eq!(boxes[1].content_box.height, 25.0);
-            assert_eq!(boxes[2].content_box.height, 15.0);
+    assert_eq!(boxes[0].content_box.height, 20.0);
+    assert_eq!(boxes[1].content_box.height, 25.0);
+    assert_eq!(boxes[2].content_box.height, 15.0);
 
-            assert_eq!(boxes[0].content_box.width, 80.0);
-            assert_eq!(boxes[1].content_box.width, 70.0);
-            assert_eq!(boxes[2].content_box.width, 60.0);
-        }
-        _ => panic!("Expected multiple box model"),
-    }
+    assert_eq!(boxes[0].content_box.width, 80.0);
+    assert_eq!(boxes[1].content_box.width, 70.0);
+    assert_eq!(boxes[2].content_box.width, 60.0);
 }
 
 #[test]
@@ -147,7 +145,10 @@ fn inline_with_line_breaks() {
     });
 
     let mut inline_node = LayoutNode::new(Style {
-        display: Display::Inline,
+        display: Display {
+            outer: OuterDisplay::Inline,
+            inner: InnerDisplay::Flow,
+        },
         ..Default::default()
     });
     inline_node.set_fragments(vec![fragment1, line_break, fragment2]);
@@ -155,8 +156,8 @@ fn inline_with_line_breaks() {
     let mut root = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
-                width: Length::Px(200.0),
-                height: Length::Auto,
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Auto,
                 ..Default::default()
             },
             ..Default::default()
@@ -181,15 +182,11 @@ fn inline_with_line_breaks() {
     assert_eq!(root.children[0].placements[2].offset.0, 0.0);
 
     // Check total height
-    match &root.children[0].layout_boxes {
-        LayoutBoxes::Multiple(box_models) => {
-            assert_eq!(box_models.len(), 2);
+    let box_models: Vec<BoxModel> = (&root.children[0].layout_box).into_iter().collect();
+    assert_eq!(box_models.len(), 2);
 
-            assert_eq!(box_models[0].content_box.height, 20.0);
-            assert_eq!(box_models[1].content_box.height, 25.0);
-        }
-        _ => panic!("Expected multiple box model"),
-    }
+    assert_eq!(box_models[0].content_box.height, 20.0);
+    assert_eq!(box_models[1].content_box.height, 25.0);
 }
 
 #[test]
@@ -200,12 +197,15 @@ fn inline_with_margins() {
     });
 
     let mut inline_node = LayoutNode::new(Style {
-        display: Display::Inline,
+        display: Display {
+            outer: OuterDisplay::Inline,
+            inner: InnerDisplay::Flow,
+        },
         spacing: Spacing {
-            margin_left: Length::Px(10.0),
-            margin_right: Length::Px(15.0),
-            margin_top: Length::Px(5.0),    // ignored
-            margin_bottom: Length::Px(8.0), // ignored
+            margin_left: LengthOrAuto::Length(Length::Px(10.0)),
+            margin_right: LengthOrAuto::Length(Length::Px(15.0)),
+            margin_top: LengthOrAuto::Length(Length::Px(5.0)), // ignored
+            margin_bottom: LengthOrAuto::Length(Length::Px(8.0)), // ignored
             ..Default::default()
         },
         ..Default::default()
@@ -215,8 +215,8 @@ fn inline_with_margins() {
     let inner = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
-                width: Length::Px(200.0),
-                height: Length::Auto,
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Auto,
                 ..Default::default()
             },
             ..Default::default()
@@ -229,27 +229,25 @@ fn inline_with_margins() {
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
     // Inline element layout
-    match &root.children[0].children[0].layout_boxes {
-        LayoutBoxes::Multiple(box_models) => {
-            assert_eq!(box_models.len(), 1);
+    let box_models: Vec<BoxModel> = (&root.children[0].children[0].layout_box)
+        .into_iter()
+        .collect();
+    assert_eq!(box_models.len(), 1);
 
-            let box_model = &box_models[0];
+    let box_model = &box_models[0];
 
-            // Horizontal margins affect x-position
-            assert_eq!(box_model.border_box.x, 10.0);
+    // Horizontal margins affect x-position
+    assert_eq!(box_model.border_box.x, 10.0);
 
-            // Vertical margins do NOT affect inline positioning
-            assert_eq!(box_model.border_box.y, 0.0);
+    // Vertical margins do NOT affect inline positioning
+    assert_eq!(box_model.border_box.y, 0.0);
 
-            assert_eq!(box_model.content_box.width, 50.0);
-            assert_eq!(box_model.content_box.height, 20.0);
-        }
-        _ => panic!("Expected multiple box model"),
-    }
+    assert_eq!(box_model.content_box.width, 50.0);
+    assert_eq!(box_model.content_box.height, 20.0);
 
     // Parent height calculation
-    match &root.children[0].layout_boxes {
-        LayoutBoxes::Single(box_model) => {
+    match &root.children[0].layout_box {
+        LayoutBox::BlockBox(box_model) => {
             // Inline margins (top/bottom) do not contribute
             assert_eq!(box_model.content_box.height, 20.0);
         }
@@ -265,7 +263,10 @@ fn inline_with_padding() {
     });
 
     let mut inline_node = LayoutNode::new(Style {
-        display: Display::Inline,
+        display: Display {
+            outer: OuterDisplay::Inline,
+            inner: InnerDisplay::Flow,
+        },
         spacing: Spacing {
             padding_left: Length::Px(12.0),
             padding_right: Length::Px(8.0),
@@ -280,8 +281,8 @@ fn inline_with_padding() {
     let mut root = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
-                width: Length::Px(200.0),
-                height: Length::Auto,
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Auto,
                 ..Default::default()
             },
             ..Default::default()
@@ -291,26 +292,22 @@ fn inline_with_padding() {
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
-    match &root.children[0].layout_boxes {
-        LayoutBoxes::Multiple(box_models) => {
-            assert_eq!(box_models.len(), 1);
+    let boxes: Vec<BoxModel> = (&root.children[0].layout_box).into_iter().collect();
+    assert_eq!(boxes.len(), 1);
 
-            let box_model = &box_models[0];
+    let box_model = &boxes[0];
 
-            // Content box should be the fragment size
-            assert_eq!(box_model.content_box.width, 40.0);
-            assert_eq!(box_model.content_box.height, 18.0);
+    // Content box should be the fragment size
+    assert_eq!(box_model.content_box.width, 40.0);
+    assert_eq!(box_model.content_box.height, 18.0);
 
-            // Padding box should include padding
-            assert_eq!(box_model.padding_box.width, 60.0); // 40 + 12 + 8
-            assert_eq!(box_model.padding_box.height, 28.0); // 18 + 6 + 4
+    // Padding box should include padding
+    assert_eq!(box_model.padding_box.width, 60.0); // 40 + 12 + 8
+    assert_eq!(box_model.padding_box.height, 28.0); // 18 + 6 + 4
 
-            // Border box same as padding box (no border)
-            assert_eq!(box_model.border_box.width, 60.0);
-            assert_eq!(box_model.border_box.height, 28.0);
-        }
-        _ => panic!("Expected multiple box model"),
-    }
+    // Border box same as padding box (no border)
+    assert_eq!(box_model.border_box.width, 60.0);
+    assert_eq!(box_model.border_box.height, 28.0);
 
     // Fragment should be positioned within padding
     assert_eq!(root.children[0].placements.len(), 1);
@@ -325,7 +322,10 @@ fn inline_with_borders() {
     });
 
     let mut inline_node = LayoutNode::new(Style {
-        display: Display::Inline,
+        display: Display {
+            outer: OuterDisplay::Inline,
+            inner: InnerDisplay::Flow,
+        },
         spacing: Spacing {
             padding_left: Length::Px(8.0),
             padding_right: Length::Px(6.0),
@@ -345,8 +345,8 @@ fn inline_with_borders() {
     let mut root = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
-                width: Length::Px(200.0),
-                height: Length::Auto,
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Auto,
                 ..Default::default()
             },
             ..Default::default()
@@ -356,26 +356,22 @@ fn inline_with_borders() {
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
-    match &root.children[0].layout_boxes {
-        LayoutBoxes::Multiple(box_models) => {
-            assert_eq!(box_models.len(), 1);
+    let boxes: Vec<BoxModel> = (&root.children[0].layout_box).into_iter().collect();
+    assert_eq!(boxes.len(), 1);
 
-            let box_model = &box_models[0];
+    let box_model = &boxes[0];
 
-            // Content box should be fragment size
-            assert_eq!(box_model.content_box.width, 35.0);
-            assert_eq!(box_model.content_box.height, 22.0);
+    // Content box should be fragment size
+    assert_eq!(box_model.content_box.width, 35.0);
+    assert_eq!(box_model.content_box.height, 22.0);
 
-            // Padding box should include padding
-            assert_eq!(box_model.padding_box.width, 49.0); // 35 + 8 + 6
-            assert_eq!(box_model.padding_box.height, 29.0); // 22 + 4 + 3
+    // Padding box should include padding
+    assert_eq!(box_model.padding_box.width, 49.0); // 35 + 8 + 6
+    assert_eq!(box_model.padding_box.height, 29.0); // 22 + 4 + 3
 
-            // Border box should include borders
-            assert_eq!(box_model.border_box.width, 54.0); // 49 + 3 + 2
-            assert_eq!(box_model.border_box.height, 32.0); // 29 + 1 + 2
-        }
-        _ => panic!("Expected multile box model"),
-    }
+    // Border box should include borders
+    assert_eq!(box_model.border_box.width, 54.0); // 49 + 3 + 2
+    assert_eq!(box_model.border_box.height, 32.0); // 29 + 1 + 2
 }
 
 #[test]
@@ -386,7 +382,10 @@ fn inline_percentage_spacing() {
     });
 
     let mut inline_node = LayoutNode::new(Style {
-        display: Display::Inline,
+        display: Display {
+            outer: OuterDisplay::Inline,
+            inner: InnerDisplay::Flow,
+        },
         spacing: Spacing {
             padding_left: Length::Percent(5.0),   // 5% of 200px = 10px
             padding_right: Length::Percent(2.5),  // 2.5% of 200px = 5px
@@ -404,8 +403,8 @@ fn inline_percentage_spacing() {
     let mut root = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
-                width: Length::Px(200.0),
-                height: Length::Auto,
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Auto,
                 ..Default::default()
             },
             ..Default::default()
@@ -415,26 +414,22 @@ fn inline_percentage_spacing() {
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
-    match &root.children[0].layout_boxes {
-        LayoutBoxes::Multiple(box_models) => {
-            assert_eq!(box_models.len(), 1);
+    let boxes: Vec<BoxModel> = (&root.children[0].layout_box).into_iter().collect();
+    assert_eq!(boxes.len(), 1);
 
-            let box_model = &box_models[0];
+    let box_model = &boxes[0];
 
-            // Content box should be fragment size
-            assert_eq!(box_model.content_box.width, 30.0);
-            assert_eq!(box_model.content_box.height, 20.0);
+    // Content box should be fragment size
+    assert_eq!(box_model.content_box.width, 30.0);
+    assert_eq!(box_model.content_box.height, 20.0);
 
-            // Padding box with percentage padding
-            assert_eq!(box_model.padding_box.width, 45.0); // 30 + 10 + 5
-            assert_eq!(box_model.padding_box.height, 37.0); // 20 + 15 + 2
+    // Padding box with percentage padding
+    assert_eq!(box_model.padding_box.width, 45.0); // 30 + 10 + 5
+    assert_eq!(box_model.padding_box.height, 37.0); // 20 + 15 + 2
 
-            // Position should account for percentage margins
-            assert_eq!(box_model.border_box.x, 4.0); // 2% of 200px
-            assert_eq!(box_model.border_box.y, 0.0); // 0% margin_top
-        }
-        _ => panic!("Expected multiple box model"),
-    }
+    // Position should account for percentage margins
+    assert_eq!(box_model.border_box.x, 4.0); // 2% of 200px
+    assert_eq!(box_model.border_box.y, 0.0); // 0% margin_top
 }
 
 #[test]
@@ -450,7 +445,10 @@ fn mixed_inline_and_block_children() {
     });
 
     let mut inline_node1 = LayoutNode::new(Style {
-        display: Display::Inline,
+        display: Display {
+            outer: OuterDisplay::Inline,
+            inner: InnerDisplay::Flow,
+        },
         ..Default::default()
     });
     inline_node1.set_fragments(vec![fragment1]);
@@ -461,15 +459,18 @@ fn mixed_inline_and_block_children() {
             inner: InnerDisplay::Flow,
         },
         size: SizeStyle {
-            width: Length::Px(100.0),
-            height: Length::Px(25.0),
+            width: LengthOrAuto::Length(Length::Px(100.0)),
+            height: LengthOrAuto::Length(Length::Px(25.0)),
             ..Default::default()
         },
         ..Default::default()
     });
 
     let mut inline_node2 = LayoutNode::new(Style {
-        display: Display::Inline,
+        display: Display {
+            outer: OuterDisplay::Inline,
+            inner: InnerDisplay::Flow,
+        },
         ..Default::default()
     });
     inline_node2.set_fragments(vec![fragment2]);
@@ -477,8 +478,8 @@ fn mixed_inline_and_block_children() {
     let mut root = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
-                width: Length::Px(200.0),
-                height: Length::Auto,
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Auto,
                 ..Default::default()
             },
             ..Default::default()
@@ -489,21 +490,17 @@ fn mixed_inline_and_block_children() {
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
     // First inline: first line
-    match &root.children[0].layout_boxes {
-        LayoutBoxes::Multiple(box_models) => {
-            assert_eq!(box_models.len(), 1);
+    let boxes: Vec<BoxModel> = (&root.children[0].layout_box).into_iter().collect();
+    assert_eq!(boxes.len(), 1);
 
-            let box_model = &box_models[0];
+    let box_model = &boxes[0];
 
-            assert_eq!(box_model.border_box.x, 0.0);
-            assert_eq!(box_model.border_box.y, 0.0);
-        }
-        _ => panic!("Expected multiple box model"),
-    }
+    assert_eq!(box_model.border_box.x, 0.0);
+    assert_eq!(box_model.border_box.y, 0.0);
 
     // Block: new line after first inline line (height = 15)
-    match &root.children[1].layout_boxes {
-        LayoutBoxes::Single(box_model) => {
+    match &root.children[1].layout_box {
+        LayoutBox::BlockBox(box_model) => {
             assert_eq!(box_model.border_box.x, 0.0);
             assert_eq!(box_model.border_box.y, 15.0);
         }
@@ -511,23 +508,22 @@ fn mixed_inline_and_block_children() {
     }
 
     // Second inline: new line after block (15 + 25 = 40)
-    match &root.children[2].layout_boxes {
-        LayoutBoxes::Multiple(box_models) => {
-            assert_eq!(box_models.len(), 1);
+    let boxes2: Vec<BoxModel> = (&root.children[2].layout_box).into_iter().collect();
+    assert_eq!(boxes2.len(), 1);
 
-            let box_model = &box_models[0];
+    let box_model = &boxes2[0];
 
-            assert_eq!(box_model.border_box.x, 0.0);
-            assert_eq!(box_model.border_box.y, 40.0);
-        }
-        _ => panic!("Expected multiple box model"),
-    }
+    assert_eq!(box_model.border_box.x, 0.0);
+    assert_eq!(box_model.border_box.y, 40.0);
 }
 
 #[test]
 fn inline_empty_fragments() {
     let inline_node = LayoutNode::new(Style {
-        display: Display::Inline,
+        display: Display {
+            outer: OuterDisplay::Inline,
+            inner: InnerDisplay::Flow,
+        },
         spacing: Spacing {
             padding_left: Length::Px(10.0),
             padding_right: Length::Px(10.0),
@@ -542,8 +538,8 @@ fn inline_empty_fragments() {
     let mut root = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
-                width: Length::Px(200.0),
-                height: Length::Auto,
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Auto,
                 ..Default::default()
             },
             ..Default::default()
@@ -554,8 +550,8 @@ fn inline_empty_fragments() {
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
     // Empty inline element should still have padding
-    match &root.children[0].layout_boxes {
-        LayoutBoxes::None => {}
+    match &root.children[0].layout_box {
+        LayoutBox::None => {}
         _ => panic!("Expected single box model"),
     }
 

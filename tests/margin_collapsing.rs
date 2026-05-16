@@ -4,11 +4,11 @@ use ui_layout::*;
 fn block_vertical_margin_collapsing_between_siblings() {
     let child1 = LayoutNode::new(Style {
         size: SizeStyle {
-            height: Length::Px(20.0),
+            height: LengthOrAuto::Length(Length::Px(20.0)),
             ..Default::default()
         },
         spacing: Spacing {
-            margin_bottom: Length::Px(30.0),
+            margin_bottom: LengthOrAuto::Length(Length::Px(30.0)),
             ..Default::default()
         },
         ..Default::default()
@@ -16,21 +16,21 @@ fn block_vertical_margin_collapsing_between_siblings() {
 
     let child2 = LayoutNode::new(Style {
         size: SizeStyle {
-            height: Length::Px(20.0),
+            height: LengthOrAuto::Length(Length::Px(20.0)),
             ..Default::default()
         },
         spacing: Spacing {
-            margin_top: Length::Px(10.0),
+            margin_top: LengthOrAuto::Length(Length::Px(10.0)),
             ..Default::default()
         },
         ..Default::default()
     });
 
-    let mut root = LayoutNode::with_children(
+    let mut root = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
-                width: Length::Px(100.0),
-                height: Length::Auto,
+                width: LengthOrAuto::Length(Length::Px(100.0)),
+                height: LengthOrAuto::Auto,
                 ..Default::default()
             },
             ..Default::default()
@@ -40,13 +40,13 @@ fn block_vertical_margin_collapsing_between_siblings() {
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
-    let c1_box = match &root.children[0].layout_boxes {
-        LayoutBoxes::Single(box_model) => box_model,
+    let c1_box = match &root.children[0].layout_box {
+        LayoutBox::BlockBox(box_model) => box_model,
         _ => panic!("Expected single box model"),
     };
 
-    let c2_box = match &root.children[1].layout_boxes {
-        LayoutBoxes::Single(box_model) => box_model,
+    let c2_box = match &root.children[1].layout_box {
+        LayoutBox::BlockBox(box_model) => box_model,
         _ => panic!("Expected single box model"),
     };
 

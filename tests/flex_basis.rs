@@ -10,8 +10,8 @@ fn test_flex_basis_auto() {
             inner: InnerDisplay::Flex,
         },
         size: SizeStyle {
-            width: Length::Px(300.0),
-            height: Length::Px(100.0),
+            width: LengthOrAuto::Length(Length::Px(300.0)),
+            height: LengthOrAuto::Length(Length::Px(100.0)),
             ..Default::default()
         },
         flex_direction: FlexDirection::Row,
@@ -21,12 +21,12 @@ fn test_flex_basis_auto() {
     // Child 1: Content size 50px
     let child1 = LayoutNode::new(Style {
         size: SizeStyle {
-            width: Length::Px(50.0),
-            height: Length::Px(50.0),
+            width: LengthOrAuto::Length(Length::Px(50.0)),
+            height: LengthOrAuto::Length(Length::Px(50.0)),
             ..Default::default()
         },
         item_style: ItemStyle {
-            flex_basis: Length::Auto,
+            flex_basis: LengthOrAuto::Auto,
             ..Default::default()
         },
         ..Default::default()
@@ -35,31 +35,34 @@ fn test_flex_basis_auto() {
     // Child 2: Content size 80px
     let child2 = LayoutNode::new(Style {
         size: SizeStyle {
-            width: Length::Px(80.0),
-            height: Length::Px(50.0),
+            width: LengthOrAuto::Length(Length::Px(80.0)),
+            height: LengthOrAuto::Length(Length::Px(50.0)),
             ..Default::default()
         },
         item_style: ItemStyle {
-            flex_basis: Length::Auto,
+            flex_basis: LengthOrAuto::Auto,
             ..Default::default()
         },
         ..Default::default()
     });
 
-    container.children = vec![child1, child2];
+    container.children = vec![
+        LayoutChild::Node(Box::new(child1)),
+        LayoutChild::Node(Box::new(child2)),
+    ];
     LayoutEngine::layout(&mut container, 800.0, 600.0);
 
-    if let LayoutBoxes::Single(ref container_box) = container.layout_boxes {
+    if let LayoutBox::BlockBox(ref container_box) = container.layout_box {
         assert_eq!(container_box.border_box.width, 300.0);
         assert_eq!(container_box.border_box.height, 100.0);
     }
 
-    if let LayoutBoxes::Single(ref child_box) = container.children[0].layout_boxes {
+    if let LayoutBox::BlockBox(ref child_box) = container.children[0].layout_box {
         assert_eq!(child_box.border_box.width, 50.0);
         assert_eq!(child_box.border_box.height, 50.0);
     }
 
-    if let LayoutBoxes::Single(ref child_box) = container.children[1].layout_boxes {
+    if let LayoutBox::BlockBox(ref child_box) = container.children[1].layout_box {
         assert_eq!(child_box.border_box.width, 80.0);
         assert_eq!(child_box.border_box.height, 50.0);
     }
@@ -74,8 +77,8 @@ fn flex_basis_overrides_width_when_no_grow_or_shrink() {
             inner: InnerDisplay::Flex,
         },
         size: SizeStyle {
-            width: Length::Px(300.0),
-            height: Length::Px(100.0),
+            width: LengthOrAuto::Length(Length::Px(300.0)),
+            height: LengthOrAuto::Length(Length::Px(100.0)),
             ..Default::default()
         },
         flex_direction: FlexDirection::Row,
@@ -84,11 +87,11 @@ fn flex_basis_overrides_width_when_no_grow_or_shrink() {
 
     let child = LayoutNode::new(Style {
         size: SizeStyle {
-            width: Length::Px(50.0),
+            width: LengthOrAuto::Length(Length::Px(50.0)),
             ..Default::default()
         },
         item_style: ItemStyle {
-            flex_basis: Length::Px(120.0),
+            flex_basis: LengthOrAuto::Length(Length::Px(120.0)),
             flex_grow: 0.0,
             flex_shrink: 0.0,
             ..Default::default()
@@ -96,10 +99,10 @@ fn flex_basis_overrides_width_when_no_grow_or_shrink() {
         ..Default::default()
     });
 
-    container.children = vec![child];
+    container.children = vec![LayoutChild::Node(Box::new(child))];
     LayoutEngine::layout(&mut container, 800.0, 600.0);
 
-    if let LayoutBoxes::Single(ref child_box) = container.children[0].layout_boxes {
+    if let LayoutBox::BlockBox(ref child_box) = container.children[0].layout_box {
         assert_eq!(child_box.border_box.width, 120.0);
     }
 }
@@ -112,7 +115,7 @@ fn flex_basis_is_starting_point_for_grow() {
             inner: InnerDisplay::Flex,
         },
         size: SizeStyle {
-            width: Length::Px(300.0),
+            width: LengthOrAuto::Length(Length::Px(300.0)),
             ..Default::default()
         },
         flex_direction: FlexDirection::Row,
@@ -121,17 +124,17 @@ fn flex_basis_is_starting_point_for_grow() {
 
     let child = LayoutNode::new(Style {
         item_style: ItemStyle {
-            flex_basis: Length::Px(100.0),
+            flex_basis: LengthOrAuto::Length(Length::Px(100.0)),
             flex_grow: 1.0,
             ..Default::default()
         },
         ..Default::default()
     });
 
-    container.children = vec![child];
+    container.children = vec![LayoutChild::Node(Box::new(child))];
     LayoutEngine::layout(&mut container, 800.0, 600.0);
 
-    if let LayoutBoxes::Single(ref child_box) = container.children[0].layout_boxes {
+    if let LayoutBox::BlockBox(ref child_box) = container.children[0].layout_box {
         assert_eq!(child_box.border_box.width, 300.0);
     }
 }
@@ -144,7 +147,7 @@ fn flex_basis_is_starting_point_for_shrink() {
             inner: InnerDisplay::Flex,
         },
         size: SizeStyle {
-            width: Length::Px(100.0),
+            width: LengthOrAuto::Length(Length::Px(100.0)),
             ..Default::default()
         },
         flex_direction: FlexDirection::Row,
@@ -153,17 +156,17 @@ fn flex_basis_is_starting_point_for_shrink() {
 
     let child = LayoutNode::new(Style {
         item_style: ItemStyle {
-            flex_basis: Length::Px(200.0),
+            flex_basis: LengthOrAuto::Length(Length::Px(200.0)),
             flex_shrink: 1.0,
             ..Default::default()
         },
         ..Default::default()
     });
 
-    container.children = vec![child];
+    container.children = vec![LayoutChild::Node(Box::new(child))];
     LayoutEngine::layout(&mut container, 800.0, 600.0);
 
-    if let LayoutBoxes::Single(ref child_box) = container.children[0].layout_boxes {
+    if let LayoutBox::BlockBox(ref child_box) = container.children[0].layout_box {
         assert_eq!(child_box.border_box.width, 100.0);
     }
 }
@@ -179,8 +182,8 @@ fn test_flex_basis_with_grow() {
             inner: InnerDisplay::Flex,
         },
         size: SizeStyle {
-            width: Length::Px(400.0),
-            height: Length::Px(100.0),
+            width: LengthOrAuto::Length(Length::Px(400.0)),
+            height: LengthOrAuto::Length(Length::Px(100.0)),
             ..Default::default()
         },
         flex_direction: FlexDirection::Row,
@@ -190,7 +193,7 @@ fn test_flex_basis_with_grow() {
     // Child 1: flex-basis 100px, flex-grow 1
     let child1 = LayoutNode::new(Style {
         item_style: ItemStyle {
-            flex_basis: Length::Px(100.0),
+            flex_basis: LengthOrAuto::Length(Length::Px(100.0)),
             flex_grow: 1.0,
             ..Default::default()
         },
@@ -200,23 +203,26 @@ fn test_flex_basis_with_grow() {
     // Child 2: flex-basis 100px, flex-grow 2
     let child2 = LayoutNode::new(Style {
         item_style: ItemStyle {
-            flex_basis: Length::Px(100.0),
+            flex_basis: LengthOrAuto::Length(Length::Px(100.0)),
             flex_grow: 2.0,
             ..Default::default()
         },
         ..Default::default()
     });
 
-    container.children = vec![child1, child2];
+    container.children = vec![
+        LayoutChild::Node(Box::new(child1)),
+        LayoutChild::Node(Box::new(child2)),
+    ];
     LayoutEngine::layout(&mut container, 800.0, 600.0);
 
     // Total basis=200px, Remaining=200px
     // Child1=100+66.67≈167px, Child2=100+133.33≈233px
-    if let LayoutBoxes::Single(ref child_box) = container.children[0].layout_boxes {
+    if let LayoutBox::BlockBox(ref child_box) = container.children[0].layout_box {
         assert!((child_box.border_box.width - 166.7).abs() < 0.1);
     }
 
-    if let LayoutBoxes::Single(ref child_box) = container.children[1].layout_boxes {
+    if let LayoutBox::BlockBox(ref child_box) = container.children[1].layout_box {
         assert!((child_box.border_box.width - 233.3).abs() < 0.1);
     }
 }
@@ -232,8 +238,8 @@ fn test_flex_basis_with_shrink() {
             inner: InnerDisplay::Flex,
         },
         size: SizeStyle {
-            width: Length::Px(200.0),
-            height: Length::Px(100.0),
+            width: LengthOrAuto::Length(Length::Px(200.0)),
+            height: LengthOrAuto::Length(Length::Px(100.0)),
             ..Default::default()
         },
         flex_direction: FlexDirection::Row,
@@ -243,7 +249,7 @@ fn test_flex_basis_with_shrink() {
     // Child 1: flex-basis 150px, flex-shrink 1
     let child1 = LayoutNode::new(Style {
         item_style: ItemStyle {
-            flex_basis: Length::Px(150.0),
+            flex_basis: LengthOrAuto::Length(Length::Px(150.0)),
             flex_shrink: 1.0,
             ..Default::default()
         },
@@ -253,25 +259,28 @@ fn test_flex_basis_with_shrink() {
     // Child 2: flex-basis 100px, flex-shrink 2
     let child2 = LayoutNode::new(Style {
         item_style: ItemStyle {
-            flex_basis: Length::Px(100.0),
+            flex_basis: LengthOrAuto::Length(Length::Px(100.0)),
             flex_shrink: 2.0,
             ..Default::default()
         },
         ..Default::default()
     });
 
-    container.children = vec![child1, child2];
+    container.children = vec![
+        LayoutChild::Node(Box::new(child1)),
+        LayoutChild::Node(Box::new(child2)),
+    ];
     LayoutEngine::layout(&mut container, 800.0, 600.0);
 
     // Total basis=250px, Overflow=50px
     // Child1 shrink factor: 150*1=150, Child2: 100*2=200
     // Child1 shrinks: 50*(150/350)≈21.4px → 128.6px
     // Child2 shrinks: 50*(200/350)≈28.6px → 71.4px
-    if let LayoutBoxes::Single(ref child_box) = container.children[0].layout_boxes {
+    if let LayoutBox::BlockBox(ref child_box) = container.children[0].layout_box {
         assert!((child_box.border_box.width - 128.6).abs() < 0.1);
     }
 
-    if let LayoutBoxes::Single(ref child_box) = container.children[1].layout_boxes {
+    if let LayoutBox::BlockBox(ref child_box) = container.children[1].layout_box {
         assert!((child_box.border_box.width - 71.4).abs() < 0.1);
     }
 }
@@ -287,8 +296,8 @@ fn test_flex_basis_percentage() {
             inner: InnerDisplay::Flex,
         },
         size: SizeStyle {
-            width: Length::Px(400.0),
-            height: Length::Px(100.0),
+            width: LengthOrAuto::Length(Length::Px(400.0)),
+            height: LengthOrAuto::Length(Length::Px(100.0)),
             ..Default::default()
         },
         flex_direction: FlexDirection::Row,
@@ -298,7 +307,7 @@ fn test_flex_basis_percentage() {
     // Child 1: flex-basis 25%
     let child1 = LayoutNode::new(Style {
         item_style: ItemStyle {
-            flex_basis: Length::Percent(25.0),
+            flex_basis: LengthOrAuto::Length(Length::Percent(25.0)),
             ..Default::default()
         },
         ..Default::default()
@@ -307,23 +316,26 @@ fn test_flex_basis_percentage() {
     // Child 2: flex-basis 50%
     let child2 = LayoutNode::new(Style {
         item_style: ItemStyle {
-            flex_basis: Length::Percent(50.0),
+            flex_basis: LengthOrAuto::Length(Length::Percent(50.0)),
             flex_grow: 1.0,
             ..Default::default()
         },
         ..Default::default()
     });
 
-    container.children = vec![child1, child2];
+    container.children = vec![
+        LayoutChild::Node(Box::new(child1)),
+        LayoutChild::Node(Box::new(child2)),
+    ];
     LayoutEngine::layout(&mut container, 800.0, 600.0);
 
     // Child1=25% of 400px=100px
     // Child2=50% of 400px=200px + remaining space=100px → 300px
-    if let LayoutBoxes::Single(ref child_box) = container.children[0].layout_boxes {
+    if let LayoutBox::BlockBox(ref child_box) = container.children[0].layout_box {
         assert_eq!(child_box.border_box.width, 100.0);
     }
 
-    if let LayoutBoxes::Single(ref child_box) = container.children[1].layout_boxes {
+    if let LayoutBox::BlockBox(ref child_box) = container.children[1].layout_box {
         assert_eq!(child_box.border_box.width, 300.0);
     }
 }

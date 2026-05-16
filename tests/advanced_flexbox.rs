@@ -4,7 +4,7 @@ use ui_layout::*;
 fn flex_column_layout() {
     let child1 = LayoutNode::new(Style {
         size: SizeStyle {
-            height: Length::Px(40.0),
+            height: LengthOrAuto::Length(Length::Px(40.0)),
             ..Default::default()
         },
         ..Default::default()
@@ -20,7 +20,7 @@ fn flex_column_layout() {
 
     let child3 = LayoutNode::new(Style {
         size: SizeStyle {
-            height: Length::Px(30.0),
+            height: LengthOrAuto::Length(Length::Px(30.0)),
             ..Default::default()
         },
         ..Default::default()
@@ -33,8 +33,8 @@ fn flex_column_layout() {
                 inner: InnerDisplay::Flex,
             },
             size: SizeStyle {
-                width: Length::Px(200.0),
-                height: Length::Px(150.0),
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Length(Length::Px(150.0)),
                 ..Default::default()
             },
             flex_direction: FlexDirection::Column,
@@ -45,24 +45,24 @@ fn flex_column_layout() {
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
-    match &root.children[0].layout_boxes {
-        LayoutBoxes::Single(box_model) => {
+    match &root.children[0].layout_box {
+        LayoutBox::BlockBox(box_model) => {
             assert_eq!(box_model.content_box.height, 40.0);
             assert_eq!(box_model.content_box.width, 200.0);
         }
         _ => panic!("Expected single box model"),
     }
 
-    match &root.children[1].layout_boxes {
-        LayoutBoxes::Single(box_model) => {
+    match &root.children[1].layout_box {
+        LayoutBox::BlockBox(box_model) => {
             assert_eq!(box_model.content_box.height, 80.0); // 150 - 40 - 30 = 80
             assert_eq!(box_model.content_box.width, 200.0);
         }
         _ => panic!("Expected single box model"),
     }
 
-    match &root.children[2].layout_boxes {
-        LayoutBoxes::Single(box_model) => {
+    match &root.children[2].layout_box {
+        LayoutBox::BlockBox(box_model) => {
             assert_eq!(box_model.content_box.height, 30.0);
             assert_eq!(box_model.content_box.width, 200.0);
         }
@@ -74,7 +74,7 @@ fn flex_column_layout() {
 fn flex_justify_content_space_evenly() {
     let child1 = LayoutNode::new(Style {
         size: SizeStyle {
-            width: Length::Px(50.0),
+            width: LengthOrAuto::Length(Length::Px(50.0)),
             ..Default::default()
         },
         ..Default::default()
@@ -82,7 +82,7 @@ fn flex_justify_content_space_evenly() {
 
     let child2 = LayoutNode::new(Style {
         size: SizeStyle {
-            width: Length::Px(60.0),
+            width: LengthOrAuto::Length(Length::Px(60.0)),
             ..Default::default()
         },
         ..Default::default()
@@ -90,7 +90,7 @@ fn flex_justify_content_space_evenly() {
 
     let child3 = LayoutNode::new(Style {
         size: SizeStyle {
-            width: Length::Px(40.0),
+            width: LengthOrAuto::Length(Length::Px(40.0)),
             ..Default::default()
         },
         ..Default::default()
@@ -103,8 +103,8 @@ fn flex_justify_content_space_evenly() {
                 inner: InnerDisplay::Flex,
             },
             size: SizeStyle {
-                width: Length::Px(300.0),
-                height: Length::Px(50.0),
+                width: LengthOrAuto::Length(Length::Px(300.0)),
+                height: LengthOrAuto::Length(Length::Px(50.0)),
                 ..Default::default()
             },
             justify_content: JustifyContent::SpaceEvenly,
@@ -120,22 +120,22 @@ fn flex_justify_content_space_evenly() {
     // Space evenly: 150 / 4 = 37.5px gaps
     // Positions: 37.5, 125, 222.5
 
-    match &root.children[0].layout_boxes {
-        LayoutBoxes::Single(box_model) => {
+    match &root.children[0].layout_box {
+        LayoutBox::BlockBox(box_model) => {
             assert!((box_model.border_box.x - 37.5).abs() < 0.1);
         }
         _ => panic!("Expected single box model"),
     }
 
-    match &root.children[1].layout_boxes {
-        LayoutBoxes::Single(box_model) => {
+    match &root.children[1].layout_box {
+        LayoutBox::BlockBox(box_model) => {
             assert!((box_model.border_box.x - 125.0).abs() < 0.1);
         }
         _ => panic!("Expected single box model"),
     }
 
-    match &root.children[2].layout_boxes {
-        LayoutBoxes::Single(box_model) => {
+    match &root.children[2].layout_box {
+        LayoutBox::BlockBox(box_model) => {
             assert!((box_model.border_box.x - 222.5).abs() < 0.1);
         }
         _ => panic!("Expected single box model"),
@@ -146,8 +146,8 @@ fn flex_justify_content_space_evenly() {
 fn flex_align_items_different_values() {
     let child1 = LayoutNode::new(Style {
         size: SizeStyle {
-            width: Length::Px(50.0),
-            height: Length::Px(30.0),
+            width: LengthOrAuto::Length(Length::Px(50.0)),
+            height: LengthOrAuto::Length(Length::Px(30.0)),
             ..Default::default()
         },
         item_style: ItemStyle {
@@ -159,8 +159,8 @@ fn flex_align_items_different_values() {
 
     let child2 = LayoutNode::new(Style {
         size: SizeStyle {
-            width: Length::Px(60.0),
-            height: Length::Px(40.0),
+            width: LengthOrAuto::Length(Length::Px(60.0)),
+            height: LengthOrAuto::Length(Length::Px(40.0)),
             ..Default::default()
         },
         item_style: ItemStyle {
@@ -172,8 +172,8 @@ fn flex_align_items_different_values() {
 
     let child3 = LayoutNode::new(Style {
         size: SizeStyle {
-            width: Length::Px(40.0),
-            height: Length::Px(20.0),
+            width: LengthOrAuto::Length(Length::Px(40.0)),
+            height: LengthOrAuto::Length(Length::Px(20.0)),
             ..Default::default()
         },
         item_style: ItemStyle {
@@ -190,8 +190,8 @@ fn flex_align_items_different_values() {
                 inner: InnerDisplay::Flex,
             },
             size: SizeStyle {
-                width: Length::Px(300.0),
-                height: Length::Px(100.0),
+                width: LengthOrAuto::Length(Length::Px(300.0)),
+                height: LengthOrAuto::Length(Length::Px(100.0)),
                 ..Default::default()
             },
             align_items: AlignItems::Stretch, // Default, but children override
@@ -204,24 +204,24 @@ fn flex_align_items_different_values() {
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
     // Child1: align-self: start -> y = 0
-    match &root.children[0].layout_boxes {
-        LayoutBoxes::Single(box_model) => {
+    match &root.children[0].layout_box {
+        LayoutBox::BlockBox(box_model) => {
             assert_eq!(box_model.border_box.y, 0.0);
         }
         _ => panic!("Expected single box model"),
     }
 
     // Child2: align-self: center -> y = (100 - 40) / 2 = 30
-    match &root.children[1].layout_boxes {
-        LayoutBoxes::Single(box_model) => {
+    match &root.children[1].layout_box {
+        LayoutBox::BlockBox(box_model) => {
             assert_eq!(box_model.border_box.y, 30.0);
         }
         _ => panic!("Expected single box model"),
     }
 
     // Child3: align-self: end -> y = 100 - 20 = 80
-    match &root.children[2].layout_boxes {
-        LayoutBoxes::Single(box_model) => {
+    match &root.children[2].layout_box {
+        LayoutBox::BlockBox(box_model) => {
             assert_eq!(box_model.border_box.y, 80.0);
         }
         _ => panic!("Expected single box model"),
@@ -237,7 +237,7 @@ fn nested_flex_containers() {
             ..Default::default()
         },
         size: SizeStyle {
-            height: Length::Px(20.0),
+            height: LengthOrAuto::Length(Length::Px(20.0)),
             ..Default::default()
         },
         ..Default::default()
@@ -249,7 +249,7 @@ fn nested_flex_containers() {
             ..Default::default()
         },
         size: SizeStyle {
-            height: Length::Px(20.0),
+            height: LengthOrAuto::Length(Length::Px(20.0)),
             ..Default::default()
         },
         ..Default::default()
@@ -262,8 +262,8 @@ fn nested_flex_containers() {
                 inner: InnerDisplay::Flex,
             },
             size: SizeStyle {
-                width: Length::Px(120.0),
-                height: Length::Px(30.0),
+                width: LengthOrAuto::Length(Length::Px(120.0)),
+                height: LengthOrAuto::Length(Length::Px(30.0)),
                 ..Default::default()
             },
             flex_direction: FlexDirection::Row,
@@ -275,8 +275,8 @@ fn nested_flex_containers() {
     // Outer flex container
     let regular_child = LayoutNode::new(Style {
         size: SizeStyle {
-            width: Length::Px(80.0),
-            height: Length::Px(30.0),
+            width: LengthOrAuto::Length(Length::Px(80.0)),
+            height: LengthOrAuto::Length(Length::Px(30.0)),
             ..Default::default()
         },
         ..Default::default()
@@ -289,12 +289,12 @@ fn nested_flex_containers() {
                 inner: InnerDisplay::Flex,
             },
             size: SizeStyle {
-                width: Length::Px(250.0),
-                height: Length::Px(50.0),
+                width: LengthOrAuto::Length(Length::Px(250.0)),
+                height: LengthOrAuto::Length(Length::Px(50.0)),
                 ..Default::default()
             },
             flex_direction: FlexDirection::Row,
-            column_gap: Length::Px(10.0),
+            column_gap: LengthOrAuto::Length(Length::Px(10.0)),
             ..Default::default()
         },
         vec![inner_flex, regular_child],
@@ -303,16 +303,16 @@ fn nested_flex_containers() {
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
     // Check outer container children positioning
-    match &root.children[0].layout_boxes {
-        LayoutBoxes::Single(box_model) => {
+    match &root.children[0].layout_box {
+        LayoutBox::BlockBox(box_model) => {
             assert_eq!(box_model.border_box.x, 0.0);
             assert_eq!(box_model.content_box.width, 120.0);
         }
         _ => panic!("Expected single box model"),
     }
 
-    match &root.children[1].layout_boxes {
-        LayoutBoxes::Single(box_model) => {
+    match &root.children[1].layout_box {
+        LayoutBox::BlockBox(box_model) => {
             assert_eq!(box_model.border_box.x, 130.0); // 120 + 10 (gap)
             assert_eq!(box_model.content_box.width, 80.0);
         }
@@ -320,15 +320,15 @@ fn nested_flex_containers() {
     }
 
     // Check inner flex container children
-    match &root.children[0].children[0].layout_boxes {
-        LayoutBoxes::Single(box_model) => {
+    match &root.children[0].children[0].layout_box {
+        LayoutBox::BlockBox(box_model) => {
             assert_eq!(box_model.content_box.width, 40.0); // 120 * 1/3
         }
         _ => panic!("Expected single box model"),
     }
 
-    match &root.children[0].children[1].layout_boxes {
-        LayoutBoxes::Single(box_model) => {
+    match &root.children[0].children[1].layout_box {
+        LayoutBox::BlockBox(box_model) => {
             assert_eq!(box_model.content_box.width, 80.0); // 120 * 2/3
         }
         _ => panic!("Expected single box model"),
@@ -339,7 +339,7 @@ fn nested_flex_containers() {
 fn flex_with_percentage_basis() {
     let child1 = LayoutNode::new(Style {
         item_style: ItemStyle {
-            flex_basis: Length::Percent(30.0), // 30% of 300px = 90px
+            flex_basis: LengthOrAuto::Length(Length::Percent(30.0)), // 30% of 300px = 90px
             flex_grow: 0.0,
             ..Default::default()
         },
@@ -348,7 +348,7 @@ fn flex_with_percentage_basis() {
 
     let child2 = LayoutNode::new(Style {
         item_style: ItemStyle {
-            flex_basis: Length::Percent(20.0), // 20% of 300px = 60px
+            flex_basis: LengthOrAuto::Length(Length::Percent(20.0)), // 20% of 300px = 60px
             flex_grow: 1.0,
             ..Default::default()
         },
@@ -362,8 +362,8 @@ fn flex_with_percentage_basis() {
                 inner: InnerDisplay::Flex,
             },
             size: SizeStyle {
-                width: Length::Px(300.0),
-                height: Length::Px(50.0),
+                width: LengthOrAuto::Length(Length::Px(300.0)),
+                height: LengthOrAuto::Length(Length::Px(50.0)),
                 ..Default::default()
             },
             flex_direction: FlexDirection::Row,
@@ -374,15 +374,15 @@ fn flex_with_percentage_basis() {
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
-    match &root.children[0].layout_boxes {
-        LayoutBoxes::Single(box_model) => {
+    match &root.children[0].layout_box {
+        LayoutBox::BlockBox(box_model) => {
             assert_eq!(box_model.content_box.width, 90.0); // 30% of 300px
         }
         _ => panic!("Expected single box model"),
     }
 
-    match &root.children[1].layout_boxes {
-        LayoutBoxes::Single(box_model) => {
+    match &root.children[1].layout_box {
+        LayoutBox::BlockBox(box_model) => {
             // flex_basis: 60px + remaining space (300 - 90 - 60 = 150px)
             assert_eq!(box_model.content_box.width, 210.0);
         }
@@ -394,7 +394,7 @@ fn flex_with_percentage_basis() {
 fn flex_auto_margins_override_justify_content() {
     let child1 = LayoutNode::new(Style {
         size: SizeStyle {
-            width: Length::Px(50.0),
+            width: LengthOrAuto::Length(Length::Px(50.0)),
             ..Default::default()
         },
         ..Default::default()
@@ -402,11 +402,11 @@ fn flex_auto_margins_override_justify_content() {
 
     let child2 = LayoutNode::new(Style {
         size: SizeStyle {
-            width: Length::Px(60.0),
+            width: LengthOrAuto::Length(Length::Px(60.0)),
             ..Default::default()
         },
         spacing: Spacing {
-            margin_left: Length::Auto,
+            margin_left: LengthOrAuto::Auto,
             ..Default::default()
         },
         ..Default::default()
@@ -414,12 +414,12 @@ fn flex_auto_margins_override_justify_content() {
 
     let child3 = LayoutNode::new(Style {
         size: SizeStyle {
-            width: Length::Px(40.0),
+            width: LengthOrAuto::Length(Length::Px(40.0)),
             ..Default::default()
         },
         spacing: Spacing {
-            margin_left: Length::Auto,
-            margin_right: Length::Auto,
+            margin_left: LengthOrAuto::Auto,
+            margin_right: LengthOrAuto::Auto,
             ..Default::default()
         },
         ..Default::default()
@@ -432,8 +432,8 @@ fn flex_auto_margins_override_justify_content() {
                 inner: InnerDisplay::Flex,
             },
             size: SizeStyle {
-                width: Length::Px(300.0),
-                height: Length::Px(50.0),
+                width: LengthOrAuto::Length(Length::Px(300.0)),
+                height: LengthOrAuto::Length(Length::Px(50.0)),
                 ..Default::default()
             },
             flex_direction: FlexDirection::Row,
@@ -447,8 +447,8 @@ fn flex_auto_margins_override_justify_content() {
 
     // Available space: 300 - 50 - 60 - 40 = 150px
     // Child1: no auto margin, at start
-    match &root.children[0].layout_boxes {
-        LayoutBoxes::Single(box_model) => {
+    match &root.children[0].layout_box {
+        LayoutBox::BlockBox(box_model) => {
             assert_eq!(box_model.border_box.x, 0.0);
         }
         _ => panic!("Expected single box model"),
@@ -463,8 +463,8 @@ fn flex_auto_margins_override_justify_content() {
 fn flex_row_gap_column_gap() {
     let child1 = LayoutNode::new(Style {
         size: SizeStyle {
-            width: Length::Px(60.0),
-            height: Length::Px(40.0),
+            width: LengthOrAuto::Length(Length::Px(60.0)),
+            height: LengthOrAuto::Length(Length::Px(40.0)),
             ..Default::default()
         },
         ..Default::default()
@@ -472,8 +472,8 @@ fn flex_row_gap_column_gap() {
 
     let child2 = LayoutNode::new(Style {
         size: SizeStyle {
-            width: Length::Px(70.0),
-            height: Length::Px(30.0),
+            width: LengthOrAuto::Length(Length::Px(70.0)),
+            height: LengthOrAuto::Length(Length::Px(30.0)),
             ..Default::default()
         },
         ..Default::default()
@@ -481,8 +481,8 @@ fn flex_row_gap_column_gap() {
 
     let child3 = LayoutNode::new(Style {
         size: SizeStyle {
-            width: Length::Px(50.0),
-            height: Length::Px(35.0),
+            width: LengthOrAuto::Length(Length::Px(50.0)),
+            height: LengthOrAuto::Length(Length::Px(35.0)),
             ..Default::default()
         },
         ..Default::default()
@@ -495,13 +495,13 @@ fn flex_row_gap_column_gap() {
                 inner: InnerDisplay::Flex,
             },
             size: SizeStyle {
-                width: Length::Px(300.0),
-                height: Length::Px(80.0),
+                width: LengthOrAuto::Length(Length::Px(300.0)),
+                height: LengthOrAuto::Length(Length::Px(80.0)),
                 ..Default::default()
             },
             flex_direction: FlexDirection::Row,
-            column_gap: Length::Px(15.0), // Gap between items in row
-            row_gap: Length::Px(10.0),    // Not used in single row, but testing
+            column_gap: LengthOrAuto::Length(Length::Px(15.0)), // Gap between items in row
+            row_gap: LengthOrAuto::Length(Length::Px(10.0)), // Not used in single row, but testing
             ..Default::default()
         },
         vec![child1, child2, child3],
@@ -514,22 +514,22 @@ fn flex_row_gap_column_gap() {
     // Child2: x = 60 + 15 = 75
     // Child3: x = 75 + 70 + 15 = 160
 
-    match &root.children[0].layout_boxes {
-        LayoutBoxes::Single(box_model) => {
+    match &root.children[0].layout_box {
+        LayoutBox::BlockBox(box_model) => {
             assert_eq!(box_model.border_box.x, 0.0);
         }
         _ => panic!("Expected single box model"),
     }
 
-    match &root.children[1].layout_boxes {
-        LayoutBoxes::Single(box_model) => {
+    match &root.children[1].layout_box {
+        LayoutBox::BlockBox(box_model) => {
             assert_eq!(box_model.border_box.x, 75.0);
         }
         _ => panic!("Expected single box model"),
     }
 
-    match &root.children[2].layout_boxes {
-        LayoutBoxes::Single(box_model) => {
+    match &root.children[2].layout_box {
+        LayoutBox::BlockBox(box_model) => {
             assert_eq!(box_model.border_box.x, 160.0);
         }
         _ => panic!("Expected single box model"),
@@ -544,8 +544,8 @@ fn flex_min_max_constraints_with_grow() {
             ..Default::default()
         },
         size: SizeStyle {
-            min_width: Length::Px(80.0),
-            max_width: Length::Px(120.0),
+            min_width: LengthOrAuto::Length(Length::Px(80.0)),
+            max_width: LengthOrAuto::Length(Length::Px(120.0)),
             ..Default::default()
         },
         ..Default::default()
@@ -557,8 +557,8 @@ fn flex_min_max_constraints_with_grow() {
             ..Default::default()
         },
         size: SizeStyle {
-            min_width: Length::Px(60.0),
-            max_width: Length::Px(100.0),
+            min_width: LengthOrAuto::Length(Length::Px(60.0)),
+            max_width: LengthOrAuto::Length(Length::Px(100.0)),
             ..Default::default()
         },
         ..Default::default()
@@ -571,8 +571,8 @@ fn flex_min_max_constraints_with_grow() {
                 inner: InnerDisplay::Flex,
             },
             size: SizeStyle {
-                width: Length::Px(400.0),
-                height: Length::Px(50.0),
+                width: LengthOrAuto::Length(Length::Px(400.0)),
+                height: LengthOrAuto::Length(Length::Px(50.0)),
                 ..Default::default()
             },
             flex_direction: FlexDirection::Row,
@@ -586,16 +586,16 @@ fn flex_min_max_constraints_with_grow() {
     // Without constraints: child1 would get 133.33px, child2 would get 266.67px
     // With constraints: child1 clamped to max 120px, child2 clamped to max 100px
 
-    match &root.children[0].layout_boxes {
-        LayoutBoxes::Single(box_model) => {
+    match &root.children[0].layout_box {
+        LayoutBox::BlockBox(box_model) => {
             assert!(box_model.content_box.width <= 120.0); // Respects max constraint
             assert!(box_model.content_box.width >= 80.0); // Respects min constraint
         }
         _ => panic!("Expected single box model"),
     }
 
-    match &root.children[1].layout_boxes {
-        LayoutBoxes::Single(box_model) => {
+    match &root.children[1].layout_box {
+        LayoutBox::BlockBox(box_model) => {
             assert!(box_model.content_box.width <= 100.0); // Respects max constraint
             assert!(box_model.content_box.width >= 60.0); // Respects min constraint
         }

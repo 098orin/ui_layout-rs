@@ -4,8 +4,8 @@ use ui_layout::*;
 fn padding_content_box() {
     let mut root = LayoutNode::new(Style {
         size: SizeStyle {
-            width: Length::Px(200.0),
-            height: Length::Px(100.0),
+            width: LengthOrAuto::Length(Length::Px(200.0)),
+            height: LengthOrAuto::Length(Length::Px(100.0)),
             ..Default::default()
         },
         spacing: Spacing {
@@ -20,8 +20,8 @@ fn padding_content_box() {
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
-    match &root.layout_boxes {
-        LayoutBoxes::Single(box_model) => {
+    match &root.layout_box {
+        LayoutBox::BlockBox(box_model) => {
             // Content box should be the specified size
             assert_eq!(box_model.content_box.width, 200.0);
             assert_eq!(box_model.content_box.height, 100.0);
@@ -42,8 +42,8 @@ fn padding_content_box() {
 fn border_box_sizing() {
     let mut root = LayoutNode::new(Style {
         size: SizeStyle {
-            width: Length::Px(200.0),
-            height: Length::Px(100.0),
+            width: LengthOrAuto::Length(Length::Px(200.0)),
+            height: LengthOrAuto::Length(Length::Px(100.0)),
             ..Default::default()
         },
         box_sizing: BoxSizing::BorderBox,
@@ -63,8 +63,8 @@ fn border_box_sizing() {
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
-    match &root.layout_boxes {
-        LayoutBoxes::Single(box_model) => {
+    match &root.layout_box {
+        LayoutBox::BlockBox(box_model) => {
             // Border box should be the specified size
             assert_eq!(box_model.border_box.width, 200.0);
             assert_eq!(box_model.border_box.height, 100.0);
@@ -85,10 +85,10 @@ fn border_box_sizing() {
 fn nested_border_box_sizing() {
     let def_style = Style {
         spacing: Spacing {
-            margin_top: Length::Px(10.0),
-            margin_bottom: Length::Px(10.0),
-            margin_left: Length::Px(10.0),
-            margin_right: Length::Px(10.0),
+            margin_top: LengthOrAuto::Length(Length::Px(10.0)),
+            margin_bottom: LengthOrAuto::Length(Length::Px(10.0)),
+            margin_left: LengthOrAuto::Length(Length::Px(10.0)),
+            margin_right: LengthOrAuto::Length(Length::Px(10.0)),
             ..Default::default()
         },
         size: SizeStyle {
@@ -103,9 +103,9 @@ fn nested_border_box_sizing() {
         if current + 1 < max {
             parent
                 .children
-                .push(LayoutItem::Node(LayoutNode::new(style.clone())));
+                .push(LayoutChild::Node(Box::new(LayoutNode::new(style.clone()))));
             push_child(
-                &mut parent.children[0].node().unwrap(),
+                &mut parent.children[0].node().unwrap().clone(),
                 style.clone(),
                 max,
                 current + 1,
@@ -113,20 +113,22 @@ fn nested_border_box_sizing() {
         } else {
             parent
                 .children
-                .push(LayoutItem::Node(LayoutNode::new(Style {
+                .push(LayoutChild::Node(Box::new(LayoutNode::new(Style {
                     size: SizeStyle {
-                        height: Length::Px(50.0),
+                        height: LengthOrAuto::Length(Length::Px(50.0)),
                         ..Default::default()
                     },
                     ..style
-                })));
+                }))));
         }
     }
 
     root.children
-        .push(LayoutItem::Node(LayoutNode::new(def_style.clone())));
+        .push(LayoutChild::Node(Box::new(LayoutNode::new(
+            def_style.clone(),
+        ))));
     push_child(
-        &mut root.children[0].node().unwrap(),
+        &mut root.children[0].node_mut().unwrap(),
         def_style.clone(),
         3,
         0,
@@ -136,8 +138,8 @@ fn nested_border_box_sizing() {
 
     // level 0
     let child0 = &root.children[0];
-    match &child0.layout_boxes {
-        LayoutBoxes::Single(box_model) => {
+    match &child0.layout_box {
+        LayoutBox::BlockBox(box_model) => {
             assert_eq!(box_model.border_box.y, 10.0);
             assert_eq!(box_model.border_box.width, 780.0);
             assert_eq!(box_model.border_box.height, 110.0);
@@ -147,8 +149,8 @@ fn nested_border_box_sizing() {
 
     // level 1
     let child1 = &child0.children[0];
-    match &child1.layout_boxes {
-        LayoutBoxes::Single(box_model) => {
+    match &child1.layout_box {
+        LayoutBox::BlockBox(box_model) => {
             assert_eq!(box_model.border_box.y, 10.0);
             assert_eq!(box_model.border_box.width, 760.0);
             assert_eq!(box_model.border_box.height, 90.0);
@@ -158,8 +160,8 @@ fn nested_border_box_sizing() {
 
     // level 2
     let child2 = &child1.children[0];
-    match &child2.layout_boxes {
-        LayoutBoxes::Single(box_model) => {
+    match &child2.layout_box {
+        LayoutBox::BlockBox(box_model) => {
             assert_eq!(box_model.border_box.y, 10.0);
             assert_eq!(box_model.border_box.width, 740.0);
             assert_eq!(box_model.border_box.height, 70.0);
@@ -169,8 +171,8 @@ fn nested_border_box_sizing() {
 
     // leaf
     let leaf = &child2.children[0];
-    match &leaf.layout_boxes {
-        LayoutBoxes::Single(box_model) => {
+    match &leaf.layout_box {
+        LayoutBox::BlockBox(box_model) => {
             assert_eq!(box_model.border_box.y, 10.0);
             assert_eq!(box_model.border_box.width, 720.0);
             assert_eq!(box_model.content_box.height, 50.0);

@@ -5,8 +5,8 @@ fn test_child_coordinates_relative_to_parent_content_box() {
     // Parent with padding and border
     let child = LayoutNode::new(Style {
         size: SizeStyle {
-            width: Length::Px(50.0),
-            height: Length::Px(30.0),
+            width: LengthOrAuto::Length(Length::Px(50.0)),
+            height: LengthOrAuto::Length(Length::Px(30.0)),
             ..Default::default()
         },
         ..Default::default()
@@ -15,8 +15,8 @@ fn test_child_coordinates_relative_to_parent_content_box() {
     let mut parent = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
-                width: Length::Px(200.0),
-                height: Length::Px(100.0),
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Length(Length::Px(100.0)),
                 ..Default::default()
             },
             spacing: Spacing {
@@ -37,13 +37,13 @@ fn test_child_coordinates_relative_to_parent_content_box() {
 
     LayoutEngine::layout(&mut parent, 800.0, 600.0);
 
-    let parent_box = match &parent.layout_boxes {
-        LayoutBoxes::Single(box_model) => box_model,
+    let parent_box = match &parent.layout_box {
+        LayoutBox::BlockBox(box_model) => box_model,
         _ => panic!("Expected single box model for parent"),
     };
 
-    let child_box = match &parent.children[0].layout_boxes {
-        LayoutBoxes::Single(box_model) => box_model,
+    let child_box = match &parent.children[0].layout_box {
+        LayoutBox::BlockBox(box_model) => box_model,
         _ => panic!("Expected single box model for child"),
     };
 
@@ -62,13 +62,13 @@ fn test_nested_coordinate_system() {
     // Deeply nested structure to test coordinate propagation
     let grandchild = LayoutNode::new(Style {
         size: SizeStyle {
-            width: Length::Px(20.0),
-            height: Length::Px(15.0),
+            width: LengthOrAuto::Length(Length::Px(20.0)),
+            height: LengthOrAuto::Length(Length::Px(15.0)),
             ..Default::default()
         },
         spacing: Spacing {
-            margin_left: Length::Px(5.0),
-            margin_top: Length::Px(3.0),
+            margin_left: LengthOrAuto::Length(Length::Px(5.0)),
+            margin_top: LengthOrAuto::Length(Length::Px(3.0)),
             ..Default::default()
         },
         ..Default::default()
@@ -77,15 +77,15 @@ fn test_nested_coordinate_system() {
     let child = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
-                width: Length::Px(100.0),
-                height: Length::Px(60.0),
+                width: LengthOrAuto::Length(Length::Px(100.0)),
+                height: LengthOrAuto::Length(Length::Px(60.0)),
                 ..Default::default()
             },
             spacing: Spacing {
                 padding_left: Length::Px(10.0),
                 padding_top: Length::Px(8.0),
-                margin_left: Length::Px(15.0),
-                margin_top: Length::Px(12.0),
+                margin_left: LengthOrAuto::Length(Length::Px(15.0)),
+                margin_top: LengthOrAuto::Length(Length::Px(12.0)),
                 ..Default::default()
             },
             ..Default::default()
@@ -96,8 +96,8 @@ fn test_nested_coordinate_system() {
     let mut root = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
-                width: Length::Px(300.0),
-                height: Length::Px(200.0),
+                width: LengthOrAuto::Length(Length::Px(300.0)),
+                height: LengthOrAuto::Length(Length::Px(200.0)),
                 ..Default::default()
             },
             spacing: Spacing {
@@ -112,18 +112,18 @@ fn test_nested_coordinate_system() {
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
-    let root_box = match &root.layout_boxes {
-        LayoutBoxes::Single(box_model) => box_model,
+    let root_box = match &root.layout_box {
+        LayoutBox::BlockBox(box_model) => box_model,
         _ => panic!("Expected single box model for root"),
     };
 
-    let child_box = match &root.children[0].layout_boxes {
-        LayoutBoxes::Single(box_model) => box_model,
+    let child_box = match &root.children[0].layout_box {
+        LayoutBox::BlockBox(box_model) => box_model,
         _ => panic!("Expected single box model for child"),
     };
 
-    let grandchild_box = match &root.children[0].children[0].layout_boxes {
-        LayoutBoxes::Single(box_model) => box_model,
+    let grandchild_box = match &root.children[0].children[0].layout_box {
+        LayoutBox::BlockBox(box_model) => box_model,
         _ => panic!("Expected single box model for grandchild"),
     };
 
@@ -150,8 +150,8 @@ fn test_nested_coordinate_system() {
 fn test_flex_children_coordinates() {
     let child1 = LayoutNode::new(Style {
         size: SizeStyle {
-            width: Length::Px(40.0),
-            height: Length::Px(30.0),
+            width: LengthOrAuto::Length(Length::Px(40.0)),
+            height: LengthOrAuto::Length(Length::Px(30.0)),
             ..Default::default()
         },
         ..Default::default()
@@ -159,8 +159,8 @@ fn test_flex_children_coordinates() {
 
     let child2 = LayoutNode::new(Style {
         size: SizeStyle {
-            width: Length::Px(60.0),
-            height: Length::Px(30.0),
+            width: LengthOrAuto::Length(Length::Px(60.0)),
+            height: LengthOrAuto::Length(Length::Px(30.0)),
             ..Default::default()
         },
         ..Default::default()
@@ -173,8 +173,8 @@ fn test_flex_children_coordinates() {
                 inner: InnerDisplay::Flex,
             },
             size: SizeStyle {
-                width: Length::Px(200.0),
-                height: Length::Px(80.0),
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Length(Length::Px(80.0)),
                 ..Default::default()
             },
             spacing: Spacing {
@@ -185,7 +185,7 @@ fn test_flex_children_coordinates() {
                 ..Default::default()
             },
             flex_direction: FlexDirection::Row,
-            column_gap: Length::Px(20.0),
+            column_gap: LengthOrAuto::Length(Length::Px(20.0)),
             ..Default::default()
         },
         vec![child1, child2],
@@ -193,18 +193,18 @@ fn test_flex_children_coordinates() {
 
     LayoutEngine::layout(&mut flex_container, 800.0, 600.0);
 
-    let container_box = match &flex_container.layout_boxes {
-        LayoutBoxes::Single(box_model) => box_model,
+    let container_box = match &flex_container.layout_box {
+        LayoutBox::BlockBox(box_model) => box_model,
         _ => panic!("Expected single box model for flex container"),
     };
 
-    let child1_box = match &flex_container.children[0].layout_boxes {
-        LayoutBoxes::Single(box_model) => box_model,
+    let child1_box = match &flex_container.children[0].layout_box {
+        LayoutBox::BlockBox(box_model) => box_model,
         _ => panic!("Expected single box model for child1"),
     };
 
-    let child2_box = match &flex_container.children[1].layout_boxes {
-        LayoutBoxes::Single(box_model) => box_model,
+    let child2_box = match &flex_container.children[1].layout_box {
+        LayoutBox::BlockBox(box_model) => box_model,
         _ => panic!("Expected single box model for child2"),
     };
 
@@ -225,12 +225,12 @@ fn test_flex_children_coordinates() {
 fn test_block_children_coordinates_with_margins() {
     let child1 = LayoutNode::new(Style {
         size: SizeStyle {
-            width: Length::Px(100.0),
-            height: Length::Px(40.0),
+            width: LengthOrAuto::Length(Length::Px(100.0)),
+            height: LengthOrAuto::Length(Length::Px(40.0)),
             ..Default::default()
         },
         spacing: Spacing {
-            margin_bottom: Length::Px(20.0),
+            margin_bottom: LengthOrAuto::Length(Length::Px(20.0)),
             ..Default::default()
         },
         ..Default::default()
@@ -238,12 +238,12 @@ fn test_block_children_coordinates_with_margins() {
 
     let child2 = LayoutNode::new(Style {
         size: SizeStyle {
-            width: Length::Px(120.0),
-            height: Length::Px(30.0),
+            width: LengthOrAuto::Length(Length::Px(120.0)),
+            height: LengthOrAuto::Length(Length::Px(30.0)),
             ..Default::default()
         },
         spacing: Spacing {
-            margin_top: Length::Px(15.0), // Should collapse with child1's margin_bottom
+            margin_top: LengthOrAuto::Length(Length::Px(15.0)), // Should collapse with child1's margin_bottom
             ..Default::default()
         },
         ..Default::default()
@@ -252,8 +252,8 @@ fn test_block_children_coordinates_with_margins() {
     let mut parent = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
-                width: Length::Px(300.0),
-                height: Length::Auto,
+                width: LengthOrAuto::Length(Length::Px(300.0)),
+                height: LengthOrAuto::Auto,
                 ..Default::default()
             },
             spacing: Spacing {
@@ -268,18 +268,18 @@ fn test_block_children_coordinates_with_margins() {
 
     LayoutEngine::layout(&mut parent, 800.0, 600.0);
 
-    let parent_box = match &parent.layout_boxes {
-        LayoutBoxes::Single(box_model) => box_model,
+    let parent_box = match &parent.layout_box {
+        LayoutBox::BlockBox(box_model) => box_model,
         _ => panic!("Expected single box model for parent"),
     };
 
-    let child1_box = match &parent.children[0].layout_boxes {
-        LayoutBoxes::Single(box_model) => box_model,
+    let child1_box = match &parent.children[0].layout_box {
+        LayoutBox::BlockBox(box_model) => box_model,
         _ => panic!("Expected single box model for child1"),
     };
 
-    let child2_box = match &parent.children[1].layout_boxes {
-        LayoutBoxes::Single(box_model) => box_model,
+    let child2_box = match &parent.children[1].layout_box {
+        LayoutBox::BlockBox(box_model) => box_model,
         _ => panic!("Expected single box model for child2"),
     };
 
@@ -300,13 +300,13 @@ fn test_block_children_coordinates_with_margins() {
 fn test_coordinate_system_with_auto_margins() {
     let child = LayoutNode::new(Style {
         size: SizeStyle {
-            width: Length::Px(60.0),
-            height: Length::Px(40.0),
+            width: LengthOrAuto::Length(Length::Px(60.0)),
+            height: LengthOrAuto::Length(Length::Px(40.0)),
             ..Default::default()
         },
         spacing: Spacing {
-            margin_left: Length::Auto,
-            margin_right: Length::Auto,
+            margin_left: LengthOrAuto::Auto,
+            margin_right: LengthOrAuto::Auto,
             ..Default::default()
         },
         ..Default::default()
@@ -315,8 +315,8 @@ fn test_coordinate_system_with_auto_margins() {
     let mut parent = LayoutNode::with_node_children(
         Style {
             size: SizeStyle {
-                width: Length::Px(200.0),
-                height: Length::Px(100.0),
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Length(Length::Px(100.0)),
                 ..Default::default()
             },
             spacing: Spacing {
@@ -333,13 +333,13 @@ fn test_coordinate_system_with_auto_margins() {
 
     LayoutEngine::layout(&mut parent, 800.0, 600.0);
 
-    let parent_box = match &parent.layout_boxes {
-        LayoutBoxes::Single(box_model) => box_model,
+    let parent_box = match &parent.layout_box {
+        LayoutBox::BlockBox(box_model) => box_model,
         _ => panic!("Expected single box model for parent"),
     };
 
-    let child_box = match &parent.children[0].layout_boxes {
-        LayoutBoxes::Single(box_model) => box_model,
+    let child_box = match &parent.children[0].layout_box {
+        LayoutBox::BlockBox(box_model) => box_model,
         _ => panic!("Expected single box model for child"),
     };
 
