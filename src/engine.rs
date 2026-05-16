@@ -1066,6 +1066,9 @@ impl LayoutEngine {
                         total_border_main += axis.rect_main(&box_model.border_box);
                         max_cross = max_cross.max(axis.rect_cross(&box_model.border_box));
                     }
+
+                    // Need to process shift
+                    todo!()
                 }
                 FlexItem::Fragments(_) => {
                     todo!()
