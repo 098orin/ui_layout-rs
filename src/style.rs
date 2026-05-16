@@ -384,7 +384,7 @@ pub enum BoxSizing {
     BorderBox,
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Spacing {
     pub margin_top: LengthOrAuto,
     pub margin_bottom: LengthOrAuto,
@@ -400,6 +400,25 @@ pub struct Spacing {
     pub padding_bottom: Length,
     pub padding_left: Length,
     pub padding_right: Length,
+}
+
+impl Default for Spacing {
+    fn default() -> Self {
+        Spacing {
+            margin_top: LengthOrAuto::Length(Length::default()),
+            margin_bottom: LengthOrAuto::Length(Length::default()),
+            margin_left: LengthOrAuto::Length(Length::default()),
+            margin_right: LengthOrAuto::Length(Length::default()),
+            border_top: Length::default(),
+            border_bottom: Length::default(),
+            border_left: Length::default(),
+            border_right: Length::default(),
+            padding_top: Length::default(),
+            padding_bottom: Length::default(),
+            padding_left: Length::default(),
+            padding_right: Length::default(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
