@@ -3,6 +3,7 @@ use ui_layout::*;
 #[test]
 fn layout_box_into_iter_block_single() {
     let child = LayoutNode::new(Style {
+        display: Display::parse("inline").unwrap(),
         size: SizeStyle {
             width: LengthOrAuto::Length(Length::Px(60.0)),
             height: LengthOrAuto::Length(Length::Px(30.0)),
