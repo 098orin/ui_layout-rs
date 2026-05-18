@@ -491,11 +491,11 @@ impl LayoutEngine {
                             (ml_opt.unwrap_or(0.0), mr_opt.unwrap_or(0.0))
                         };
 
+                        child_node.layout_box.shift(ml, 0.0);
+
                         if child_node.style.display.outer == OuterDisplay::Block {
                             cursor_y += previous_child_margin.max(top.unwrap_or_default());
                         }
-
-                        child_node.layout_box.shift(ml, 0.0);
 
                         previous_child_margin = bottom.unwrap_or_default();
                     }
