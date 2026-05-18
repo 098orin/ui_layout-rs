@@ -45,7 +45,12 @@ fn make_flex_chain(depth: usize, max_depth: usize) -> LayoutNode {
     });
 
     // Block の中にさらに Flex
-    block.children.push(LayoutChild::Node(Box::new(make_flex_chain(depth + 1, max_depth))));
+    block
+        .children
+        .push(LayoutChild::Node(Box::new(make_flex_chain(
+            depth + 1,
+            max_depth,
+        ))));
 
     root.children.push(LayoutChild::Node(Box::new(block)));
     root
@@ -61,7 +66,10 @@ fn make_branch(depth: usize, max_depth: usize) -> LayoutNode {
     flex.style.flex_direction = FlexDirection::Column;
 
     // 子は少ない（1〜2）
-    flex.children.push(LayoutChild::Node(Box::new(make_flex_chain(depth, max_depth))));
+    flex.children
+        .push(LayoutChild::Node(Box::new(make_flex_chain(
+            depth, max_depth,
+        ))));
 
     if depth.is_multiple_of(3) {
         let mut side = node(Display {
@@ -91,7 +99,8 @@ fn make_tree() -> LayoutNode {
     }))));
 
     // 問題の塊
-    root.children.push(LayoutChild::Node(Box::new(make_branch(0, 20))));
+    root.children
+        .push(LayoutChild::Node(Box::new(make_branch(0, 20))));
 
     root
 }
