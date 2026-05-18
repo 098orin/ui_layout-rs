@@ -30,7 +30,7 @@ fn block_vertical_margin_collapsing_between_siblings() {
         ..Default::default()
     });
 
-    let mut root = LayoutNode::with_node_children(
+    let mut root = LayoutNode::with_children(
         Style {
             size: SizeStyle {
                 width: LengthOrAuto::Length(Length::Px(100.0)),

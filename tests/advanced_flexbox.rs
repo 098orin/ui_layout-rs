@@ -30,7 +30,7 @@ fn flex_column_layout() {
         ..Default::default()
     });
 
-    let mut root = LayoutNode::with_node_children(
+    let mut root = LayoutNode::with_children(
         Style {
             display: Display {
                 outer: OuterDisplay::Block,
@@ -100,7 +100,7 @@ fn flex_justify_content_space_evenly() {
         ..Default::default()
     });
 
-    let mut root = LayoutNode::with_node_children(
+    let mut root = LayoutNode::with_children(
         Style {
             display: Display {
                 outer: OuterDisplay::Block,
@@ -187,7 +187,7 @@ fn flex_align_items_different_values() {
         ..Default::default()
     });
 
-    let mut root = LayoutNode::with_node_children(
+    let mut root = LayoutNode::with_children(
         Style {
             display: Display {
                 outer: OuterDisplay::Block,
@@ -259,7 +259,7 @@ fn nested_flex_containers() {
         ..Default::default()
     });
 
-    let inner_flex = LayoutNode::with_node_children(
+    let inner_flex = LayoutNode::with_children(
         Style {
             display: Display {
                 outer: OuterDisplay::Block,
@@ -286,7 +286,7 @@ fn nested_flex_containers() {
         ..Default::default()
     });
 
-    let mut root = LayoutNode::with_node_children(
+    let mut root = LayoutNode::with_children(
         Style {
             display: Display {
                 outer: OuterDisplay::Block,
@@ -359,7 +359,7 @@ fn flex_with_percentage_basis() {
         ..Default::default()
     });
 
-    let mut root = LayoutNode::with_node_children(
+    let mut root = LayoutNode::with_children(
         Style {
             display: Display {
                 outer: OuterDisplay::Block,
@@ -429,7 +429,7 @@ fn flex_auto_margins_override_justify_content() {
         ..Default::default()
     });
 
-    let mut root = LayoutNode::with_node_children(
+    let mut root = LayoutNode::with_children(
         Style {
             display: Display {
                 outer: OuterDisplay::Block,
@@ -492,7 +492,7 @@ fn flex_row_gap_column_gap() {
         ..Default::default()
     });
 
-    let mut root = LayoutNode::with_node_children(
+    let mut root = LayoutNode::with_children(
         Style {
             display: Display {
                 outer: OuterDisplay::Block,
@@ -568,7 +568,7 @@ fn flex_min_max_constraints_with_grow() {
         ..Default::default()
     });
 
-    let mut root = LayoutNode::with_node_children(
+    let mut root = LayoutNode::with_children(
         Style {
             display: Display {
                 outer: OuterDisplay::Block,

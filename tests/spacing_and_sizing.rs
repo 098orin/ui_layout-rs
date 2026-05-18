@@ -91,7 +91,7 @@ fn margins_affect_positioning_simple() {
         ..Default::default()
     });
 
-    let inner = LayoutNode::with_node_children(
+    let inner = LayoutNode::with_children(
         Style {
             size: SizeStyle {
                 width: LengthOrAuto::Length(Length::Px(300.0)),
@@ -103,7 +103,7 @@ fn margins_affect_positioning_simple() {
         vec![child],
     );
 
-    let mut root = LayoutNode::with_node_children(Style::default(), vec![inner]);
+    let mut root = LayoutNode::with_children(Style::default(), vec![inner]);
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 

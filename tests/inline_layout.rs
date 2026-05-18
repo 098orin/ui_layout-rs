@@ -5,22 +5,19 @@ fn layout_box_into_iter_block_single_line() {
     let fragment1 = ItemFragment::Fragment(Fragment {
         width: 30.0,
         height: 20.0,
-    })
-    .into();
+    });
 
     let fragment2 = ItemFragment::Fragment(Fragment {
         width: 40.0,
         height: 25.0,
-    })
-    .into();
+    });
 
     let fragment3 = ItemFragment::Fragment(Fragment {
         width: 35.0,
         height: 15.0,
-    })
-    .into();
+    });
 
-    let child = LayoutNode::with_fragment_children(
+    let child = LayoutNode::with_children(
         Style {
             display: Display::parse("inline").unwrap(),
             spacing: Spacing {
@@ -35,7 +32,7 @@ fn layout_box_into_iter_block_single_line() {
         vec![fragment1, fragment2, fragment3],
     );
 
-    let mut root = LayoutNode::with_node_children(Style::default(), vec![child]);
+    let mut root = LayoutNode::with_children(Style::default(), vec![child]);
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
