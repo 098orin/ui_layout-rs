@@ -9,6 +9,21 @@ pub struct FragmentNode {
     pub placement: Placement,
 }
 
+impl FragmentNode {
+    pub fn new(item: ItemFragment) -> Self {
+        FragmentNode {
+            node: item,
+            placement: Placement::default(),
+        }
+    }
+}
+
+impl From<ItemFragment> for FragmentNode {
+    fn from(value: ItemFragment) -> Self {
+        Self::new(value)
+    }
+}
+
 /// An item fragment for inline layout.
 ///
 /// Represents the smallest splittable unit of inline content or a control character.
@@ -61,7 +76,7 @@ pub struct Fragment {
 /// Represents where a is positioned after layout computation.
 /// Each placement corresponds 1:1 to a in the input.
 /// This 1:1 mapping applies uniformly to both `Node` and `Fragment`.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct Placement {
     /// Offset position (x, y) relative to the container
     pub offset: (f32, f32),
