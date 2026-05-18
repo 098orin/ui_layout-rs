@@ -48,11 +48,13 @@ pub struct LineSpan {
 }
 
 impl LineSpan {
+    /*
     /// Shift [`Self::line_pos`].
     fn shift(&mut self, dx: f32, dy: f32) {
         self.line_pos.0 += dx;
         self.line_pos.1 += dy;
     }
+    */
 
     pub fn width(&self) -> f32 {
         self.x_range.end - self.x_range.start
