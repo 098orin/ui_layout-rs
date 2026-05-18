@@ -1,7 +1,7 @@
 use ui_layout::*;
 
 #[test]
-fn layout_box_into_iter_block_single() {
+fn layout_box_into_iter_block_single_line() {
     let fragment1 = ItemFragment::Fragment(Fragment {
         width: 30.0,
         height: 20.0,
@@ -23,11 +23,6 @@ fn layout_box_into_iter_block_single() {
     let child = LayoutNode::with_fragment_children(
         Style {
             display: Display::parse("inline").unwrap(),
-            size: SizeStyle {
-                width: LengthOrAuto::Length(Length::Px(60.0)),
-                height: LengthOrAuto::Length(Length::Px(30.0)),
-                ..Default::default()
-            },
             spacing: Spacing {
                 padding_left: Length::Px(5.0),
                 padding_right: Length::Px(5.0),
@@ -44,12 +39,11 @@ fn layout_box_into_iter_block_single() {
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
-    let boxes: Vec<BoxModel> = (&root.children[0].node().unwrap().layout_box)
+    let boxes: Vec<BoxModel> = dbg!(&root.children[0].node().unwrap().layout_box)
         .into_iter()
         .collect();
     assert_eq!(boxes.len(), 1);
-    let b = &boxes[0];
-    // border box width = content width + padding + border: 60 + 5+5 + 2+2 = 74
-    assert_eq!(b.border_box.width, 74.0);
-    assert_eq!(b.content_box.width, 60.0);
+    let b = dbg!(&boxes[0]);
+    assert_eq!(b.content_box.width, 105.0);
+    assert_eq!(b.border_box.width, 105.0 + 14.0);
 }
