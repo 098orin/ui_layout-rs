@@ -221,11 +221,11 @@ impl IntoIterator for &LayoutBox {
             LayoutBox::InlineBox(inline) => {
                 let len = inline.line_spans.len();
 
-                let left_extra_padding = inline.box_model.padding_box.x;
-                let right_extra_padding = inline.box_model.border_box.width
+                let left_extra_border = inline.box_model.padding_box.x;
+                let right_extra_border = inline.box_model.border_box.width
                     - (inline.box_model.padding_box.x + inline.box_model.padding_box.width);
-                let left_extra_content = inline.box_model.content_box.x;
-                let right_extra_content = inline.box_model.border_box.width
+                let left_extra_padding = inline.box_model.content_box.x;
+                let right_extra_padding = inline.box_model.padding_box.width
                     - (inline.box_model.content_box.x + inline.box_model.content_box.width);
 
                 inline
@@ -240,7 +240,7 @@ impl IntoIterator for &LayoutBox {
                         let dy = span.line_pos.1 - b.content_box.y;
                         b.shift(dx, dy);
 
-                        let new_border_width = span.width();
+                        let new_content_width = span.width();
 
                         // decide which sides to keep
                         let keep_left = i == 0;
@@ -248,17 +248,17 @@ impl IntoIterator for &LayoutBox {
 
                         let left_padding = if keep_left { left_extra_padding } else { 0.0 };
                         let right_padding = if keep_right { right_extra_padding } else { 0.0 };
-                        let left_content = if keep_left { left_extra_content } else { 0.0 };
-                        let right_content = if keep_right { right_extra_content } else { 0.0 };
+                        let left_border = if keep_left { left_extra_border } else { 0.0 };
+                        let right_border = if keep_right { right_extra_border } else { 0.0 };
 
-                        // set content width
-                        b.border_box.width = new_border_width;
+                        // set content box
+                        b.content_box.width = new_content_width;
+                        b.content_box.x = left_padding;
 
-                        // rebuild inner boxes
-                        b.padding_box.x = left_padding;
-                        b.content_box.x = left_content;
-                        b.padding_box.width = new_border_width - left_padding - right_padding;
-                        b.content_box.width = new_border_width - left_content - right_content;
+                        // rebuild outer boxes
+                        b.padding_box.x = left_border;
+                        b.padding_box.width = new_content_width + left_padding + right_padding;
+                        b.border_box.width = b.padding_box.width + left_border + right_border;
                         b.children_box = b.content_box;
 
                         b
@@ -286,12 +286,12 @@ impl IntoIterator for LayoutBox {
                 let base = inline.box_model;
                 let spans = inline.line_spans;
 
-                let left_extra_padding = base.padding_box.x;
-                let right_extra_padding =
+                let left_extra_border = base.padding_box.x;
+                let right_extra_border =
                     base.border_box.width - (base.padding_box.x + base.padding_box.width);
-                let left_extra_content = base.content_box.x;
-                let right_extra_content =
-                    base.border_box.width - (base.content_box.x + base.content_box.width);
+                let left_extra_padding = base.content_box.x;
+                let right_extra_padding =
+                    base.padding_box.width - (base.content_box.x + base.content_box.width);
 
                 spans
                     .iter()
@@ -304,7 +304,7 @@ impl IntoIterator for LayoutBox {
                         let dy = span.line_pos.1 - b.content_box.y;
                         b.shift(dx, dy);
 
-                        let new_border_width = span.width();
+                        let new_content_width = span.width();
 
                         // decide which sides to keep
                         let keep_left = i == 0;
@@ -312,17 +312,17 @@ impl IntoIterator for LayoutBox {
 
                         let left_padding = if keep_left { left_extra_padding } else { 0.0 };
                         let right_padding = if keep_right { right_extra_padding } else { 0.0 };
-                        let left_content = if keep_left { left_extra_content } else { 0.0 };
-                        let right_content = if keep_right { right_extra_content } else { 0.0 };
+                        let left_border = if keep_left { left_extra_border } else { 0.0 };
+                        let right_border = if keep_right { right_extra_border } else { 0.0 };
 
-                        // set content width
-                        b.border_box.width = new_border_width;
+                        // set content box
+                        b.content_box.width = new_content_width;
+                        b.content_box.x = left_padding;
 
-                        // rebuild inner boxes
-                        b.padding_box.x = left_padding;
-                        b.content_box.x = left_content;
-                        b.padding_box.width = new_border_width - left_padding - right_padding;
-                        b.content_box.width = new_border_width - left_content - right_content;
+                        // rebuild outer boxes
+                        b.padding_box.x = left_border;
+                        b.padding_box.width = new_content_width + left_padding + right_padding;
+                        b.border_box.width = b.padding_box.width + left_border + right_border;
                         b.children_box = b.content_box;
 
                         b
