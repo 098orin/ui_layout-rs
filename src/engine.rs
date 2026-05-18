@@ -459,6 +459,8 @@ impl LayoutEngine {
                         intrinsic_pass,
                     );
 
+                    let (mut child_position_x, mut child_position_y) = line_ctx_for_child.end_pos;
+
                     // Process margin shift.
                     {
                         let EdgeOption {
@@ -494,7 +496,9 @@ impl LayoutEngine {
                         child_node.layout_box.shift(ml, 0.0);
 
                         if child_node.style.display.outer == OuterDisplay::Block {
+                            child_position_y += previous_child_margin.max(top.unwrap_or_default());
                             cursor_y += previous_child_margin.max(top.unwrap_or_default());
+
                             previous_child_margin = bottom.unwrap_or_default();
                         } else if child_node.style.display.outer != OuterDisplay::Inline {
                             unreachable!("This is unreachable for now.")
@@ -503,13 +507,11 @@ impl LayoutEngine {
 
                     // Process shift
                     if child_node.style.display.outer == OuterDisplay::Inline {
-                        child_node
-                            .layout_box
-                            .shift(line_ctx_for_child.end_pos.0, 0.0);
+                        child_node.layout_box.shift(child_position_x, 0.0);
                     } else {
                         child_node
                             .layout_box
-                            .shift(line_ctx_for_child.end_pos.0, line_ctx_for_child.end_pos.1);
+                            .shift(child_position_x, child_position_y);
                     }
 
                     // Collect child's line_spans if the outer display is Inline.
