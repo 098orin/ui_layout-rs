@@ -1,4 +1,4 @@
-use crate::{FragmentNode, LayoutNode};
+use crate::{FragmentNode, ItemFragment, LayoutNode};
 
 /// A unified layout item used during layout processing.
 ///
@@ -54,5 +54,11 @@ impl From<LayoutNode> for LayoutChild {
 impl From<FragmentNode> for LayoutChild {
     fn from(fragment: FragmentNode) -> Self {
         LayoutChild::Fragment(fragment)
+    }
+}
+
+impl From<ItemFragment> for LayoutChild {
+    fn from(value: ItemFragment) -> Self {
+        LayoutChild::Fragment(FragmentNode::new(value))
     }
 }
