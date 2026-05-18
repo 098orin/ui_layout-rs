@@ -3,6 +3,10 @@
 //! This module defines the fragment model used for inline content layout,
 //! including splittable content fragments and control characters.
 
+/// A fragment with associated layout placement information.
+///
+/// Wraps an `ItemFragment` together with its computed `Placement`.
+/// Used during layout to track both fragment content and its position.
 #[derive(Debug, Clone, Copy)]
 pub struct FragmentNode {
     pub node: ItemFragment,
