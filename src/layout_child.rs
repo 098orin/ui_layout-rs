@@ -44,3 +44,15 @@ impl LayoutChild {
         }
     }
 }
+
+impl From<LayoutNode> for LayoutChild {
+    fn from(node: LayoutNode) -> Self {
+        LayoutChild::Node(Box::new(node))
+    }
+}
+
+impl From<FragmentNode> for LayoutChild {
+    fn from(fragment: FragmentNode) -> Self {
+        LayoutChild::Fragment(fragment)
+    }
+}

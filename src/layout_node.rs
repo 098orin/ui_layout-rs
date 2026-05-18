@@ -1,4 +1,4 @@
-use crate::{EMPTY_LINE_CONTEXT, FragmentNode, LayoutBox, LayoutChild, LineContext, Style};
+use crate::{EMPTY_LINE_CONTEXT, LayoutBox, LayoutChild, LineContext, Style};
 
 /// (key, (layout_box, LineContext))
 type LayoutCache = (u32, (LayoutBox, LineContext));
@@ -27,27 +27,12 @@ impl LayoutNode {
         }
     }
 
-    /// A function to create a [`LayoutNode`] whose children are [`LayoutNode`]
-    pub fn with_node_children(style: Style, node_children: Vec<LayoutNode>) -> Self {
-        let children = node_children
-            .into_iter()
-            .map(|node| LayoutChild::Node(Box::new(node)))
-            .collect();
-
-        Self {
-            style,
-            layout_box: LayoutBox::default(),
-            children,
-            layout_box_cache: (0, (LayoutBox::default(), EMPTY_LINE_CONTEXT)),
-        }
-    }
-
-    /// A function to create a [`LayoutNode`] whose children are [`crate::ItemFragment`]
-    pub fn with_fragment_children(style: Style, fragment_children: Vec<FragmentNode>) -> Self {
-        let children = fragment_children
-            .into_iter()
-            .map(LayoutChild::Fragment)
-            .collect();
+    /// Create a LayoutNode with arbitrary children.
+    pub fn with_children<T>(style: Style, children: Vec<T>) -> Self
+    where
+        T: Into<LayoutChild>,
+    {
+        let children = children.into_iter().map(Into::into).collect();
 
         Self {
             style,
