@@ -459,7 +459,7 @@ impl LayoutEngine {
                         intrinsic_pass,
                     );
 
-                    let (mut child_position_x, mut child_position_y) = line_ctx_for_child.end_pos;
+                    let (child_position_x, child_position_y) = line_ctx_for_child.end_pos;
 
                     // Process margin shift.
                     {
@@ -496,7 +496,9 @@ impl LayoutEngine {
                         child_node.layout_box.shift(ml, 0.0);
 
                         if child_node.style.display.outer == OuterDisplay::Block {
-                            child_position_y += previous_child_margin.max(top.unwrap_or_default());
+                            child_node
+                                .layout_box
+                                .shift(0.0, previous_child_margin.max(top.unwrap_or_default()));
                             cursor_y += previous_child_margin.max(top.unwrap_or_default());
 
                             previous_child_margin = bottom.unwrap_or_default();
