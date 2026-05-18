@@ -7,6 +7,26 @@ and this project loosely follows Semantic Versioning.
 
 ---
 
+## Unreleased
+
+### Breaking Changes
+* `LayoutNode{ children, .. }`  changed from `Vec<LayoutNode>` to `Vec<LayoutChild>`
+* `LayoutBoxes` renamed/simplified to `LayoutBox`
+  * `None`
+  * `BlockBox(BoxModel)`
+  * `InlineBox(InlineBox)`
+* Removed `LayoutNode::set_fragments(...)`
+* Some size/spacing properties types migrated from  `Length`  to `LengthOrAuto`
+* `Display` changed into `{ outer, inner }` structure
+
+### Added 
+* Added `LayoutBox` iteration support and helper methods (`width`, `height`, `len`, etc.)
+* Added `LayoutNode::with_children(...)`
+* Added `LayoutChild` , an enum: `Node(Box<LayoutNode>) | Fragment(FragmentNode)`
+* Added `FragmentNode`
+
+---
+
 ## [0.10.0] - 2026-3-25
 
 > [!WARNING]
