@@ -495,9 +495,10 @@ impl LayoutEngine {
 
                         if child_node.style.display.outer == OuterDisplay::Block {
                             cursor_y += previous_child_margin.max(top.unwrap_or_default());
+                            previous_child_margin = bottom.unwrap_or_default();
+                        } else if child_node.style.display.outer != OuterDisplay::Inline {
+                            unreachable!("This is unreachable for now.")
                         }
-
-                        previous_child_margin = bottom.unwrap_or_default();
                     }
 
                     // Process shift
