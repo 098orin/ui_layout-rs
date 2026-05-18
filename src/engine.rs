@@ -381,6 +381,8 @@ impl LayoutEngine {
         let mut current_x = 0.0;
         let mut line_index = 0;
 
+        let mut previous_child_margin = 0.0_f32;
+
         let (content_width_opt, content_height_opt) = content_size_opt;
 
         let (mut children_width, mut children_height) = (0.0_f32, 0.0_f32);
@@ -463,7 +465,7 @@ impl LayoutEngine {
                             left: ml_opt,
                             top,
                             right: mr_opt,
-                            ..
+                            bottom,
                         } = child_margin;
 
                         let (ml, _mr) = if child_node.style.display.outer == OuterDisplay::Block {
@@ -489,11 +491,24 @@ impl LayoutEngine {
                             (ml_opt.unwrap_or(0.0), mr_opt.unwrap_or(0.0))
                         };
 
-                        if child_node.style.display.outer == OuterDisplay::Inline {
-                            child_node.layout_box.shift(ml, 0.0);
-                        } else {
-                            child_node.layout_box.shift(ml, top.unwrap_or(0.0));
+                        if child_node.style.display.outer == OuterDisplay::Block {
+                            cursor_y += previous_child_margin.max(top.unwrap_or_default());
                         }
+
+                        child_node.layout_box.shift(ml, 0.0);
+
+                        previous_child_margin = bottom.unwrap_or_default();
+                    }
+
+                    // Process shift
+                    if child_node.style.display.outer == OuterDisplay::Inline {
+                        child_node
+                            .layout_box
+                            .shift(line_ctx_for_child.end_pos.0, 0.0);
+                    } else {
+                        child_node
+                            .layout_box
+                            .shift(line_ctx_for_child.end_pos.0, line_ctx_for_child.end_pos.1);
                     }
 
                     // Collect child's line_spans if the outer display is Inline.
@@ -545,9 +560,6 @@ impl LayoutEngine {
             };
             node.layout_box = LayoutBox::InlineBox(inline_box);
         } else {
-            // Set current_x to zero so it won't propagate to the parent.
-            current_x = 0.0;
-
             let content_width = content_width_opt.unwrap_or(children_width);
             let content_height = content_height_opt.unwrap_or(children_height);
 
@@ -561,6 +573,12 @@ impl LayoutEngine {
             );
 
             node.layout_box = LayoutBox::BlockBox(box_model);
+
+            // Set current_x to zero so it won't propagate to the parent.
+            current_x = 0.0;
+            // Update cursor.
+            cursor_x = 0.0;
+            cursor_y += content_height;
         }
 
         LineContext {
