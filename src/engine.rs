@@ -512,7 +512,9 @@ impl LayoutEngine {
                     }
 
                     // Collect child's line_spans if the outer display is Inline.
-                    if child_node.style.display.outer == OuterDisplay::Inline {
+                    if node.style.display.outer == OuterDisplay::Inline
+                        && child_node.style.display.outer == OuterDisplay::Inline
+                    {
                         todo!()
                     }
 
