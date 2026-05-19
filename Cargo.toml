@@ -9,4 +9,5 @@ repository = "https://github.com/098orin/ui_layout-rs"
 keywords = ["layout", "gui", "flexbox", "ui"]
 categories = ["gui"]
 
-[dependencies]
+[features]
+layout-bench = []
