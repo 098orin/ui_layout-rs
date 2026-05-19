@@ -27,7 +27,7 @@ pub enum InnerDisplay {
 /// split into outer and inner display types.
 ///
 /// This follows the modern CSS Display specification:
-/// https://www.w3.org/TR/css-display-3/
+/// <https://www.w3.org/TR/css-display-3/>
 ///
 /// Examples:
 /// - `block`        => (Block, Flow)
