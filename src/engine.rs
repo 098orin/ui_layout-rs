@@ -305,7 +305,6 @@ impl LayoutEngine {
         line_ctx: LineContext,
         intrinsic_pass: bool,
     ) -> LineContext {
-        count_layout_call();
         if intrinsic_pass {
             let (key, (layout_box, line_ctx)) = &node.layout_box_cache;
             if *key == crate::cache::make_layout_key(ctx, self) {
@@ -313,6 +312,8 @@ impl LayoutEngine {
                 return *line_ctx;
             }
         }
+
+        count_layout_call();
 
         let out = self.layout_by_display(node, ctx, line_ctx, intrinsic_pass);
 
