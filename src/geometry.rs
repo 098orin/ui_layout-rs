@@ -194,8 +194,8 @@ impl LayoutBox {
     ///
     /// The iteration order is:
     /// - empty for [`LayoutBox::None`]
-    /// - a single element for [`LayoutBox::Single`]
-    /// - the order of elements in the inner vector for [`LayoutBox::Multiple`]
+    /// - a single element for [`LayoutBox::BlockBox`]
+    /// - the order of elements in the inner vector for [`LayoutBox::InlineBox`]
     ///
     /// This method provides a convenient way to iterate over all boxes
     /// regardless of the internal representation.
