@@ -10,7 +10,7 @@ and this project loosely follows Semantic Versioning.
 ## Unreleased
 
 ### Breaking Changes
-* `LayoutNode{ children, .. }`  changed from `Vec<LayoutNode>` to `Vec<LayoutChild>`
+* `LayoutNode{ children, .. }` changed from `Vec<LayoutNode>` to `Vec<LayoutChild>`
 * `LayoutBoxes` renamed/simplified to `LayoutBox`
   * `None`
   * `BlockBox(BoxModel)`
