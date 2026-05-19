@@ -632,8 +632,6 @@ impl LayoutEngine {
 
             node.layout_box = LayoutBox::BlockBox(box_model);
 
-            // Set current_x to zero so it won't propagate to the parent.
-            current_x = 0.0;
             // Update cursor.
             cursor_x = 0.0;
             cursor_y += content_height;
