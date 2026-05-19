@@ -422,6 +422,11 @@ impl LayoutEngine {
         content_size_opt: (Option<f32>, Option<f32>),
         intrinsic_pass: bool,
     ) -> LineContext {
+        let (content_width_opt, content_height_opt) = content_size_opt;
+
+        let border = self.resolve_border(&node.style.spacing, ctx);
+        let padding = self.resolve_padding(&node.style.spacing, ctx);
+
         let LineContext {
             end_pos: (end_x, end_y),
             inline_pos: (parent_current_x, mut line_start_x),
@@ -434,12 +439,7 @@ impl LayoutEngine {
 
         let mut previous_child_margin = 0.0_f32;
 
-        let (content_width_opt, content_height_opt) = content_size_opt;
-
         let (mut children_width, mut children_height) = (0.0_f32, 0.0_f32);
-
-        let border = self.resolve_border(&node.style.spacing, ctx);
-        let padding = self.resolve_padding(&node.style.spacing, ctx);
 
         let base_ctx_for_child = LayoutContext {
             containing_block_width: content_width_opt,
