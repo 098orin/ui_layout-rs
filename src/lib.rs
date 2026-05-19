@@ -1,7 +1,10 @@
-//! layout
+//! # ui_layout
 //!
 //! Minimal CSS-like layout engine for UI frameworks.
 //! Designed for lightweight, fast, and portable applications (e.g. IDE).
+//!
+//! Provides predictable layout behavior for custom GUI frameworks,
+//! editors, and experimental rendering engines.
 
 mod cache;
 mod engine;
