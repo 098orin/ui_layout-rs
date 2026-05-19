@@ -46,9 +46,7 @@ use ui_layout::*;
 // Create a flex container
 let mut root = LayoutNode::with_children(
     Style {
-        display: Display::Flex {
-            flex_direction: FlexDirection::Row,
-        },
+        display: Display::parse("flex"),
         size: SizeStyle {
             width: Length::Px(300.0),
             height: Length::Px(200.0),
@@ -56,6 +54,7 @@ let mut root = LayoutNode::with_children(
         },
         justify_content: JustifyContent::SpaceBetween,
         align_items: AlignItems::Center,
+        flex_direction: FlexDirection::Row,
         column_gap: Length::Px(20.0),
         ..Default::default()
     },
