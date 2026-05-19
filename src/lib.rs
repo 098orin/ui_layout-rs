@@ -10,9 +10,73 @@
 //!
 //! Basic usage follows a simple flow:
 //!
-//! 1. Create layout nodes
+//! 1. Create a layout tree
 //! 2. Run the layout engine
 //! 3. Access computed layout results
+//!
+//! ```rust
+//! use ui_layout::*;
+//!
+//! let mut root = LayoutNode::new(Style::default());
+//!
+//! // Compute layout using a viewport size.
+//! LayoutEngine::layout(&mut root, 800.0, 600.0);
+//! ```
+//!
+//! ## Core Concepts
+//!
+//! Layout behavior is configured through [`Style`], which groups
+//! commonly used layout properties into focused categories:
+//!
+//! - [`Display`] — controls layout mode
+//! - [`SizeStyle`] — width and height constraints
+//! - [`Spacing`] — margin, padding, and borders
+//! - [`ItemStyle`] — item-specific flex behavior
+//! - `justify_content` / `align_items` — child alignment
+//! - `flex_direction`, `row_gap`, `column_gap` — flex container behavior
+//!
+//! This organization keeps layout rules explicit and easy to reason about.
+//!
+//! ## Observing Layout Results
+//!
+//! After layout computation, results are written into each
+//! [`LayoutNode`] through its `layout_box` field.
+//!
+//! The resulting [`LayoutBox`] describes how the node was laid out:
+//!
+//! - `LayoutBox::None` — no layout result
+//! - `LayoutBox::BlockBox(BoxModel)` — standard box layout result
+//! - `LayoutBox::InlineBox(InlineBox)` — inline content that may span multiple lines
+//!
+//! [`BoxModel`] contains absolute rectangles for different regions:
+//!
+//! - `border_box` — outer box including borders
+//! - `padding_box` — inner box including padding
+//! - `content_box` — content area
+//! - `children_box` — area occupied by child content
+//!
+//! Inline layouts additionally provide [`LineSpan`] information for
+//! observing how a box is split across lines.
+//!
+//! ## Fragments
+//!
+//! Layout trees may contain both complete nodes and inline fragments.
+//! Children are represented by [`LayoutChild`]:
+//!
+//! - `LayoutChild::Node` — a normal layout node
+//! - `LayoutChild::Fragment` — a fragment participating in inline layout
+//!
+//! [`ItemFragment`] represents the smallest independently positioned
+//! piece of inline content.
+//!
+//! Common fragment types:
+//!
+//! - `Fragment` — inline content with dimensions
+//! - `LineBreak` — forces a line break
+//!
+//! During layout, fragments are wrapped in [`FragmentNode`] and assigned
+//! placement information, allowing inline content to be split and
+//! positioned across multiple lines.
 
 mod cache;
 mod engine;
