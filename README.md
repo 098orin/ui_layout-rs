@@ -83,8 +83,8 @@ let mut root = LayoutNode::with_children(
 LayoutEngine::layout(&mut root, 800.0, 600.0);
 
 // Access results
-match &root.layout_boxes {
-    LayoutBoxes::Single(box_model) => {
+match &root.layout_box {
+    LayoutBox::BlockBox(box_model) => {
         println!("Container: {}x{}", box_model.border_box.width, box_model.border_box.height);
     },
     _ => {}
@@ -109,9 +109,9 @@ This implementation follows CSS3 specifications with current focus on:
 
 See [CHANGELOG.md](CHANGELOG.md) for a detailed list of changes.
 
-* Version: **0.10.0**
+* Version: **0.11.0(Unreleased)**
 * API is evolving but now includes full Flexbox-like alignment and gaps
-* **Phase 1 improvements**: Enhanced margin collapsing, improved flex item min-size semantics, comprehensive specification references
+* **Phase 1 improvements**: Enhanced margin collapsing, comprehensive specification references
 
 Future versions may add:
 
