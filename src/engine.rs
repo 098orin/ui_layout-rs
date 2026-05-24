@@ -766,7 +766,9 @@ impl LayoutEngine {
             ))
         };
 
-        self.flow_flex_children(node, axis, intrinsic_pass, ctx);
+        if !intrinsic_pass {
+            self.flow_flex_children(node, axis, ctx);
+        }
 
         LineContext {
             end_pos: (
@@ -1196,17 +1198,7 @@ impl LayoutEngine {
     }
 
     /// Set child positions.
-    fn flow_flex_children(
-        &self,
-        node: &mut LayoutNode,
-        axis: Axis,
-        intrinsic_pass: bool,
-        ctx: &LayoutContext,
-    ) {
-        if intrinsic_pass {
-            return;
-        }
-
+    fn flow_flex_children(&self, node: &mut LayoutNode, axis: Axis, ctx: &LayoutContext) {
         if node.children.is_empty() {
             return;
         }
