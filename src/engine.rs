@@ -75,7 +75,7 @@ impl EdgeOption {
     }
 }
 
-pub enum FlexItem {
+pub enum LayoutItem {
     Node(usize),
     Fragments(std::ops::Range<usize>),
 }
@@ -357,6 +357,26 @@ impl LayoutEngine {
                 ctx,
             );
 
+        // --- Intrinsic pass ---
+        if intrinsic_pass && content_width_opt.is_some() && content_height_opt.is_some() {
+            let box_model = create_box_model(
+                content_width_opt.unwrap(),
+                content_height_opt.unwrap(),
+                0.0,
+                0.0,
+                padding,
+                border,
+            );
+
+            node.layout_box = LayoutBox::BlockBox(box_model);
+
+            return LineContext {
+                end_pos: (0.0, line_ctx.end_pos.1 + content_height_opt.unwrap()),
+                line_index: line_ctx.line_index + 1,
+                ..line_ctx
+            };
+        }
+
         let content_width_opt = content_width_opt.or(ctx
             .available_width
             .map(|v| v - border.left - border.right - padding.left - padding.right));
@@ -429,7 +449,7 @@ impl LayoutEngine {
 
         let LineContext {
             end_pos: (end_x, end_y),
-            inline_pos: (parent_current_x, mut line_start_x),
+            inline_pos: (parent_current_x, line_start_x),
             line_index: parent_line_index,
         } = line_ctx;
 
@@ -438,7 +458,6 @@ impl LayoutEngine {
         let mut line_index = 0;
 
         let mut previous_child_margin = 0.0_f32;
-
         let (mut children_width, mut children_height) = (0.0_f32, 0.0_f32);
 
         let base_ctx_for_child = LayoutContext {
@@ -449,39 +468,88 @@ impl LayoutEngine {
             parent_assigned_border_height: None,
         };
 
-        let mut line_span_buf = Vec::new();
         let line_height = node
             .style
             .line_height
             .resolve_with(None, self.viewport_width, self.viewport_height)
             .unwrap_or_default();
-        let mut fragment_node_buffer = Vec::with_capacity(node.children.len());
 
-        for child in &mut node.children {
+        let mut line_span_buf = Vec::new();
+
+        // -------------------------------
+        // 1. Build LayoutItem stream
+        // -------------------------------
+        let mut items: Vec<LayoutItem> = Vec::new();
+        let mut frag_start: Option<usize> = None;
+
+        for (i, child) in node.children.iter().enumerate() {
             match child {
-                LayoutChild::Fragment(fragment_node) => {
-                    fragment_node_buffer.push(fragment_node);
-                }
-                LayoutChild::Node(child_node) => {
-                    if !fragment_node_buffer.is_empty() {
-                        let line_ctx_for_child = LineContext {
-                            end_pos: (cursor_x, cursor_y),
-                            inline_pos: (current_x, line_start_x),
-                            line_index,
-                        };
-                        let (line_spans, updated_line_ctx) = Self::flow_fragments(
-                            &mut std::mem::take(&mut fragment_node_buffer),
-                            line_ctx_for_child,
-                            line_height,
-                            content_width_opt.unwrap_or(self.viewport_width),
-                        );
-                        LineContext {
-                            end_pos: (cursor_x, cursor_y),
-                            inline_pos: (current_x, line_start_x),
-                            line_index,
-                        } = updated_line_ctx;
-                        line_span_buf.extend_from_slice(&line_spans);
+                LayoutChild::Node(_) => {
+                    if let Some(start) = frag_start.take() {
+                        items.push(LayoutItem::Fragments(start..i));
                     }
+                    items.push(LayoutItem::Node(i));
+                }
+                LayoutChild::Fragment(_) => {
+                    if frag_start.is_none() {
+                        frag_start = Some(i);
+                    }
+                }
+            }
+        }
+
+        if let Some(start) = frag_start.take() {
+            items.push(LayoutItem::Fragments(start..node.children.len()));
+        }
+
+        // -------------------------------
+        // 2. Process LayoutItems
+        // -------------------------------
+        for item in items {
+            match item {
+                LayoutItem::Fragments(range) => {
+                    let mut fragment_node_buffer = std::mem::take(
+                        &mut node.children[range.clone()]
+                            .iter_mut()
+                            .map(|c| match c {
+                                LayoutChild::Fragment(f) => f,
+                                _ => unreachable!(),
+                            })
+                            .collect::<Vec<_>>(),
+                    );
+
+                    let line_ctx_for_child = LineContext {
+                        end_pos: (cursor_x, cursor_y),
+                        inline_pos: (current_x, line_start_x),
+                        line_index,
+                    };
+
+                    let (line_spans, updated_line_ctx) = Self::flow_fragments(
+                        &mut fragment_node_buffer,
+                        line_ctx_for_child,
+                        line_height,
+                        content_width_opt.unwrap_or(self.viewport_width),
+                    );
+
+                    let LineContext {
+                        end_pos: (cx, cy),
+                        inline_pos: (ix, _),
+                        line_index: li,
+                    } = updated_line_ctx;
+
+                    cursor_x = cx;
+                    cursor_y = cy;
+                    current_x = ix;
+                    line_index = li;
+
+                    line_span_buf.extend_from_slice(&line_spans);
+                }
+
+                LayoutItem::Node(i) => {
+                    let child_node = match &mut node.children[i] {
+                        LayoutChild::Node(n) => n,
+                        _ => unreachable!(),
+                    };
 
                     let child_margin = self.resolve_margin(&child_node.style.spacing, ctx);
 
@@ -492,7 +560,6 @@ impl LayoutEngine {
                         ..base_ctx_for_child
                     };
 
-                    // Layout Node
                     let line_ctx_for_child = LineContext {
                         end_pos: (cursor_x, cursor_y),
                         inline_pos: (current_x, line_start_x),
@@ -501,7 +568,7 @@ impl LayoutEngine {
 
                     LineContext {
                         end_pos: (cursor_x, cursor_y),
-                        inline_pos: (current_x, line_start_x),
+                        inline_pos: (current_x, _),
                         line_index,
                     } = self.layout_node(
                         child_node,
@@ -512,50 +579,42 @@ impl LayoutEngine {
 
                     let (child_position_x, child_position_y) = line_ctx_for_child.end_pos;
 
-                    // Process margin shift.
-                    {
-                        let EdgeOption {
-                            left: ml_opt,
-                            top,
-                            right: mr_opt,
-                            bottom,
-                        } = child_margin;
+                    let EdgeOption {
+                        left: ml_opt,
+                        top,
+                        right: mr_opt,
+                        bottom,
+                    } = child_margin;
 
-                        let (ml, _mr) = if child_node.style.display.outer == OuterDisplay::Block {
-                            let child_width = child_node.layout_box.width();
-                            let (ml, mr) = match (ml_opt, mr_opt, content_width_opt) {
-                                (None, None, Some(cw)) => {
-                                    let auto_margin = (cw - child_width) / 2.0;
-                                    (auto_margin, auto_margin)
-                                }
-                                (None, Some(mr), Some(cw)) => {
-                                    let auto_margin = cw - child_width - mr;
-                                    (auto_margin, mr)
-                                }
-                                (Some(ml), None, Some(cw)) => {
-                                    let auto_margin = cw - child_width - ml;
-                                    (ml, auto_margin)
-                                }
-                                _ => (ml_opt.unwrap_or(0.0), mr_opt.unwrap_or(0.0)),
-                            };
-
-                            (ml, mr)
-                        } else {
-                            (ml_opt.unwrap_or(0.0), mr_opt.unwrap_or(0.0))
-                        };
-
-                        child_node.layout_box.shift(ml, 0.0);
-
-                        if child_node.style.display.outer == OuterDisplay::Block {
-                            child_node
-                                .layout_box
-                                .shift(0.0, previous_child_margin.max(top.unwrap_or_default()));
-                            cursor_y += previous_child_margin.max(top.unwrap_or_default());
-
-                            previous_child_margin = bottom.unwrap_or_default();
-                        } else if child_node.style.display.outer != OuterDisplay::Inline {
-                            unreachable!("This is unreachable for now.")
+                    let (ml, _mr) = if child_node.style.display.outer == OuterDisplay::Block {
+                        let child_width = child_node.layout_box.width();
+                        match (ml_opt, mr_opt, content_width_opt) {
+                            (None, None, Some(cw)) => {
+                                let auto = (cw - child_width) / 2.0;
+                                (auto, auto)
+                            }
+                            (None, Some(mr), Some(cw)) => {
+                                let auto = cw - child_width - mr;
+                                (auto, mr)
+                            }
+                            (Some(ml), None, Some(cw)) => {
+                                let auto = cw - child_width - ml;
+                                (ml, auto)
+                            }
+                            _ => (ml_opt.unwrap_or(0.0), mr_opt.unwrap_or(0.0)),
                         }
+                    } else {
+                        (ml_opt.unwrap_or(0.0), mr_opt.unwrap_or(0.0))
+                    };
+
+                    child_node.layout_box.shift(ml, 0.0);
+
+                    if child_node.style.display.outer == OuterDisplay::Block {
+                        child_node
+                            .layout_box
+                            .shift(0.0, previous_child_margin.max(top.unwrap_or_default()));
+                        cursor_y += previous_child_margin.max(top.unwrap_or_default());
+                        previous_child_margin = bottom.unwrap_or_default();
                     }
 
                     // Process shift
@@ -581,26 +640,9 @@ impl LayoutEngine {
             }
         }
 
-        if !fragment_node_buffer.is_empty() {
-            let line_ctx_for_child = LineContext {
-                end_pos: (cursor_x, cursor_y),
-                inline_pos: (current_x, line_start_x),
-                line_index,
-            };
-            let (line_spans, updated_line_ctx) = Self::flow_fragments(
-                &mut std::mem::take(&mut fragment_node_buffer),
-                line_ctx_for_child,
-                line_height,
-                content_width_opt.unwrap_or(self.viewport_width),
-            );
-            LineContext {
-                end_pos: (cursor_x, cursor_y),
-                inline_pos: (current_x, line_start_x),
-                line_index,
-            } = updated_line_ctx;
-            line_span_buf.extend_from_slice(&line_spans);
-        }
-
+        // -------------------------------
+        // 3. Inline final box creation
+        // -------------------------------
         if node.style.display.outer == OuterDisplay::Inline {
             let mut box_model = create_box_model(
                 current_x,
@@ -610,13 +652,13 @@ impl LayoutEngine {
                 padding,
                 border,
             );
+
             box_model.shift(-(border.left + padding.left), -(border.top + padding.top));
 
-            let inline_box = InlineBox {
+            node.layout_box = LayoutBox::InlineBox(InlineBox {
                 box_model,
                 line_spans: line_span_buf,
-            };
-            node.layout_box = LayoutBox::InlineBox(inline_box);
+            });
         } else {
             let content_width = content_width_opt.unwrap_or(children_width);
             let content_height = content_height_opt.unwrap_or(children_height);
@@ -774,7 +816,7 @@ impl LayoutEngine {
         while let Some((i, child)) = iter.next() {
             match child {
                 LayoutChild::Node(_) => {
-                    flex_items.push(FlexItem::Node(i));
+                    flex_items.push(LayoutItem::Node(i));
                 }
 
                 LayoutChild::Fragment(_) => {
@@ -786,7 +828,7 @@ impl LayoutEngine {
                         iter.next();
                     }
 
-                    flex_items.push(FlexItem::Fragments(start..end));
+                    flex_items.push(LayoutItem::Fragments(start..end));
                 }
             }
         }
@@ -799,7 +841,7 @@ impl LayoutEngine {
 
         for (item, state) in flex_items.iter_mut().zip(states.iter_mut()) {
             match item {
-                FlexItem::Node(index) => {
+                LayoutItem::Node(index) => {
                     let ctx = base_ctx_for_children;
                     let node = node.children.get_mut(*index).unwrap().node_mut().unwrap();
 
@@ -875,7 +917,7 @@ impl LayoutEngine {
                     state.grow = node.style.item_style.flex_grow;
                     state.shrink = node.style.item_style.flex_shrink;
                 }
-                FlexItem::Fragments(range) => {
+                LayoutItem::Fragments(range) => {
                     state.main_size = match axis {
                         Axis::Horizontal => node.children[range.clone()]
                             .iter()
@@ -960,7 +1002,7 @@ impl LayoutEngine {
                     let max = states[i].main_max;
 
                     let proposed_content = states[i].main_size + delta;
-                    let clamped_content = if let FlexItem::Node(index) = item {
+                    let clamped_content = if let LayoutItem::Node(index) = item {
                         let item_box_sizing =
                             node.children[*index].node().unwrap().style.box_sizing;
                         match item_box_sizing {
@@ -1035,7 +1077,7 @@ impl LayoutEngine {
                     let max = states[i].main_max;
 
                     let proposed_content = states[i].main_size + delta;
-                    let clamped_content = if let FlexItem::Node(index) = item {
+                    let clamped_content = if let LayoutItem::Node(index) = item {
                         let item_box_sizing =
                             node.children[*index].node().unwrap().style.box_sizing;
                         match item_box_sizing {
@@ -1081,7 +1123,7 @@ impl LayoutEngine {
 
         for (item, state) in flex_items.iter().zip(states) {
             match item {
-                FlexItem::Node(index) => {
+                LayoutItem::Node(index) => {
                     let child = node.children.get_mut(*index).unwrap().node_mut().unwrap();
 
                     let is_auto_margin = axis
@@ -1144,7 +1186,7 @@ impl LayoutEngine {
                         max_cross = max_cross.max(axis.rect_cross(&box_model.border_box));
                     }
                 }
-                FlexItem::Fragments(_) => {
+                LayoutItem::Fragments(_) => {
                     todo!()
                 }
             }
