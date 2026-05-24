@@ -508,15 +508,13 @@ impl LayoutEngine {
         for item in items {
             match item {
                 LayoutItem::Fragments(range) => {
-                    let mut fragment_node_buffer = std::mem::take(
-                        &mut node.children[range.clone()]
-                            .iter_mut()
-                            .map(|c| match c {
-                                LayoutChild::Fragment(f) => f,
-                                _ => unreachable!(),
-                            })
-                            .collect::<Vec<_>>(),
-                    );
+                    let mut fragment_node_buffer = node.children[range.clone()]
+                        .iter_mut()
+                        .filter_map(|c| match c {
+                            LayoutChild::Fragment(f) => Some(f),
+                            _ => None,
+                        })
+                        .collect();
 
                     let line_ctx_for_child = LineContext {
                         end_pos: (cursor_x, cursor_y),
