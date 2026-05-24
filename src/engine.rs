@@ -11,36 +11,95 @@ use crate::{
 #[cfg(feature = "layout-bench")]
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-pub const BENCH_LAYOUT_CALLS: bool = cfg!(feature = "layout-bench");
-
 #[cfg(feature = "layout-bench")]
-static LAYOUT_CALLS: AtomicUsize = AtomicUsize::new(0);
-
-#[inline(always)]
-pub fn count_layout_call() {
-    #[cfg(feature = "layout-bench")]
-    {
-        LAYOUT_CALLS.fetch_add(1, Ordering::Relaxed);
-    }
+pub struct LayoutMetrics {
+    pub layout_calls: AtomicUsize,
+    pub cache_match: AtomicUsize,
+    pub cache_miss_match: AtomicUsize,
 }
 
-#[inline(always)]
-pub fn layout_call_count() -> usize {
-    if BENCH_LAYOUT_CALLS {
-        #[cfg(feature = "layout-bench")]
-        {
-            return LAYOUT_CALLS.load(Ordering::Relaxed);
+#[cfg(feature = "layout-bench")]
+impl LayoutMetrics {
+    pub const fn new() -> Self {
+        Self {
+            layout_calls: AtomicUsize::new(0),
+            cache_match: AtomicUsize::new(0),
+            cache_miss_match: AtomicUsize::new(0),
         }
     }
 
-    0
+    #[inline(always)]
+    pub fn reset(&self) {
+        self.layout_calls.store(0, Ordering::Relaxed);
+        self.cache_match.store(0, Ordering::Relaxed);
+        self.cache_miss_match.store(0, Ordering::Relaxed);
+    }
+
+    #[inline(always)]
+    pub fn count_layout_call(&self) {
+        self.layout_calls.fetch_add(1, Ordering::Relaxed);
+    }
+
+    #[inline(always)]
+    pub fn count_cache_match(&self) {
+        self.cache_match.fetch_add(1, Ordering::Relaxed);
+    }
+
+    #[inline(always)]
+    pub fn count_cache_miss_match(&self) {
+        self.cache_miss_match.fetch_add(1, Ordering::Relaxed);
+    }
+
+    #[inline(always)]
+    pub fn layout_call_count(&self) -> usize {
+        self.layout_calls.load(Ordering::Relaxed)
+    }
+
+    #[inline(always)]
+    pub fn cache_match_count(&self) -> usize {
+        self.cache_match.load(Ordering::Relaxed)
+    }
+
+    #[inline(always)]
+    pub fn cache_miss_match_count(&self) -> usize {
+        self.cache_miss_match.load(Ordering::Relaxed)
+    }
 }
 
-#[inline(always)]
-pub fn reset_layout_call_count() {
-    #[cfg(feature = "layout-bench")]
-    {
-        LAYOUT_CALLS.store(0, Ordering::Relaxed);
+#[cfg(not(feature = "layout-bench"))]
+pub struct LayoutMetrics;
+
+#[cfg(not(feature = "layout-bench"))]
+impl LayoutMetrics {
+    pub const fn new() -> Self {
+        LayoutMetrics
+    }
+
+    #[inline(always)]
+    pub fn reset(&self) {}
+
+    #[inline(always)]
+    pub fn count_layout_call(&self) {}
+
+    #[inline(always)]
+    pub fn count_cache_match(&self) {}
+
+    #[inline(always)]
+    pub fn count_cache_miss_match(&self) {}
+
+    #[inline(always)]
+    pub fn layout_call_count(&self) -> usize {
+        0
+    }
+
+    #[inline(always)]
+    pub fn cache_miss_count(&self) -> usize {
+        0
+    }
+
+    #[inline(always)]
+    pub fn cache_miss_match_count(&self) -> usize {
+        0
     }
 }
 
@@ -247,6 +306,7 @@ impl Axis {
 pub struct LayoutEngine {
     pub(crate) viewport_width: f32,
     pub(crate) viewport_height: f32,
+    layout_metrics: LayoutMetrics,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -274,8 +334,6 @@ impl LayoutEngine {
     /// Main layout entry point.
     /// Initiates layout computation from the root node with specified viewport dimensions.
     pub fn layout(root: &mut LayoutNode, width: f32, height: f32) {
-        reset_layout_call_count();
-
         let ctx = LayoutContext {
             containing_block_width: Some(width),
             containing_block_height: Some(height),
@@ -287,12 +345,26 @@ impl LayoutEngine {
         let engine = LayoutEngine {
             viewport_width: width,
             viewport_height: height,
+            layout_metrics: LayoutMetrics::new(),
         };
 
         let _ = engine.layout_node(root, &ctx, EMPTY_LINE_CONTEXT, false);
 
         #[cfg(feature = "layout-bench")]
-        println!("layout calls: {}", layout_call_count());
+        println!(
+            "layout calls    : {}",
+            engine.layout_metrics.layout_call_count()
+        );
+        #[cfg(feature = "layout-bench")]
+        println!(
+            "cache match     : {}",
+            engine.layout_metrics.cache_match_count()
+        );
+        #[cfg(feature = "layout-bench")]
+        println!(
+            "cache miss match: {}",
+            engine.layout_metrics.cache_miss_match_count()
+        );
     }
 
     /// Internal method for layout a node.
@@ -308,12 +380,16 @@ impl LayoutEngine {
         if intrinsic_pass {
             let (key, (layout_box, line_ctx)) = &node.layout_box_cache;
             if *key == crate::cache::make_layout_key(ctx, self) {
+                self.layout_metrics.count_cache_match();
+
                 node.layout_box = layout_box.clone();
                 return *line_ctx;
+            } else {
+                self.layout_metrics.count_cache_miss_match();
             }
         }
 
-        count_layout_call();
+        self.layout_metrics.count_layout_call();
 
         let out = self.layout_by_display(node, ctx, line_ctx, intrinsic_pass);
 
