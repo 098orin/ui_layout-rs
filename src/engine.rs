@@ -906,30 +906,8 @@ impl LayoutEngine {
             .unwrap_or(0.0)
             .max(0.0);
 
-        // --------- Conver to FlexItem ----------
-        let mut flex_items = Vec::with_capacity(children_count);
-
-        let mut iter = node.children.iter().enumerate().peekable();
-
-        while let Some((i, child)) = iter.next() {
-            match child {
-                LayoutChild::Node(_) => {
-                    flex_items.push(LayoutItem::Node(i));
-                }
-
-                LayoutChild::Fragment(_) => {
-                    let start = i;
-                    let mut end = i + 1;
-
-                    while let Some((next_i, LayoutChild::Fragment(_))) = iter.peek() {
-                        end = *next_i + 1;
-                        iter.next();
-                    }
-
-                    flex_items.push(LayoutItem::Fragments(start..end));
-                }
-            }
-        }
+        // --------- Convert to FlexItem ----------
+        let flex_items = collect_layout_items(&node.children);
 
         // ---------- Intrinsic pass ----------
         let item_len = flex_items.len();
@@ -937,7 +915,7 @@ impl LayoutEngine {
         let mut states = vec![FlexItemState::default(); item_len];
         let mut total_grow = 0.0;
 
-        for (item, state) in flex_items.iter_mut().zip(states.iter_mut()) {
+        for (item, state) in flex_items.iter().zip(states.iter_mut()) {
             match item {
                 LayoutItem::Node(index) => {
                     let ctx = base_ctx_for_children;
@@ -1016,31 +994,22 @@ impl LayoutEngine {
                     state.shrink = node.style.item_style.flex_shrink;
                 }
                 LayoutItem::Fragments(range) => {
+                    let line_height = resolved_fragment_line_height(
+                        &node.children,
+                        range.clone(),
+                        node.style.line_height.resolve_with(None, vw, vh),
+                    );
+                    let (fragment_width, fragment_height, _) = flow_fragment_range(
+                        &mut node.children,
+                        range.clone(),
+                        EMPTY_LINE_CONTEXT,
+                        line_height,
+                        base_ctx_for_children.containing_block_width.unwrap_or(vw),
+                    );
+
                     state.main_size = match axis {
-                        Axis::Horizontal => node.children[range.clone()]
-                            .iter()
-                            .map(|f| f.fragment().unwrap().node.width())
-                            .sum(),
-                        Axis::Vertical => {
-                            let (spans, _) = Self::flow_fragments(
-                                &mut node.children[range.clone()]
-                                    .iter_mut()
-                                    .map(|f| f.fragment_mut().unwrap())
-                                    .collect(),
-                                EMPTY_LINE_CONTEXT,
-                                node.style
-                                    .line_height
-                                    .resolve_with(None, vw, vh)
-                                    .unwrap_or_default(),
-                                base_ctx_for_children.containing_block_width.unwrap_or(vw),
-                            );
-                            spans
-                                .iter()
-                                .map(|s| s.width())
-                                .filter(|v| !v.is_nan())
-                                .max_by(f32::total_cmp)
-                                .unwrap_or(0.0)
-                        }
+                        Axis::Horizontal => fragment_width,
+                        Axis::Vertical => fragment_height,
                     };
                 }
             }
@@ -1285,20 +1254,27 @@ impl LayoutEngine {
                     }
                 }
                 LayoutItem::Fragments(range) => {
-                    // TODO: flow fragments via self.flow_fragments
-                    todo!();
+                    let line_height = resolved_fragment_line_height(
+                        &node.children,
+                        range.clone(),
+                        node.style.line_height.resolve_with(None, vw, vh),
+                    );
+                    let (fragment_width, fragment_height, _) = flow_fragment_range(
+                        &mut node.children,
+                        range.clone(),
+                        EMPTY_LINE_CONTEXT,
+                        line_height,
+                        base_ctx_for_children.containing_block_width.unwrap_or(vw),
+                    );
 
-                    total_border_main += state.main_size;
+                    total_border_main += match axis {
+                        Axis::Horizontal => fragment_width,
+                        Axis::Vertical => fragment_height,
+                    };
 
                     let cross = match axis {
-                        Axis::Horizontal => node.children[range.clone()]
-                            .iter()
-                            .map(|f| f.fragment().unwrap().node.height())
-                            .fold(0.0_f32, f32::max),
-                        Axis::Vertical => node.children[range.clone()]
-                            .iter()
-                            .map(|f| f.fragment().unwrap().node.width())
-                            .fold(0.0_f32, f32::max),
+                        Axis::Horizontal => fragment_height,
+                        Axis::Vertical => fragment_width,
                     };
 
                     max_cross = max_cross.max(cross);
@@ -1332,22 +1308,47 @@ impl LayoutEngine {
             .unwrap_or(0.0)
             .max(0.0);
 
-        // Calculate total size of all flex children along the main axis
-        let children_main_total: f32 = node
-            .children
+        let items = collect_layout_items(&node.children);
+
+        // Calculate total size of all flex items along the main axis
+        let children_main_total: f32 = items
             .iter()
-            .map(|child| match child {
-                crate::LayoutChild::Node(n) => match &n.layout_box {
-                    LayoutBox::BlockBox(box_model) => axis.rect_main(&box_model.border_box),
-                    _ => 0.0,
+            .map(|item| match item {
+                LayoutItem::Node(index) => {
+                    match &node.children[*index].node().unwrap().layout_box {
+                        LayoutBox::BlockBox(box_model) => axis.rect_main(&box_model.border_box),
+                        _ => 0.0,
+                    }
+                }
+                LayoutItem::Fragments(range) => match axis {
+                    Axis::Horizontal => node.children[range.clone()]
+                        .iter()
+                        .map(|f| f.fragment().unwrap().node.width())
+                        .sum(),
+                    Axis::Vertical => {
+                        let line_height = resolved_fragment_line_height(
+                            &node.children,
+                            range.clone(),
+                            node.style.line_height.resolve_with(None, vw, vh),
+                        );
+                        let line_count = node.children[range.clone()]
+                            .iter()
+                            .filter(|f| {
+                                f.fragment()
+                                    .map(|fragment| fragment.node.is_line_break())
+                                    .unwrap_or(false)
+                            })
+                            .count()
+                            + 1;
+                        line_height * line_count as f32
+                    }
                 },
-                crate::LayoutChild::Fragment(_) => 0.0,
             })
             .sum();
 
         // Calculate total gap between items
-        let gaps_total = if node.children.len() > 1 {
-            gap * (node.children.len() as f32 - 1.0)
+        let gaps_total = if items.len() > 1 {
+            gap * (items.len() as f32 - 1.0)
         } else {
             0.0
         };
@@ -1402,17 +1403,17 @@ impl LayoutEngine {
             resolve_justify_content(
                 node.style.justify_content,
                 remaining_space.max(0.0),
-                node.children.len(),
+                items.len(),
             )
         };
 
         // Position each flex child
         let mut cursor_main = start_offset;
 
-        for child in &mut node.children {
-            match child {
-                crate::LayoutChild::Node(n) => {
-                    let child_node = n.as_mut();
+        for item in items {
+            match item {
+                LayoutItem::Node(index) => {
+                    let child_node = node.children[index].node_mut().unwrap();
 
                     // Resolved numeric margins (fall back to 0.0 for auto; we'll handle autos separately)
                     let child_margin = self
@@ -1526,15 +1527,35 @@ impl LayoutEngine {
                     cursor_main += child_main_size + margin_end + gap + gap_between;
                 }
 
-                crate::LayoutChild::Fragment(fragment) => {
+                LayoutItem::Fragments(range) => {
+                    let line_height = resolved_fragment_line_height(
+                        &node.children,
+                        range.clone(),
+                        node.style.line_height.resolve_with(None, vw, vh),
+                    );
+                    let fragment_width: f32 = node.children[range.clone()]
+                        .iter()
+                        .map(|f| f.fragment().unwrap().node.width())
+                        .sum();
+                    let line_count = node.children[range.clone()]
+                        .iter()
+                        .filter(|f| {
+                            f.fragment()
+                                .map(|fragment| fragment.node.is_line_break())
+                                .unwrap_or(false)
+                        })
+                        .count()
+                        + 1;
+                    let fragment_height = line_height * line_count as f32;
+
                     let item_main_size = match axis {
-                        Axis::Horizontal => fragment.node.width(),
-                        Axis::Vertical => fragment.node.height(),
+                        Axis::Horizontal => fragment_width,
+                        Axis::Vertical => fragment_height,
                     };
 
                     let item_cross_size = match axis {
-                        Axis::Horizontal => fragment.node.height(),
-                        Axis::Vertical => fragment.node.width(),
+                        Axis::Horizontal => fragment_height,
+                        Axis::Vertical => fragment_width,
                     };
 
                     let child_main_pos = match axis {
@@ -1554,12 +1575,31 @@ impl LayoutEngine {
                         Axis::Vertical => content_box.x + cross_offset,
                     };
 
-                    fragment.placement.offset = match axis {
-                        Axis::Horizontal => (child_main_pos, child_cross_pos),
-                        Axis::Vertical => (child_cross_pos, child_main_pos),
+                    let line_ctx = match axis {
+                        Axis::Horizontal => LineContext {
+                            end_pos: (child_main_pos, child_cross_pos),
+                            inline_pos: (child_main_pos, child_main_pos),
+                            line_index: 0,
+                        },
+                        Axis::Vertical => LineContext {
+                            end_pos: (child_cross_pos, child_main_pos),
+                            inline_pos: (child_cross_pos, child_cross_pos),
+                            line_index: 0,
+                        },
                     };
 
-                    fragment.placement.line_index = 0;
+                    let outbox_width = match axis {
+                        Axis::Horizontal => child_main_pos + item_main_size,
+                        Axis::Vertical => child_cross_pos + item_cross_size,
+                    };
+
+                    let _ = flow_fragment_range(
+                        &mut node.children,
+                        range,
+                        line_ctx,
+                        line_height,
+                        outbox_width,
+                    );
 
                     cursor_main += item_main_size + gap + gap_between;
                 }
@@ -1849,6 +1889,79 @@ fn resolve_content_size_with_box_sizing(
 fn clamp(value: f32, min: Option<f32>, max: Option<f32>) -> f32 {
     let v = min.map_or(value, |m| value.max(m));
     max.map_or(v, |m| v.min(m))
+}
+
+fn collect_layout_items(children: &[LayoutChild]) -> Vec<LayoutItem> {
+    let mut items = Vec::new();
+    let mut iter = children.iter().enumerate().peekable();
+
+    while let Some((i, child)) = iter.next() {
+        match child {
+            LayoutChild::Node(_) => items.push(LayoutItem::Node(i)),
+            LayoutChild::Fragment(_) => {
+                let start = i;
+                let mut end = i + 1;
+
+                while let Some((next_i, LayoutChild::Fragment(_))) = iter.peek() {
+                    end = *next_i + 1;
+                    iter.next();
+                }
+
+                items.push(LayoutItem::Fragments(start..end));
+            }
+        }
+    }
+
+    items
+}
+
+fn resolved_fragment_line_height(
+    children: &[LayoutChild],
+    range: std::ops::Range<usize>,
+    line_height: Option<f32>,
+) -> f32 {
+    line_height.unwrap_or_else(|| {
+        children[range]
+            .iter()
+            .filter_map(|child| child.fragment())
+            .map(|fragment| fragment.node.height())
+            .fold(0.0_f32, f32::max)
+    })
+}
+
+fn flow_fragment_range(
+    children: &mut [LayoutChild],
+    range: std::ops::Range<usize>,
+    line_ctx: LineContext,
+    line_height: f32,
+    outbox_width: f32,
+) -> (f32, f32, LineContext) {
+    let mut fragment_node_buffer = children[range]
+        .iter_mut()
+        .filter_map(|child| child.fragment_mut())
+        .collect();
+
+    let (line_spans, line_ctx) = LayoutEngine::flow_fragments(
+        &mut fragment_node_buffer,
+        line_ctx,
+        line_height,
+        outbox_width,
+    );
+
+    let width = line_spans
+        .iter()
+        .map(|span| span.width())
+        .filter(|width| !width.is_nan())
+        .max_by(f32::total_cmp)
+        .unwrap_or(0.0);
+
+    let height = if line_spans.is_empty() {
+        0.0
+    } else {
+        line_height * line_spans.len() as f32
+    };
+
+    (width, height, line_ctx)
 }
 
 fn push_or_merge_line_span(spans: &mut Vec<LineSpan>, span: LineSpan) {
