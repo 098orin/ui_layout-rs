@@ -221,12 +221,14 @@ impl IntoIterator for &LayoutBox {
             LayoutBox::InlineBox(inline) => {
                 let len = inline.line_spans.len();
 
-                let left_extra_border = inline.box_model.padding_box.x;
-                let right_extra_border = inline.box_model.border_box.width
-                    - (inline.box_model.padding_box.x + inline.box_model.padding_box.width);
-                let left_extra_padding = inline.box_model.content_box.x;
-                let right_extra_padding = inline.box_model.padding_box.width
-                    - (inline.box_model.content_box.x + inline.box_model.content_box.width);
+                let left_extra_border =
+                    inline.box_model.padding_box.x - inline.box_model.border_box.x;
+                let right_extra_border =
+                    inline.box_model.border_box.right() - inline.box_model.padding_box.right();
+                let left_extra_padding =
+                    inline.box_model.content_box.x - inline.box_model.padding_box.x;
+                let right_extra_padding =
+                    inline.box_model.padding_box.right() - inline.box_model.content_box.right();
 
                 inline
                     .line_spans
@@ -286,12 +288,10 @@ impl IntoIterator for LayoutBox {
                 let base = inline.box_model;
                 let spans = inline.line_spans;
 
-                let left_extra_border = base.padding_box.x;
-                let right_extra_border =
-                    base.border_box.width - (base.padding_box.x + base.padding_box.width);
-                let left_extra_padding = base.content_box.x;
-                let right_extra_padding =
-                    base.padding_box.width - (base.content_box.x + base.content_box.width);
+                let left_extra_border = base.padding_box.x - base.border_box.x;
+                let right_extra_border = base.border_box.right() - base.padding_box.right();
+                let left_extra_padding = base.content_box.x - base.padding_box.x;
+                let right_extra_padding = base.padding_box.right() - base.content_box.right();
 
                 spans
                     .iter()
