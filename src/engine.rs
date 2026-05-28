@@ -525,7 +525,7 @@ impl LayoutEngine {
 
         let LineContext {
             end_pos: (end_x, end_y),
-            inline_pos: (parent_current_x, line_start_x),
+            inline_pos: (parent_current_x, mut line_start_x),
             line_index: parent_line_index,
         } = line_ctx;
 
@@ -539,7 +539,7 @@ impl LayoutEngine {
         let base_ctx_for_child = LayoutContext {
             containing_block_width: content_width_opt,
             containing_block_height: content_height_opt,
-            available_width: content_width_opt,
+            available_width: content_width_opt.or(ctx.available_width),
             parent_assigned_border_width: None,
             parent_assigned_border_height: None,
         };
@@ -602,21 +602,26 @@ impl LayoutEngine {
                         &mut fragment_node_buffer,
                         line_ctx_for_child,
                         line_height,
-                        content_width_opt.unwrap_or(self.viewport_width),
+                        content_width_opt
+                            .or(ctx.available_width)
+                            .unwrap_or(self.viewport_width),
                     );
 
                     let LineContext {
                         end_pos: (cx, cy),
-                        inline_pos: (ix, _),
+                        inline_pos: (ix, ils),
                         line_index: li,
                     } = updated_line_ctx;
 
                     cursor_x = cx;
                     cursor_y = cy;
                     current_x = ix;
+                    line_start_x = ils;
                     line_index = li;
 
-                    line_span_buf.extend_from_slice(&line_spans);
+                    for span in line_spans {
+                        push_or_merge_line_span(&mut line_span_buf, span);
+                    }
                 }
 
                 LayoutItem::Node(i) => {
@@ -628,7 +633,7 @@ impl LayoutEngine {
                     let child_margin = self.resolve_margin(&child_node.style.spacing, ctx);
 
                     let ctx_for_child = LayoutContext {
-                        available_width: content_width_opt.map(|v| {
+                        available_width: content_width_opt.or(ctx.available_width).map(|v| {
                             v - child_margin.left.unwrap_or(0.0) - child_margin.right.unwrap_or(0.0)
                         }),
                         ..base_ctx_for_child
@@ -642,7 +647,7 @@ impl LayoutEngine {
 
                     LineContext {
                         end_pos: (cursor_x, cursor_y),
-                        inline_pos: (current_x, _),
+                        inline_pos: (current_x, line_start_x),
                         line_index,
                     } = self.layout_node(
                         child_node,
@@ -704,7 +709,21 @@ impl LayoutEngine {
                     if node.style.display.outer == OuterDisplay::Inline
                         && child_node.style.display.outer == OuterDisplay::Inline
                     {
-                        todo!()
+                        if let LayoutBox::InlineBox(child_inline) = &child_node.layout_box {
+                            let x_offset = line_ctx_for_child.inline_pos.0;
+
+                            for child_span in &child_inline.line_spans {
+                                push_or_merge_line_span(
+                                    &mut line_span_buf,
+                                    LineSpan {
+                                        x_range: (child_span.x_range.start + x_offset)
+                                            ..(child_span.x_range.end + x_offset),
+                                        line_pos: child_span.line_pos,
+                                        line_index: child_span.line_index,
+                                    },
+                                );
+                            }
+                        }
                     }
 
                     // Update children_width and children_height
@@ -755,7 +774,10 @@ impl LayoutEngine {
 
         LineContext {
             end_pos: (cursor_x, cursor_y),
-            inline_pos: (parent_current_x + current_x, line_start_x),
+            inline_pos: (
+                parent_current_x + current_x,
+                parent_current_x + line_start_x,
+            ),
             line_index: parent_line_index + line_index,
         }
     }
@@ -1262,8 +1284,24 @@ impl LayoutEngine {
                         max_cross = max_cross.max(axis.rect_cross(&box_model.border_box));
                     }
                 }
-                LayoutItem::Fragments(_) => {
-                    todo!()
+                LayoutItem::Fragments(range) => {
+                    // TODO: flow fragments via self.flow_fragments
+                    todo!();
+
+                    total_border_main += state.main_size;
+
+                    let cross = match axis {
+                        Axis::Horizontal => node.children[range.clone()]
+                            .iter()
+                            .map(|f| f.fragment().unwrap().node.height())
+                            .fold(0.0_f32, f32::max),
+                        Axis::Vertical => node.children[range.clone()]
+                            .iter()
+                            .map(|f| f.fragment().unwrap().node.width())
+                            .fold(0.0_f32, f32::max),
+                    };
+
+                    max_cross = max_cross.max(cross);
                 }
             }
         }
@@ -1488,10 +1526,42 @@ impl LayoutEngine {
                     cursor_main += child_main_size + margin_end + gap + gap_between;
                 }
 
-                crate::LayoutChild::Fragment(_) => {
-                    // Fragment placement inside a flex container is not implemented yet.
-                    // For now we skip positioning fragments.
-                    todo!()
+                crate::LayoutChild::Fragment(fragment) => {
+                    let item_main_size = match axis {
+                        Axis::Horizontal => fragment.node.width(),
+                        Axis::Vertical => fragment.node.height(),
+                    };
+
+                    let item_cross_size = match axis {
+                        Axis::Horizontal => fragment.node.height(),
+                        Axis::Vertical => fragment.node.width(),
+                    };
+
+                    let child_main_pos = match axis {
+                        Axis::Horizontal => content_box.x + cursor_main,
+                        Axis::Vertical => content_box.y + cursor_main,
+                    };
+
+                    let available_cross = axis.rect_cross(content_box);
+                    let cross_offset = resolve_align_position(
+                        node.style.align_items,
+                        item_cross_size,
+                        available_cross,
+                    );
+
+                    let child_cross_pos = match axis {
+                        Axis::Horizontal => content_box.y + cross_offset,
+                        Axis::Vertical => content_box.x + cross_offset,
+                    };
+
+                    fragment.placement.offset = match axis {
+                        Axis::Horizontal => (child_main_pos, child_cross_pos),
+                        Axis::Vertical => (child_cross_pos, child_main_pos),
+                    };
+
+                    fragment.placement.line_index = 0;
+
+                    cursor_main += item_main_size + gap + gap_between;
                 }
             }
         }
@@ -1508,6 +1578,7 @@ impl LayoutEngine {
 
         let mut current_x = line_ctx.inline_pos.0;
         let mut line_start_x = line_ctx.inline_pos.1;
+        let mut visual_line_start_x = cursor_x - (current_x - line_start_x);
 
         let mut line_index = line_ctx.line_index;
 
@@ -1518,11 +1589,14 @@ impl LayoutEngine {
         for fragment_node in fragments {
             match fragment_node.node {
                 ItemFragment::LineBreak => {
-                    line_span_buf.push(LineSpan {
-                        x_range: line_start_x..current_x,
-                        line_pos: (line_start_x, cursor_y),
-                        line_index,
-                    });
+                    push_or_merge_line_span(
+                        &mut line_span_buf,
+                        LineSpan {
+                            x_range: line_start_x..current_x,
+                            line_pos: (visual_line_start_x, cursor_y),
+                            line_index,
+                        },
+                    );
 
                     fragment_node.placement = Placement {
                         offset: (cursor_x, cursor_y),
@@ -1532,17 +1606,21 @@ impl LayoutEngine {
                     cursor_x = 0.0;
                     cursor_y += line_height;
                     line_index += 1;
-                    line_start_x = 0.0;
+                    line_start_x = current_x;
+                    visual_line_start_x = 0.0;
                     if_first_of_line = true;
                 }
 
                 ItemFragment::Fragment(fragment_item) => {
                     if cursor_x + fragment_item.width > outbox_width && !if_first_of_line {
-                        line_span_buf.push(LineSpan {
-                            x_range: line_start_x..current_x,
-                            line_pos: (line_start_x, cursor_y),
-                            line_index,
-                        });
+                        push_or_merge_line_span(
+                            &mut line_span_buf,
+                            LineSpan {
+                                x_range: line_start_x..current_x,
+                                line_pos: (visual_line_start_x, cursor_y),
+                                line_index,
+                            },
+                        );
 
                         fragment_node.placement = Placement {
                             offset: (cursor_x, cursor_y),
@@ -1552,10 +1630,8 @@ impl LayoutEngine {
                         cursor_x = 0.0;
                         cursor_y += line_height;
                         line_index += 1;
-                        line_start_x = 0.0;
-                        if_first_of_line = true;
-                    } else {
-                        if_first_of_line = false;
+                        line_start_x = current_x;
+                        visual_line_start_x = 0.0;
                     }
 
                     fragment_node.placement = Placement {
@@ -1565,16 +1641,20 @@ impl LayoutEngine {
 
                     cursor_x += fragment_item.width;
                     current_x += fragment_item.width;
+                    if_first_of_line = false;
                 }
             }
         }
 
         if !if_first_of_line {
-            line_span_buf.push(LineSpan {
-                x_range: line_start_x..current_x,
-                line_pos: (line_start_x, cursor_y),
-                line_index,
-            });
+            push_or_merge_line_span(
+                &mut line_span_buf,
+                LineSpan {
+                    x_range: line_start_x..current_x,
+                    line_pos: (visual_line_start_x, cursor_y),
+                    line_index,
+                },
+            );
         }
 
         (
@@ -1769,6 +1849,23 @@ fn resolve_content_size_with_box_sizing(
 fn clamp(value: f32, min: Option<f32>, max: Option<f32>) -> f32 {
     let v = min.map_or(value, |m| value.max(m));
     max.map_or(v, |m| v.min(m))
+}
+
+fn push_or_merge_line_span(spans: &mut Vec<LineSpan>, span: LineSpan) {
+    if span.x_range.end <= span.x_range.start {
+        return;
+    }
+
+    if let Some(last) = spans.last_mut() {
+        if last.line_index == span.line_index && last.line_pos.1 == span.line_pos.1 {
+            last.x_range.end = last.x_range.end.max(span.x_range.end);
+            last.x_range.start = last.x_range.start.min(span.x_range.start);
+            last.line_pos.0 = last.line_pos.0.min(span.line_pos.0);
+            return;
+        }
+    }
+
+    spans.push(span);
 }
 
 /// Creates a box model with specified dimensions and spacing.
