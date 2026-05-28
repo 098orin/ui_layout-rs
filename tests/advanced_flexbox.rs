@@ -4,6 +4,10 @@ fn node<'a>(n: &'a LayoutNode, idx: usize) -> &'a LayoutNode {
     n.children[idx].node().expect("expected node child")
 }
 
+fn fragment(width: f32, height: f32) -> ItemFragment {
+    ItemFragment::Fragment(Fragment { width, height })
+}
+
 #[test]
 fn flex_column_layout() {
     let child1 = LayoutNode::new(Style {
@@ -535,6 +539,59 @@ fn flex_row_gap_column_gap() {
     match &node(&root, 2).layout_box {
         LayoutBox::BlockBox(box_model) => {
             assert_eq!(box_model.border_box.x, 160.0);
+        }
+        _ => panic!("Expected block box model"),
+    }
+}
+
+#[test]
+fn flex_row_places_consecutive_fragments_as_one_item() {
+    let trailing_node = LayoutNode::new(Style {
+        size: SizeStyle {
+            width: LengthOrAuto::Length(Length::Px(40.0)),
+            height: LengthOrAuto::Length(Length::Px(20.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            display: Display {
+                outer: OuterDisplay::Block,
+                inner: InnerDisplay::Flex,
+            },
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Length(Length::Px(40.0)),
+                ..Default::default()
+            },
+            line_height: Length::Px(20.0),
+            flex_direction: FlexDirection::Row,
+            column_gap: LengthOrAuto::Length(Length::Px(10.0)),
+            ..Default::default()
+        },
+        vec![
+            LayoutChild::from(fragment(20.0, 10.0)),
+            LayoutChild::from(fragment(30.0, 10.0)),
+            LayoutChild::from(trailing_node),
+        ],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    assert_eq!(
+        root.children[0].fragment().unwrap().placement.offset,
+        (0.0, 0.0)
+    );
+    assert_eq!(
+        root.children[1].fragment().unwrap().placement.offset,
+        (20.0, 0.0)
+    );
+
+    match &node(&root, 2).layout_box {
+        LayoutBox::BlockBox(box_model) => {
+            assert_eq!(box_model.border_box.x, 60.0);
         }
         _ => panic!("Expected block box model"),
     }
