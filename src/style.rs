@@ -349,7 +349,7 @@ impl LengthOrAuto {
         }
     }
 
-    pub fn lenth(&self) -> Option<&Length> {
+    pub fn lenth(self) -> Option<Length> {
         match self {
             LengthOrAuto::Length(l) => Some(l),
             LengthOrAuto::Auto => None,
