@@ -28,8 +28,9 @@ impl LayoutNode {
     }
 
     /// Create a LayoutNode with arbitrary children.
-    pub fn with_children<T>(style: Style, children: Vec<T>) -> Self
+    pub fn with_children<I, T>(style: Style, children: I) -> Self
     where
+        I: IntoIterator<Item = T>,
         T: Into<LayoutChild>,
     {
         let children = children.into_iter().map(Into::into).collect();
