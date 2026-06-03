@@ -1115,13 +1115,13 @@ impl LayoutEngine {
                 // negative remaining = overflow
                 let mut total_shrink_factor = 0.0;
 
-                for i in 0..item_len {
-                    if states[i].frozen_shrink {
+                for state in &mut states {
+                    if state.frozen_shrink {
                         continue;
                     }
 
-                    let shrink = states[i].shrink;
-                    total_shrink_factor += shrink * states[i].main_size;
+                    let shrink = state.shrink;
+                    total_shrink_factor += shrink * state.main_size;
                 }
 
                 if total_shrink_factor <= 0.0 {
