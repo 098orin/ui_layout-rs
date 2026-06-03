@@ -72,6 +72,66 @@ pub enum LayoutBox {
     InlineBox(InlineBox),
 }
 
+#[derive(Debug, Clone, Copy)]
+struct InlineBoxEdges {
+    left_border: f32,
+    right_border: f32,
+    left_padding: f32,
+    right_padding: f32,
+}
+
+impl InlineBoxEdges {
+    fn new(base: &BoxModel) -> Self {
+        Self {
+            left_border: base.padding_box.x - base.border_box.x,
+            right_border: base.border_box.right() - base.padding_box.right(),
+            left_padding: base.content_box.x - base.padding_box.x,
+            right_padding: base.padding_box.right() - base.content_box.right(),
+        }
+    }
+}
+
+/// Iterator over the [`BoxModel`]s represented by a borrowed [`LayoutBox`].
+///
+/// Inline boxes are converted one line at a time, avoiding the intermediate
+/// allocation that a collected `Vec<BoxModel>` would require.
+#[derive(Debug)]
+pub struct LayoutBoxIter<'a> {
+    inner: LayoutBoxIterInner<'a>,
+}
+
+#[derive(Debug)]
+enum LayoutBoxIterInner<'a> {
+    Empty,
+    Block(Option<&'a BoxModel>),
+    Inline {
+        base: &'a BoxModel,
+        spans: std::slice::Iter<'a, LineSpan>,
+        len: usize,
+        edges: InlineBoxEdges,
+    },
+}
+
+/// Iterator over the [`BoxModel`]s represented by an owned [`LayoutBox`].
+///
+/// This consumes inline line spans directly and yields each computed box lazily.
+#[derive(Debug)]
+pub struct LayoutBoxIntoIter {
+    inner: LayoutBoxIntoIterInner,
+}
+
+#[derive(Debug)]
+enum LayoutBoxIntoIterInner {
+    Empty,
+    Block(Option<BoxModel>),
+    Inline {
+        base: BoxModel,
+        spans: std::vec::IntoIter<LineSpan>,
+        len: usize,
+        edges: InlineBoxEdges,
+    },
+}
+
 impl Rect {
     pub fn right(&self) -> f32 {
         self.x + self.width
@@ -199,7 +259,7 @@ impl LayoutBox {
     ///
     /// This method provides a convenient way to iterate over all boxes
     /// regardless of the internal representation.
-    pub fn iter(&self) -> impl Iterator<Item = BoxModel> {
+    pub fn iter(&self) -> LayoutBoxIter<'_> {
         self.into_iter()
     }
 }
@@ -208,128 +268,174 @@ impl LayoutBox {
 //   Implementing IntoIterator for LayoutBox
 // =============================================
 
-impl IntoIterator for &LayoutBox {
+fn line_box(base: &BoxModel, span: &LineSpan, len: usize, edges: InlineBoxEdges) -> BoxModel {
+    let mut b = base.clone();
+
+    let dx = span.line_pos.0 - b.content_box.x;
+    let dy = span.line_pos.1 - b.content_box.y;
+    b.shift(dx, dy);
+
+    let new_content_width = span.width();
+    let keep_left = span.line_index == 0;
+    let keep_right = span.line_index == len - 1;
+
+    let left_padding = if keep_left { edges.left_padding } else { 0.0 };
+    let right_padding = if keep_right { edges.right_padding } else { 0.0 };
+    let left_border = if keep_left { edges.left_border } else { 0.0 };
+    let right_border = if keep_right { edges.right_border } else { 0.0 };
+
+    b.content_box.width = new_content_width;
+    b.content_box.x = left_padding;
+
+    b.padding_box.x = left_border;
+    b.padding_box.width = new_content_width + left_padding + right_padding;
+    b.border_box.width = b.padding_box.width + left_border + right_border;
+    b.children_box = b.content_box;
+
+    b
+}
+
+impl<'a> IntoIterator for &'a LayoutBox {
     type Item = BoxModel;
-    type IntoIter = std::vec::IntoIter<BoxModel>;
+    type IntoIter = LayoutBoxIter<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
-        match self {
-            LayoutBox::None => Vec::new().into_iter(),
-
-            LayoutBox::BlockBox(b) => vec![b.clone()].into_iter(),
-
-            LayoutBox::InlineBox(inline) => {
-                let len = inline.line_spans.len();
-
-                let left_extra_border =
-                    inline.box_model.padding_box.x - inline.box_model.border_box.x;
-                let right_extra_border =
-                    inline.box_model.border_box.right() - inline.box_model.padding_box.right();
-                let left_extra_padding =
-                    inline.box_model.content_box.x - inline.box_model.padding_box.x;
-                let right_extra_padding =
-                    inline.box_model.padding_box.right() - inline.box_model.content_box.right();
-
-                inline
-                    .line_spans
-                    .iter()
-                    .map(|span| {
-                        let i = span.line_index;
-                        let mut b = inline.box_model.clone();
-
-                        // shift
-                        let dx = span.line_pos.0 - b.content_box.x;
-                        let dy = span.line_pos.1 - b.content_box.y;
-                        b.shift(dx, dy);
-
-                        let new_content_width = span.width();
-
-                        // decide which sides to keep
-                        let keep_left = i == 0;
-                        let keep_right = i == len - 1;
-
-                        let left_padding = if keep_left { left_extra_padding } else { 0.0 };
-                        let right_padding = if keep_right { right_extra_padding } else { 0.0 };
-                        let left_border = if keep_left { left_extra_border } else { 0.0 };
-                        let right_border = if keep_right { right_extra_border } else { 0.0 };
-
-                        // set content box
-                        b.content_box.width = new_content_width;
-                        b.content_box.x = left_padding;
-
-                        // rebuild outer boxes
-                        b.padding_box.x = left_border;
-                        b.padding_box.width = new_content_width + left_padding + right_padding;
-                        b.border_box.width = b.padding_box.width + left_border + right_border;
-                        b.children_box = b.content_box;
-
-                        b
-                    })
-                    .collect::<Vec<_>>()
-                    .into_iter()
-            }
+        LayoutBoxIter {
+            inner: match self {
+                LayoutBox::None => LayoutBoxIterInner::Empty,
+                LayoutBox::BlockBox(b) => LayoutBoxIterInner::Block(Some(b)),
+                LayoutBox::InlineBox(inline) => LayoutBoxIterInner::Inline {
+                    base: &inline.box_model,
+                    spans: inline.line_spans.iter(),
+                    len: inline.line_spans.len(),
+                    edges: InlineBoxEdges::new(&inline.box_model),
+                },
+            },
         }
     }
 }
+
+impl Iterator for LayoutBoxIter<'_> {
+    type Item = BoxModel;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match &mut self.inner {
+            LayoutBoxIterInner::Empty => None,
+            LayoutBoxIterInner::Block(b) => b.take().cloned(),
+            LayoutBoxIterInner::Inline {
+                base,
+                spans,
+                len,
+                edges,
+            } => spans.next().map(|span| line_box(base, span, *len, *edges)),
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let len = self.len();
+        (len, Some(len))
+    }
+}
+
+impl DoubleEndedIterator for LayoutBoxIter<'_> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        match &mut self.inner {
+            LayoutBoxIterInner::Empty => None,
+            LayoutBoxIterInner::Block(b) => b.take().cloned(),
+            LayoutBoxIterInner::Inline {
+                base,
+                spans,
+                len,
+                edges,
+            } => spans
+                .next_back()
+                .map(|span| line_box(base, span, *len, *edges)),
+        }
+    }
+}
+
+impl ExactSizeIterator for LayoutBoxIter<'_> {
+    fn len(&self) -> usize {
+        match &self.inner {
+            LayoutBoxIterInner::Empty => 0,
+            LayoutBoxIterInner::Block(b) => usize::from(b.is_some()),
+            LayoutBoxIterInner::Inline { spans, .. } => spans.len(),
+        }
+    }
+}
+
+impl std::iter::FusedIterator for LayoutBoxIter<'_> {}
 
 impl IntoIterator for LayoutBox {
     type Item = BoxModel;
-    type IntoIter = std::vec::IntoIter<BoxModel>;
+    type IntoIter = LayoutBoxIntoIter;
 
     fn into_iter(self) -> Self::IntoIter {
-        match self {
-            LayoutBox::None => Vec::new().into_iter(),
-
-            LayoutBox::BlockBox(b) => vec![b].into_iter(),
-
-            LayoutBox::InlineBox(inline) => {
-                let len = inline.line_spans.len();
-
-                let base = inline.box_model;
-                let spans = inline.line_spans;
-
-                let left_extra_border = base.padding_box.x - base.border_box.x;
-                let right_extra_border = base.border_box.right() - base.padding_box.right();
-                let left_extra_padding = base.content_box.x - base.padding_box.x;
-                let right_extra_padding = base.padding_box.right() - base.content_box.right();
-
-                spans
-                    .iter()
-                    .map(|span| {
-                        let i = span.line_index;
-                        let mut b = base.clone();
-
-                        // shift
-                        let dx = span.line_pos.0 - b.content_box.x;
-                        let dy = span.line_pos.1 - b.content_box.y;
-                        b.shift(dx, dy);
-
-                        let new_content_width = span.width();
-
-                        // decide which sides to keep
-                        let keep_left = i == 0;
-                        let keep_right = i == len - 1;
-
-                        let left_padding = if keep_left { left_extra_padding } else { 0.0 };
-                        let right_padding = if keep_right { right_extra_padding } else { 0.0 };
-                        let left_border = if keep_left { left_extra_border } else { 0.0 };
-                        let right_border = if keep_right { right_extra_border } else { 0.0 };
-
-                        // set content box
-                        b.content_box.width = new_content_width;
-                        b.content_box.x = left_padding;
-
-                        // rebuild outer boxes
-                        b.padding_box.x = left_border;
-                        b.padding_box.width = new_content_width + left_padding + right_padding;
-                        b.border_box.width = b.padding_box.width + left_border + right_border;
-                        b.children_box = b.content_box;
-
-                        b
-                    })
-                    .collect::<Vec<_>>()
-                    .into_iter()
-            }
+        LayoutBoxIntoIter {
+            inner: match self {
+                LayoutBox::None => LayoutBoxIntoIterInner::Empty,
+                LayoutBox::BlockBox(b) => LayoutBoxIntoIterInner::Block(Some(b)),
+                LayoutBox::InlineBox(inline) => {
+                    let edges = InlineBoxEdges::new(&inline.box_model);
+                    LayoutBoxIntoIterInner::Inline {
+                        base: inline.box_model,
+                        len: inline.line_spans.len(),
+                        spans: inline.line_spans.into_iter(),
+                        edges,
+                    }
+                }
+            },
         }
     }
 }
+
+impl Iterator for LayoutBoxIntoIter {
+    type Item = BoxModel;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match &mut self.inner {
+            LayoutBoxIntoIterInner::Empty => None,
+            LayoutBoxIntoIterInner::Block(b) => b.take(),
+            LayoutBoxIntoIterInner::Inline {
+                base,
+                spans,
+                len,
+                edges,
+            } => spans.next().map(|span| line_box(base, &span, *len, *edges)),
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let len = self.len();
+        (len, Some(len))
+    }
+}
+
+impl DoubleEndedIterator for LayoutBoxIntoIter {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        match &mut self.inner {
+            LayoutBoxIntoIterInner::Empty => None,
+            LayoutBoxIntoIterInner::Block(b) => b.take(),
+            LayoutBoxIntoIterInner::Inline {
+                base,
+                spans,
+                len,
+                edges,
+            } => spans
+                .next_back()
+                .map(|span| line_box(base, &span, *len, *edges)),
+        }
+    }
+}
+
+impl ExactSizeIterator for LayoutBoxIntoIter {
+    fn len(&self) -> usize {
+        match &self.inner {
+            LayoutBoxIntoIterInner::Empty => 0,
+            LayoutBoxIntoIterInner::Block(b) => usize::from(b.is_some()),
+            LayoutBoxIntoIterInner::Inline { spans, .. } => spans.len(),
+        }
+    }
+}
+
+impl std::iter::FusedIterator for LayoutBoxIntoIter {}
