@@ -557,6 +557,7 @@ impl LayoutEngine {
             .unwrap_or_default();
 
         let mut line_span_buf = Vec::new();
+        let mut max_inline_line_height = line_height;
 
         // -------------------------------
         // 1. Build LayoutItem stream
@@ -628,6 +629,8 @@ impl LayoutEngine {
                     for span in line_spans {
                         push_or_merge_line_span(&mut line_span_buf, span);
                     }
+
+                    max_inline_line_height = max_inline_line_height.max(line_height);
                 }
 
                 LayoutItem::Node(i) => {
@@ -731,6 +734,13 @@ impl LayoutEngine {
                         }
                     }
 
+                    if child_node.style.display.outer == OuterDisplay::Inline {
+                        for line_box in child_node.layout_box.iter() {
+                            max_inline_line_height =
+                                max_inline_line_height.max(line_box.border_box.height);
+                        }
+                    }
+
                     // Update children_width and children_height
                     children_width = children_width.max(child_node.layout_box.width_box());
                     children_height += child_node.layout_box.height_box();
@@ -744,9 +754,9 @@ impl LayoutEngine {
         if node.style.display.outer == OuterDisplay::Inline {
             let mut box_model = create_box_model(
                 current_x,
-                line_height,
+                max_inline_line_height,
                 current_x,
-                line_height,
+                max_inline_line_height,
                 padding,
                 border,
             );

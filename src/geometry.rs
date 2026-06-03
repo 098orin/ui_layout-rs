@@ -216,13 +216,14 @@ impl LayoutBox {
         }
     }
 
-    /// Returns the maximum width among all boxes via [`BoxModel::height`].
-    /// For [`LayoutBox::InlineBox`], height is calclated via sum of height for every line.
+    /// Returns the height covered by the represented box or split boxes.
+    /// For [`LayoutBox::InlineBox`], height is calculated from the laid-out
+    /// line positions so wrapped inline boxes include their border-box extent.
     pub fn height_box(&self) -> f32 {
         match self {
             LayoutBox::None => 0.0,
-            LayoutBox::BlockBox(b) => b.width(),
-            LayoutBox::InlineBox(l) => l.box_model.content_box.height * (l.line_spans.len() as f32),
+            LayoutBox::BlockBox(b) => b.height(),
+            LayoutBox::InlineBox(l) => inline_box_height(l),
         }
     }
 
@@ -232,14 +233,7 @@ impl LayoutBox {
         match self {
             LayoutBox::None => 0.0,
             LayoutBox::BlockBox(b) => b.height(),
-            LayoutBox::InlineBox(l) => {
-                // Last y pos - First y pos + line border height
-                if let (Some(first), Some(last)) = (l.line_spans.first(), l.line_spans.last()) {
-                    last.line_pos.1 - first.line_pos.1 + l.box_model.height()
-                } else {
-                    0.0
-                }
-            }
+            LayoutBox::InlineBox(l) => inline_box_height(l),
         }
     }
 
@@ -269,6 +263,14 @@ impl LayoutBox {
     /// regardless of the internal representation.
     pub fn iter(&self) -> LayoutBoxIter<'_> {
         self.into_iter()
+    }
+}
+
+fn inline_box_height(inline: &InlineBox) -> f32 {
+    if let (Some(first), Some(last)) = (inline.line_spans.first(), inline.line_spans.last()) {
+        last.line_pos.1 - first.line_pos.1 + inline.box_model.height()
+    } else {
+        0.0
     }
 }
 

@@ -169,6 +169,66 @@ fn nested_inline_child_spans_are_merged_into_parent_lines() {
 }
 
 #[test]
+fn block_flow_parent_uses_nested_inline_multiline_height() {
+    let nested = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline").unwrap(),
+            line_height: Length::Px(20.0),
+            spacing: Spacing {
+                padding_top: Length::Px(3.0),
+                padding_bottom: Length::Px(5.0),
+                border_top: Length::Px(2.0),
+                border_bottom: Length::Px(4.0),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        [
+            LayoutChild::from(fragment(60.0, 10.0)),
+            LayoutChild::from(fragment(50.0, 10.0)),
+            LayoutChild::from(fragment(30.0, 10.0)),
+        ],
+    );
+
+    let inline_parent = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline").unwrap(),
+            line_height: Length::Px(20.0),
+            ..Default::default()
+        },
+        [nested],
+    );
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            display: Display::parse("block flow").unwrap(),
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(100.0)),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        [inline_parent],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    let inline_parent = node(&root, 0);
+    let inline_boxes: Vec<BoxModel> = inline_parent.layout_box.iter().collect();
+    assert_eq!(inline_boxes.len(), 2);
+    assert_eq!(inline_boxes[0].border_box.y, 0.0);
+    assert_eq!(inline_boxes[1].border_box.y, 20.0);
+
+    let root_box = match &root.layout_box {
+        LayoutBox::BlockBox(b) => b,
+        _ => panic!("expected block box"),
+    };
+
+    assert_eq!(root_box.content_box.height, 54.0);
+    assert_eq!(root_box.children_box.height, 54.0);
+}
+
+#[test]
 fn inline_padding_and_border_are_applied_only_to_outer_edges_when_split() {
     let child = LayoutNode::with_children(
         Style {
