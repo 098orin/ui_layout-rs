@@ -1014,11 +1014,7 @@ impl LayoutEngine {
                                         0.0
                                     }
                                 }
-                                Some(v) => {
-                                    state.frozen_grow = true;
-                                    state.frozen_shrink = true;
-                                    v
-                                }
+                                Some(v) => v,
                             }
                         }
                     };
@@ -1771,31 +1767,43 @@ impl LayoutEngine {
         let vh = self.viewport_height;
 
         // --- width ---
-        let content_width = size_style
-            .width
-            .resolve_with(ctx.containing_block_width, vw, vh)
-            .map(|width| {
-                let padding_edge = (padding.left, padding.right);
-                let border_edge = (border.left, border.right);
-                resolve_content_size_with_box_sizing(box_sizing, width, padding_edge, border_edge)
-            })
-            .or(ctx
-                .parent_assigned_border_width
-                .map(|v| v - (padding.left + padding.right) - (border.left + border.right)))
+        // Parent-assigned (flex) size takes priority over explicit size
+        let content_width = ctx
+            .parent_assigned_border_width
+            .map(|v| v - (padding.left + padding.right) - (border.left + border.right))
+            .or(size_style
+                .width
+                .resolve_with(ctx.containing_block_width, vw, vh)
+                .map(|width| {
+                    let padding_edge = (padding.left, padding.right);
+                    let border_edge = (border.left, border.right);
+                    resolve_content_size_with_box_sizing(
+                        box_sizing,
+                        width,
+                        padding_edge,
+                        border_edge,
+                    )
+                }))
             .map(|width| self.apply_size_constraints(width, size_style, ctx, true));
 
         // --- height ---
-        let content_height = size_style
-            .height
-            .resolve_with(ctx.containing_block_height, vw, vh)
-            .map(|height| {
-                let padding_edge = (padding.top, padding.bottom);
-                let border_edge = (border.top, border.bottom);
-                resolve_content_size_with_box_sizing(box_sizing, height, padding_edge, border_edge)
-            })
-            .or(ctx
-                .parent_assigned_border_height
-                .map(|v| v - (padding.top + padding.bottom) - (border.top + border.bottom)))
+        // Parent-assigned (flex) size takes priority over explicit size
+        let content_height = ctx
+            .parent_assigned_border_height
+            .map(|v| v - (padding.top + padding.bottom) - (border.top + border.bottom))
+            .or(size_style
+                .height
+                .resolve_with(ctx.containing_block_height, vw, vh)
+                .map(|height| {
+                    let padding_edge = (padding.top, padding.bottom);
+                    let border_edge = (border.top, border.bottom);
+                    resolve_content_size_with_box_sizing(
+                        box_sizing,
+                        height,
+                        padding_edge,
+                        border_edge,
+                    )
+                }))
             .map(|height| self.apply_size_constraints(height, size_style, ctx, false));
 
         ((content_width, content_height), border, padding)
