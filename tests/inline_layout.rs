@@ -190,34 +190,33 @@ fn block_flow_parent_uses_nested_inline_multiline_height() {
         ],
     );
 
-    let inline_parent = LayoutNode::with_children(
+    let block_parent = LayoutNode::with_children(
         Style {
-            display: Display::parse("inline").unwrap(),
+            display: Display::parse("block").unwrap(),
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(100.0)),
+                ..Default::default()
+            },
             line_height: Length::Px(20.0),
             ..Default::default()
         },
         [nested],
     );
 
-    let mut root = LayoutNode::with_children(
-        Style {
-            display: Display::parse("block flow").unwrap(),
-            size: SizeStyle {
-                width: LengthOrAuto::Length(Length::Px(100.0)),
-                ..Default::default()
-            },
-            ..Default::default()
-        },
-        [inline_parent],
-    );
+    let mut root = LayoutNode::with_children(Style::default(), [block_parent]);
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
-    let inline_parent = node(&root, 0);
+    let inline_parent = node(&root.children[0].node().unwrap(), 0);
     let inline_boxes: Vec<BoxModel> = inline_parent.layout_box.iter().collect();
     assert_eq!(inline_boxes.len(), 2);
     assert_eq!(inline_boxes[0].border_box.y, 0.0);
     assert_eq!(inline_boxes[1].border_box.y, 20.0);
+
+    let block_parent = node(&root, 0);
+    let block_boxes: Vec<BoxModel> = block_parent.layout_box.iter().collect();
+    assert_eq!(block_boxes.len(), 1);
+    assert!(block_boxes[0].content_box.height >= 40.0);
 
     let root_box = match &root.layout_box {
         LayoutBox::BlockBox(b) => b,
