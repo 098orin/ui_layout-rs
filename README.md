@@ -58,7 +58,7 @@ let mut root = LayoutNode::with_children(
         column_gap: Length::Px(20.0),
         ..Default::default()
     },
-    vec![
+    [
         LayoutNode::new(Style {
             item_style: ItemStyle {
                 flex_grow: 1.0,
