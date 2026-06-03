@@ -100,10 +100,10 @@ fn margins_affect_positioning_simple() {
             },
             ..Default::default()
         },
-        vec![child],
+        [child],
     );
 
-    let mut root = LayoutNode::with_children(Style::default(), vec![inner]);
+    let mut root = LayoutNode::with_children(Style::default(), [inner]);
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 

@@ -36,7 +36,7 @@ fn test_child_coordinates_relative_to_parent_content_box() {
             },
             ..Default::default()
         },
-        vec![child],
+        [child],
     );
 
     LayoutEngine::layout(&mut parent, 800.0, 600.0);
@@ -94,7 +94,7 @@ fn test_nested_coordinate_system() {
             },
             ..Default::default()
         },
-        vec![grandchild],
+        [grandchild],
     );
 
     let mut root = LayoutNode::with_children(
@@ -111,7 +111,7 @@ fn test_nested_coordinate_system() {
             },
             ..Default::default()
         },
-        vec![child],
+        [child],
     );
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
@@ -192,7 +192,7 @@ fn test_flex_children_coordinates() {
             column_gap: LengthOrAuto::Length(Length::Px(20.0)),
             ..Default::default()
         },
-        vec![child1, child2],
+        [child1, child2],
     );
 
     LayoutEngine::layout(&mut flex_container, 800.0, 600.0);
@@ -267,7 +267,7 @@ fn test_block_children_coordinates_with_margins() {
             },
             ..Default::default()
         },
-        vec![child1, child2],
+        [child1, child2],
     );
 
     LayoutEngine::layout(&mut parent, 800.0, 600.0);
@@ -332,7 +332,7 @@ fn test_coordinate_system_with_auto_margins() {
             },
             ..Default::default()
         },
-        vec![child],
+        [child],
     );
 
     LayoutEngine::layout(&mut parent, 800.0, 600.0);

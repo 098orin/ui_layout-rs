@@ -39,7 +39,7 @@ fn block_vertical_margin_collapsing_between_siblings() {
             },
             ..Default::default()
         },
-        vec![child1, child2],
+        [child1, child2],
     );
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);

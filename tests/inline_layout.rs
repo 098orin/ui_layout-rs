@@ -26,10 +26,10 @@ fn layout_box_into_iter_block_single_line() {
             },
             ..Default::default()
         },
-        vec![fragment1, fragment2, fragment3],
+        [fragment1, fragment2, fragment3],
     );
 
-    let mut root = LayoutNode::with_children(Style::default(), vec![child]);
+    let mut root = LayoutNode::with_children(Style::default(), [child]);
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
@@ -48,7 +48,7 @@ fn inline_fragments_wrap_into_line_boxes_with_max_line_width() {
             line_height: Length::Px(20.0),
             ..Default::default()
         },
-        vec![
+        [
             fragment(60.0, 10.0),
             fragment(50.0, 10.0),
             fragment(30.0, 10.0),
@@ -63,7 +63,7 @@ fn inline_fragments_wrap_into_line_boxes_with_max_line_width() {
             },
             ..Default::default()
         },
-        vec![child],
+        [child],
     );
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
@@ -88,14 +88,14 @@ fn inline_line_break_starts_a_new_line() {
             line_height: Length::Px(16.0),
             ..Default::default()
         },
-        vec![
+        [
             fragment(25.0, 10.0),
             ItemFragment::LineBreak,
             fragment(35.0, 10.0),
         ],
     );
 
-    let mut root = LayoutNode::with_children(Style::default(), vec![child]);
+    let mut root = LayoutNode::with_children(Style::default(), [child]);
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
@@ -116,7 +116,7 @@ fn nested_inline_child_spans_are_merged_into_parent_lines() {
             line_height: Length::Px(20.0),
             ..Default::default()
         },
-        vec![fragment(40.0, 10.0), fragment(50.0, 10.0)],
+        [fragment(40.0, 10.0), fragment(50.0, 10.0)],
     );
 
     let parent = LayoutNode::with_children(
@@ -125,7 +125,7 @@ fn nested_inline_child_spans_are_merged_into_parent_lines() {
             line_height: Length::Px(20.0),
             ..Default::default()
         },
-        vec![
+        [
             LayoutChild::from(fragment(30.0, 10.0)),
             LayoutChild::from(nested),
             LayoutChild::from(fragment(20.0, 10.0)),
@@ -140,7 +140,7 @@ fn nested_inline_child_spans_are_merged_into_parent_lines() {
             },
             ..Default::default()
         },
-        vec![parent],
+        [parent],
     );
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
@@ -177,7 +177,7 @@ fn inline_padding_and_border_are_applied_only_to_outer_edges_when_split() {
             },
             ..Default::default()
         },
-        vec![fragment(70.0, 10.0), fragment(50.0, 10.0)],
+        [fragment(70.0, 10.0), fragment(50.0, 10.0)],
     );
 
     let mut root = LayoutNode::with_children(
@@ -188,7 +188,7 @@ fn inline_padding_and_border_are_applied_only_to_outer_edges_when_split() {
             },
             ..Default::default()
         },
-        vec![child],
+        [child],
     );
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);

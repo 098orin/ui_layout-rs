@@ -60,7 +60,7 @@ fn block_auto_height_from_children() {
             },
             ..Default::default()
         },
-        vec![child],
+        [child],
     );
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
@@ -105,7 +105,7 @@ fn flex_row_grow() {
             flex_direction: FlexDirection::Row,
             ..Default::default()
         },
-        vec![child1, child2],
+        [child1, child2],
     );
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
@@ -158,7 +158,7 @@ fn flex_gap_affects_children_box() {
             column_gap: LengthOrAuto::Length(Length::Px(20.0)),
             ..Default::default()
         },
-        vec![child1, child2],
+        [child1, child2],
     );
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
@@ -207,7 +207,7 @@ fn flex_align_items_stretch() {
             align_items: AlignItems::Stretch,
             ..Default::default()
         },
-        vec![child],
+        [child],
     );
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
@@ -246,7 +246,7 @@ fn block_margin_auto_centering() {
             },
             ..Default::default()
         },
-        vec![child],
+        [child],
     );
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);

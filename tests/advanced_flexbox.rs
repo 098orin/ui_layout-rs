@@ -48,7 +48,7 @@ fn flex_column_layout() {
             flex_direction: FlexDirection::Column,
             ..Default::default()
         },
-        vec![child1, child2, child3],
+        [child1, child2, child3],
     );
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
@@ -119,7 +119,7 @@ fn flex_justify_content_space_evenly() {
             flex_direction: FlexDirection::Row,
             ..Default::default()
         },
-        vec![child1, child2, child3],
+        [child1, child2, child3],
     );
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
@@ -206,7 +206,7 @@ fn flex_align_items_different_values() {
             flex_direction: FlexDirection::Row,
             ..Default::default()
         },
-        vec![child1, child2, child3],
+        [child1, child2, child3],
     );
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
@@ -277,7 +277,7 @@ fn nested_flex_containers() {
             flex_direction: FlexDirection::Row,
             ..Default::default()
         },
-        vec![inner_child1, inner_child2],
+        [inner_child1, inner_child2],
     );
 
     // Outer flex container
@@ -305,7 +305,7 @@ fn nested_flex_containers() {
             column_gap: LengthOrAuto::Length(Length::Px(10.0)),
             ..Default::default()
         },
-        vec![inner_flex, regular_child],
+        [inner_flex, regular_child],
     );
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
@@ -377,7 +377,7 @@ fn flex_with_percentage_basis() {
             flex_direction: FlexDirection::Row,
             ..Default::default()
         },
-        vec![child1, child2],
+        [child1, child2],
     );
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
@@ -448,7 +448,7 @@ fn flex_auto_margins_override_justify_content() {
             justify_content: JustifyContent::Center, // Should be overridden by auto margins
             ..Default::default()
         },
-        vec![child1, child2, child3],
+        [child1, child2, child3],
     );
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
@@ -512,7 +512,7 @@ fn flex_row_gap_column_gap() {
             row_gap: LengthOrAuto::Length(Length::Px(10.0)), // Not used in single row, but testing
             ..Default::default()
         },
-        vec![child1, child2, child3],
+        [child1, child2, child3],
     );
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
@@ -571,7 +571,7 @@ fn flex_row_places_consecutive_fragments_as_one_item() {
             column_gap: LengthOrAuto::Length(Length::Px(10.0)),
             ..Default::default()
         },
-        vec![
+        [
             LayoutChild::from(fragment(20.0, 10.0)),
             LayoutChild::from(fragment(30.0, 10.0)),
             LayoutChild::from(trailing_node),
@@ -639,7 +639,7 @@ fn flex_min_max_constraints_with_grow() {
             flex_direction: FlexDirection::Row,
             ..Default::default()
         },
-        vec![child1, child2],
+        [child1, child2],
     );
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
