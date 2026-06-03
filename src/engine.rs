@@ -103,6 +103,12 @@ impl LayoutMetrics {
     }
 }
 
+impl Default for LayoutMetrics {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 //=====================
 // Main code
 //=====================
@@ -708,21 +714,20 @@ impl LayoutEngine {
                     // Collect child's line_spans if the outer display is Inline.
                     if node.style.display.outer == OuterDisplay::Inline
                         && child_node.style.display.outer == OuterDisplay::Inline
+                        && let LayoutBox::InlineBox(child_inline) = &child_node.layout_box
                     {
-                        if let LayoutBox::InlineBox(child_inline) = &child_node.layout_box {
-                            let x_offset = line_ctx_for_child.inline_pos.0;
+                        let x_offset = line_ctx_for_child.inline_pos.0;
 
-                            for child_span in &child_inline.line_spans {
-                                push_or_merge_line_span(
-                                    &mut line_span_buf,
-                                    LineSpan {
-                                        x_range: (child_span.x_range.start + x_offset)
-                                            ..(child_span.x_range.end + x_offset),
-                                        line_pos: child_span.line_pos,
-                                        line_index: child_span.line_index,
-                                    },
-                                );
-                            }
+                        for child_span in &child_inline.line_spans {
+                            push_or_merge_line_span(
+                                &mut line_span_buf,
+                                LineSpan {
+                                    x_range: (child_span.x_range.start + x_offset)
+                                        ..(child_span.x_range.end + x_offset),
+                                    line_pos: child_span.line_pos,
+                                    line_index: child_span.line_index,
+                                },
+                            );
                         }
                     }
 
@@ -820,10 +825,10 @@ impl LayoutEngine {
 
         // Apply min/max
         let final_width =
-            self.apply_size_constraints(width_before_constraints, &node.style.size, &ctx, true);
+            self.apply_size_constraints(width_before_constraints, &node.style.size, ctx, true);
 
         let final_height =
-            self.apply_size_constraints(height_before_constraints, &node.style.size, &ctx, false);
+            self.apply_size_constraints(height_before_constraints, &node.style.size, ctx, false);
 
         // Detect whether constraints changed size
         let relayout_needed = (Some(final_width) != content_width_opt
@@ -1969,13 +1974,14 @@ fn push_or_merge_line_span(spans: &mut Vec<LineSpan>, span: LineSpan) {
         return;
     }
 
-    if let Some(last) = spans.last_mut() {
-        if last.line_index == span.line_index && last.line_pos.1 == span.line_pos.1 {
-            last.x_range.end = last.x_range.end.max(span.x_range.end);
-            last.x_range.start = last.x_range.start.min(span.x_range.start);
-            last.line_pos.0 = last.line_pos.0.min(span.line_pos.0);
-            return;
-        }
+    if let Some(last) = spans.last_mut()
+        && last.line_index == span.line_index
+        && last.line_pos.1 == span.line_pos.1
+    {
+        last.x_range.end = last.x_range.end.max(span.x_range.end);
+        last.x_range.start = last.x_range.start.min(span.x_range.start);
+        last.line_pos.0 = last.line_pos.0.min(span.line_pos.0);
+        return;
     }
 
     spans.push(span);
