@@ -76,8 +76,12 @@ pub enum LayoutBox {
 struct InlineBoxEdges {
     left_border: f32,
     right_border: f32,
+    top_border: f32,
+    bottom_border: f32,
     left_padding: f32,
     right_padding: f32,
+    top_padding: f32,
+    bottom_padding: f32,
 }
 
 impl InlineBoxEdges {
@@ -85,8 +89,12 @@ impl InlineBoxEdges {
         Self {
             left_border: base.padding_box.x - base.border_box.x,
             right_border: base.border_box.right() - base.padding_box.right(),
+            top_border: base.padding_box.y - base.border_box.y,
+            bottom_border: base.border_box.bottom() - base.padding_box.bottom(),
             left_padding: base.content_box.x - base.padding_box.x,
             right_padding: base.padding_box.right() - base.content_box.right(),
+            top_padding: base.content_box.y - base.padding_box.y,
+            bottom_padding: base.padding_box.bottom() - base.content_box.bottom(),
         }
     }
 }
@@ -271,10 +279,6 @@ impl LayoutBox {
 fn line_box(base: &BoxModel, span: &LineSpan, len: usize, edges: InlineBoxEdges) -> BoxModel {
     let mut b = base.clone();
 
-    let dx = span.line_pos.0 - b.content_box.x;
-    let dy = span.line_pos.1 - b.content_box.y;
-    b.shift(dx, dy);
-
     let new_content_width = span.width();
     let keep_left = span.line_index == 0;
     let keep_right = span.line_index == len - 1;
@@ -284,12 +288,18 @@ fn line_box(base: &BoxModel, span: &LineSpan, len: usize, edges: InlineBoxEdges)
     let left_border = if keep_left { edges.left_border } else { 0.0 };
     let right_border = if keep_right { edges.right_border } else { 0.0 };
 
+    b.border_box.x = span.line_pos.0;
+    b.border_box.y = span.line_pos.1;
     b.content_box.width = new_content_width;
-    b.content_box.x = left_padding;
+    b.content_box.x = left_border + left_padding;
+    b.content_box.y = edges.top_border + edges.top_padding;
 
     b.padding_box.x = left_border;
+    b.padding_box.y = edges.top_border;
     b.padding_box.width = new_content_width + left_padding + right_padding;
+    b.padding_box.height = b.content_box.height + edges.top_padding + edges.bottom_padding;
     b.border_box.width = b.padding_box.width + left_border + right_border;
+    b.border_box.height = b.padding_box.height + edges.top_border + edges.bottom_border;
     b.children_box = b.content_box;
 
     b

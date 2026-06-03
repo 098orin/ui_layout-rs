@@ -47,7 +47,8 @@ fn borrowed_layout_box_iter_tracks_remaining_len() {
 
     let first = iter.next().unwrap();
     assert_eq!(first.content_box.width, 40.0);
-    assert_eq!(first.content_box.x, 4.0);
+    assert_eq!(first.border_box.x, 6.0);
+    assert_eq!(first.content_box.x, 6.0);
     assert_eq!(first.border_box.width, 46.0);
     assert_eq!(iter.len(), 2);
     assert_eq!(iter.size_hint(), (2, Some(2)));
@@ -74,16 +75,19 @@ fn owned_layout_box_into_iter_yields_line_boxes_lazily() {
     assert_eq!(iter.len(), 3);
 
     let first = iter.next().unwrap();
+    assert_eq!(first.border_box.y, 0.0);
     assert_eq!(first.content_box.y, 0.0);
     assert_eq!(first.content_box.width, 40.0);
 
     let second = iter.next().unwrap();
-    assert_eq!(second.content_box.y, 20.0);
+    assert_eq!(second.border_box.y, 20.0);
+    assert_eq!(second.content_box.y, 0.0);
     assert_eq!(second.content_box.width, 30.0);
     assert_eq!(second.border_box.width, 30.0);
 
     let third = iter.next().unwrap();
-    assert_eq!(third.content_box.y, 40.0);
+    assert_eq!(third.border_box.y, 40.0);
+    assert_eq!(third.content_box.y, 0.0);
     assert_eq!(third.content_box.width, 30.0);
     assert_eq!(third.border_box.width, 38.0);
 

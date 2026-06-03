@@ -75,9 +75,11 @@ fn inline_fragments_wrap_into_line_boxes_with_max_line_width() {
     let boxes: Vec<BoxModel> = child.layout_box.iter().collect();
     assert_eq!(boxes.len(), 2);
     assert_eq!(boxes[0].content_box.width, 60.0);
+    assert_eq!(boxes[0].border_box.y, 0.0);
     assert_eq!(boxes[0].content_box.y, 0.0);
     assert_eq!(boxes[1].content_box.width, 80.0);
-    assert_eq!(boxes[1].content_box.y, 20.0);
+    assert_eq!(boxes[1].border_box.y, 20.0);
+    assert_eq!(boxes[1].content_box.y, 0.0);
 }
 
 #[test]
@@ -102,10 +104,12 @@ fn inline_line_break_starts_a_new_line() {
     let boxes: Vec<BoxModel> = node(&root, 0).layout_box.iter().collect();
     assert_eq!(boxes.len(), 2);
     assert_eq!(boxes[0].content_box.width, 25.0);
+    assert_eq!(boxes[0].border_box.y, 0.0);
     assert_eq!(boxes[0].content_box.y, 0.0);
     assert_eq!(boxes[1].content_box.width, 35.0);
     assert_eq!(boxes[1].content_box.x, 0.0);
-    assert_eq!(boxes[1].content_box.y, 16.0);
+    assert_eq!(boxes[1].border_box.y, 16.0);
+    assert_eq!(boxes[1].content_box.y, 0.0);
 }
 
 #[test]
@@ -149,10 +153,12 @@ fn nested_inline_child_spans_are_merged_into_parent_lines() {
     assert_eq!(parent_boxes.len(), 2);
     assert_eq!(parent_boxes[0].content_box.width, 70.0);
     assert_eq!(parent_boxes[0].content_box.x, 0.0);
+    assert_eq!(parent_boxes[0].border_box.y, 0.0);
     assert_eq!(parent_boxes[0].content_box.y, 0.0);
     assert_eq!(parent_boxes[1].content_box.width, 70.0);
     assert_eq!(parent_boxes[1].content_box.x, 0.0);
-    assert_eq!(parent_boxes[1].content_box.y, 20.0);
+    assert_eq!(parent_boxes[1].border_box.y, 20.0);
+    assert_eq!(parent_boxes[1].content_box.y, 0.0);
 
     let nested_boxes: Vec<BoxModel> = node(node(&root, 0), 1).layout_box.iter().collect();
     assert_eq!(nested_boxes.len(), 2);
