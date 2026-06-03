@@ -654,18 +654,32 @@ impl LayoutEngine {
                         line_index,
                     };
 
-                    LineContext {
-                        end_pos: (cursor_x, cursor_y),
-                        inline_pos: (current_x, line_start_x),
-                        line_index,
-                    } = self.layout_node(
+                    let child_is_block = child_node.style.display.outer == OuterDisplay::Block;
+                    let layout_line_ctx = if child_is_block {
+                        EMPTY_LINE_CONTEXT
+                    } else {
+                        line_ctx_for_child
+                    };
+
+                    let updated_line_ctx = self.layout_node(
                         child_node,
                         &ctx_for_child,
-                        line_ctx_for_child,
+                        layout_line_ctx,
                         intrinsic_pass,
                     );
 
                     let (child_position_x, child_position_y) = line_ctx_for_child.end_pos;
+
+                    if child_is_block {
+                        cursor_x = 0.0;
+                        cursor_y = child_position_y + updated_line_ctx.end_pos.1;
+                    } else {
+                        LineContext {
+                            end_pos: (cursor_x, cursor_y),
+                            inline_pos: (current_x, line_start_x),
+                            line_index,
+                        } = updated_line_ctx;
+                    }
 
                     let EdgeOption {
                         left: ml_opt,
@@ -674,7 +688,7 @@ impl LayoutEngine {
                         bottom,
                     } = child_margin;
 
-                    let (ml, _mr) = if child_node.style.display.outer == OuterDisplay::Block {
+                    let (ml, _mr) = if child_is_block {
                         let child_width = child_node.layout_box.width();
                         match (ml_opt, mr_opt, content_width_opt) {
                             (None, None, Some(cw)) => {
@@ -697,7 +711,7 @@ impl LayoutEngine {
 
                     child_node.layout_box.shift(ml, 0.0);
 
-                    if child_node.style.display.outer == OuterDisplay::Block {
+                    if child_is_block {
                         child_node
                             .layout_box
                             .shift(0.0, previous_child_margin.max(top.unwrap_or_default()));
@@ -741,9 +755,26 @@ impl LayoutEngine {
                         }
                     }
 
-                    // Update children_width and children_height
-                    children_width = children_width.max(child_node.layout_box.width_box());
-                    children_height += child_node.layout_box.height_box();
+                    // Update children bounds after all shifts have been applied.
+                    let (child_right, child_bottom) = child_node
+                        .layout_box
+                        .iter()
+                        .map(|box_model| {
+                            (box_model.border_box.right(), box_model.border_box.bottom())
+                        })
+                        .fold((0.0_f32, 0.0_f32), |acc, extent| {
+                            (acc.0.max(extent.0), acc.1.max(extent.1))
+                        });
+
+                    children_width = children_width.max(child_right);
+                    children_height = children_height.max(
+                        child_bottom
+                            + if child_is_block {
+                                previous_child_margin
+                            } else {
+                                0.0
+                            },
+                    );
                 }
             }
         }
@@ -784,7 +815,7 @@ impl LayoutEngine {
 
             // Update cursor.
             cursor_x = 0.0;
-            cursor_y += content_height;
+            cursor_y = end_y + content_height;
         }
 
         LineContext {
