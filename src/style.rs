@@ -20,7 +20,7 @@ pub enum InnerDisplay {
     Flex,
 }
 
-// for future implmentation:
+// for future implementation:
 // https://drafts.csswg.org/css-display/#the-display-properties
 
 /// Full representation of the CSS `display` property,
@@ -349,7 +349,7 @@ impl LengthOrAuto {
         }
     }
 
-    pub fn lenth(self) -> Option<Length> {
+    pub fn length(self) -> Option<Length> {
         match self {
             LengthOrAuto::Length(l) => Some(l),
             LengthOrAuto::Auto => None,

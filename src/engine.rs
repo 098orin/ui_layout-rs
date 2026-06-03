@@ -336,7 +336,7 @@ pub(crate) const EMPTY_LINE_CONTEXT: LineContext = LineContext {
 };
 
 impl LayoutEngine {
-    // TODO: implemant parent_margin_end
+    // TODO: implement parent_margin_end
     /// Main layout entry point.
     /// Initiates layout computation from the root node with specified viewport dimensions.
     pub fn layout(root: &mut LayoutNode, width: f32, height: f32) {
@@ -1110,34 +1110,30 @@ impl LayoutEngine {
                     let min = states[i].main_min;
                     let max = states[i].main_max;
 
-                    let proposed_content = states[i].main_size + delta;
-                    let clamped_content = if let LayoutItem::Node(index) = item {
-                        let item_box_sizing =
-                            node.children[*index].node().unwrap().style.box_sizing;
-                        match item_box_sizing {
-                            BoxSizing::ContentBox => clamp(proposed_content, min, max),
-                            BoxSizing::BorderBox => {
-                                let padding_border_main = states[i].main_padding.0
-                                    + states[i].main_padding.1
-                                    + states[i].main_border.0
-                                    + states[i].main_border.1;
-                                let proposed_border = proposed_content + padding_border_main;
+                    let old_size = states[i].main_size;
 
-                                let clamped_border = clamp(proposed_border, min, max);
+                    let clamped_content = clamp_flex_main_size(
+                        old_size,
+                        delta,
+                        min,
+                        max,
+                        states[i].main_padding.0
+                            + states[i].main_padding.1
+                            + states[i].main_border.0
+                            + states[i].main_border.1,
+                        if let LayoutItem::Node(index) = item {
+                            Some(node.children[*index].node().unwrap().style.box_sizing)
+                        } else {
+                            None
+                        },
+                    );
 
-                                (clamped_border - padding_border_main).max(0.0)
-                            }
-                        }
-                    } else {
-                        proposed_content
-                    };
-
-                    let actual = clamped_content - states[i].main_size;
+                    let actual = clamped_content - old_size;
 
                     states[i].main_size = clamped_content;
                     used += actual;
 
-                    if proposed_content != clamped_content {
+                    if (old_size + delta - clamped_content).abs() > 0.001 {
                         states[i].frozen_grow = true;
                         total_grow -= grow;
                     }
@@ -1185,29 +1181,25 @@ impl LayoutEngine {
                     let min = states[i].main_min;
                     let max = states[i].main_max;
 
-                    let proposed_content = states[i].main_size + delta;
-                    let clamped_content = if let LayoutItem::Node(index) = item {
-                        let item_box_sizing =
-                            node.children[*index].node().unwrap().style.box_sizing;
-                        match item_box_sizing {
-                            BoxSizing::ContentBox => clamp(proposed_content, min, max),
-                            BoxSizing::BorderBox => {
-                                let padding_border_main = states[i].main_padding.0
-                                    + states[i].main_padding.1
-                                    + states[i].main_border.0
-                                    + states[i].main_border.1;
-                                let proposed_border = proposed_content + padding_border_main;
+                    let old_size = states[i].main_size;
 
-                                let clamped_border = clamp(proposed_border, min, max);
+                    let clamped_content = clamp_flex_main_size(
+                        old_size,
+                        delta,
+                        min,
+                        max,
+                        states[i].main_padding.0
+                            + states[i].main_padding.1
+                            + states[i].main_border.0
+                            + states[i].main_border.1,
+                        if let LayoutItem::Node(index) = item {
+                            Some(node.children[*index].node().unwrap().style.box_sizing)
+                        } else {
+                            None
+                        },
+                    );
 
-                                (clamped_border - padding_border_main).max(0.0)
-                            }
-                        }
-                    } else {
-                        proposed_content
-                    };
-
-                    let actual = clamped_content - states[i].main_size;
+                    let actual = clamped_content - old_size;
 
                     states[i].main_size = clamped_content;
                     used += actual;
@@ -1943,6 +1935,27 @@ fn resolve_content_size_with_box_sizing(
 fn clamp(value: f32, min: Option<f32>, max: Option<f32>) -> f32 {
     let v = min.map_or(value, |m| value.max(m));
     max.map_or(v, |m| v.min(m))
+}
+
+/// Clamps a flex item's content size, accounting for box-sizing.
+fn clamp_flex_main_size(
+    main_size: f32,
+    delta: f32,
+    min: Option<f32>,
+    max: Option<f32>,
+    padding_border_main: f32,
+    box_sizing: Option<BoxSizing>,
+) -> f32 {
+    let proposed_content = main_size + delta;
+    match box_sizing {
+        Some(BoxSizing::ContentBox) => clamp(proposed_content, min, max),
+        Some(BoxSizing::BorderBox) => {
+            let proposed_border = proposed_content + padding_border_main;
+            let clamped_border = clamp(proposed_border, min, max);
+            (clamped_border - padding_border_main).max(0.0)
+        }
+        None => proposed_content,
+    }
 }
 
 fn collect_layout_items(children: &[LayoutChild]) -> Vec<LayoutItem> {

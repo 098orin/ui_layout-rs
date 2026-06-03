@@ -31,7 +31,7 @@ pub struct BoxModel {
 pub struct InlineBox {
     /// The original (unsplit) box model.
     pub box_model: BoxModel,
-    /// Span infomation of this box on each line.
+    /// Span information of this box on each line.
     pub line_spans: Vec<LineSpan>,
 }
 
@@ -48,14 +48,6 @@ pub struct LineSpan {
 }
 
 impl LineSpan {
-    /*
-    /// Shift [`Self::line_pos`].
-    fn shift(&mut self, dx: f32, dy: f32) {
-        self.line_pos.0 += dx;
-        self.line_pos.1 += dy;
-    }
-    */
-
     pub fn width(&self) -> f32 {
         self.x_range.end - self.x_range.start
     }
@@ -191,7 +183,7 @@ impl LayoutBox {
     }
 
     /// Returns the maximum width among all boxes via [`LineSpan::width`] or[`BoxModel::width`].
-    /// For [`LayoutBox::InlineBox`], width is calclated via [`LineSpan::width`]
+    /// For [`LayoutBox::InlineBox`], width is calculated via [`LineSpan::width`]
     pub fn width_box(&self) -> f32 {
         match self {
             LayoutBox::None => 0.0,
