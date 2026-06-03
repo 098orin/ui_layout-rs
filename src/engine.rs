@@ -93,11 +93,6 @@ impl LayoutMetrics {
     }
 
     #[inline(always)]
-    pub fn cache_miss_count(&self) -> usize {
-        0
-    }
-
-    #[inline(always)]
     pub fn cache_miss_match_count(&self) -> usize {
         0
     }
@@ -132,10 +127,10 @@ pub struct EdgeOption {
 impl EdgeOption {
     fn unwrap_or_default(self) -> Edge {
         Edge {
+            left: self.left.unwrap_or_default(),
             top: self.top.unwrap_or_default(),
             right: self.right.unwrap_or_default(),
             bottom: self.bottom.unwrap_or_default(),
-            left: self.left.unwrap_or_default(),
         }
     }
 }
@@ -562,28 +557,7 @@ impl LayoutEngine {
         // -------------------------------
         // 1. Build LayoutItem stream
         // -------------------------------
-        let mut items: Vec<LayoutItem> = Vec::new();
-        let mut frag_start: Option<usize> = None;
-
-        for (i, child) in node.children.iter().enumerate() {
-            match child {
-                LayoutChild::Node(_) => {
-                    if let Some(start) = frag_start.take() {
-                        items.push(LayoutItem::Fragments(start..i));
-                    }
-                    items.push(LayoutItem::Node(i));
-                }
-                LayoutChild::Fragment(_) => {
-                    if frag_start.is_none() {
-                        frag_start = Some(i);
-                    }
-                }
-            }
-        }
-
-        if let Some(start) = frag_start.take() {
-            items.push(LayoutItem::Fragments(start..node.children.len()));
-        }
+        let items = collect_layout_items(&node.children);
 
         // -------------------------------
         // 2. Process LayoutItems
@@ -1434,11 +1408,7 @@ impl LayoutEngine {
         let (start_offset, gap_between) = if has_auto_margins {
             (0.0, 0.0)
         } else {
-            resolve_justify_content(
-                node.style.justify_content,
-                remaining_space.max(0.0),
-                items.len(),
-            )
+            resolve_justify_content(node.style.justify_content, remaining_space, items.len())
         };
 
         // Position each flex child
@@ -1886,7 +1856,6 @@ impl LayoutEngine {
     }
 
     fn resolve_margin(&self, spacing: &Spacing, ctx: &LayoutContext) -> EdgeOption {
-        let containing_width = ctx.containing_block_width.unwrap_or(self.viewport_width);
         let vw = self.viewport_width;
         let vh = self.viewport_height;
 
@@ -1896,13 +1865,13 @@ impl LayoutEngine {
                 .resolve_with(ctx.containing_block_width, vw, vh),
             top: spacing
                 .margin_top
-                .resolve_with(Some(containing_width), vw, vh),
+                .resolve_with(ctx.containing_block_width, vw, vh),
             right: spacing
                 .margin_right
                 .resolve_with(ctx.containing_block_width, vw, vh),
             bottom: spacing
                 .margin_bottom
-                .resolve_with(Some(containing_width), vw, vh),
+                .resolve_with(ctx.containing_block_width, vw, vh),
         }
     }
 }
@@ -1954,7 +1923,7 @@ fn clamp_flex_main_size(
             let clamped_border = clamp(proposed_border, min, max);
             (clamped_border - padding_border_main).max(0.0)
         }
-        None => proposed_content,
+        None => clamp(proposed_content, min, max),
     }
 }
 
