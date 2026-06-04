@@ -107,6 +107,34 @@ impl fmt::Display for BoxSizing {
     }
 }
 
+impl fmt::Display for Placement {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "({}, {}) @line {}", self.offset.0, self.offset.1, self.line_index)
+    }
+}
+
+impl fmt::Display for LayoutBox {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            LayoutBox::None => write!(f, "none"),
+            LayoutBox::BlockBox(b) => {
+                let w = self.width_box();
+                let h = self.height_box();
+                write!(f, "block({}x{} @{},{})", w, h, b.border_box.x, b.border_box.y)
+            }
+            LayoutBox::InlineBox(inline) => {
+                let w = self.width_box();
+                let h = self.height_box();
+                write!(
+                    f,
+                    "inline({}x{} @{},{})",
+                    w, h, inline.box_model.border_box.x, inline.box_model.border_box.y
+                )
+            }
+        }
+    }
+}
+
 // ============================================================
 //  Macros for collecting non-default style entries
 // ============================================================
@@ -267,6 +295,9 @@ impl fmt::Display for LayoutNode {
         if !entries.is_empty() {
             write!(f, " [{}]", entries.join(", "))?;
         }
+        if f.alternate() {
+            write!(f, " {}", self.layout_box)?;
+        }
         writeln!(f)?;
 
         let prefix = "";
@@ -294,6 +325,9 @@ fn write_node(
     let entries = collect_style_entries(&node.style);
     if !entries.is_empty() {
         write!(f, " [{}]", entries.join(", "))?;
+    }
+    if f.alternate() {
+        write!(f, " {}", node.layout_box)?;
     }
     writeln!(f)?;
 
@@ -331,6 +365,9 @@ fn write_fragment(
     match frag.node {
         ItemFragment::Fragment(c) => write!(f, "Fragment [{}x{}]", c.width, c.height)?,
         ItemFragment::LineBreak => write!(f, "LineBreak")?,
+    }
+    if f.alternate() {
+        write!(f, " {}", frag.placement)?;
     }
     writeln!(f)
 }
