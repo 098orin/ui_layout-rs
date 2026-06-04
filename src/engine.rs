@@ -535,6 +535,7 @@ impl LayoutEngine {
         let mut line_index = 0;
 
         let mut previous_child_margin = 0.0_f32;
+        let mut pending_line_advance = 0.0_f32;
         let (mut children_width, mut children_height) = (0.0_f32, 0.0_f32);
 
         let base_ctx_for_child = LayoutContext {
@@ -588,6 +589,8 @@ impl LayoutEngine {
                             .unwrap_or(self.viewport_width),
                     );
 
+                    let had_line_spans = !line_spans.is_empty();
+
                     let LineContext {
                         end_pos: (cx, cy),
                         inline_pos: (ix, ils),
@@ -605,9 +608,13 @@ impl LayoutEngine {
                     }
 
                     max_inline_line_height = max_inline_line_height.max(line_height);
+                    if had_line_spans {
+                        pending_line_advance = max_inline_line_height;
+                    }
                 }
 
                 LayoutItem::Node(i) => {
+                    let cursor_y_before = cursor_y;
                     let child_node = match &mut node.children[i] {
                         LayoutChild::Node(n) => n,
                         _ => unreachable!(),
@@ -643,6 +650,12 @@ impl LayoutEngine {
                     );
 
                     let (child_position_x, child_position_y) = line_ctx_for_child.end_pos;
+                    let (child_position_x, child_position_y) =
+                        if child_is_block && node.style.display.outer == OuterDisplay::Block {
+                            (0.0, child_position_y + pending_line_advance)
+                        } else {
+                            (child_position_x, child_position_y)
+                        };
 
                     if child_is_block {
                         cursor_x = 0.0;
@@ -748,6 +761,18 @@ impl LayoutEngine {
                         child_bottom.max(cursor_y)
                     };
                     children_height = children_height.max(inline_extent);
+
+                    // For inline children with line content, track pending line advance
+                    // for the next block sibling.  Reset when a block child is seen.
+                    if child_node.style.display.outer == OuterDisplay::Inline {
+                        if line_index > 0 || cursor_y == cursor_y_before {
+                            pending_line_advance = max_inline_line_height;
+                        } else {
+                            pending_line_advance = 0.0;
+                        }
+                    } else {
+                        pending_line_advance = 0.0;
+                    }
                 }
             }
         }

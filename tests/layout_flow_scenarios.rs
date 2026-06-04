@@ -704,3 +704,126 @@ fn block_with_inline_children_cursor_tracks_correctly() {
         root_box.content_box.height
     );
 }
+
+// ============================================================
+// Block child after inline child — overlapping Y position
+// ============================================================
+
+/// Block parent with inline child followed by block child.
+/// The block child should start after the inline's line box.
+#[test]
+fn block_with_inline_then_block_child_height() {
+    let inline = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline").unwrap(),
+            line_height: Length::Px(20.0),
+            ..Default::default()
+        },
+        [fragment(35.0, 10.0)],
+    );
+
+    let block_child = LayoutNode::new(Style {
+        display: Display::parse("block").unwrap(),
+        size: SizeStyle {
+            width: LengthOrAuto::Length(Length::Px(100.0)),
+            height: LengthOrAuto::Length(Length::Px(100.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Auto,
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        [inline, block_child],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    // Block parent height should be: line_height (20) + block_child height (100) = 120
+    let root_height = root.layout_box.height();
+    assert!(
+        (root_height - 120.0).abs() < 0.1,
+        "expected height 120, got {}",
+        root_height
+    );
+
+    // Block child's y should be at 20 (after the inline line)
+    let block_child = node(&root, 1);
+    let block_y = match &block_child.layout_box {
+        LayoutBox::BlockBox(b) => b.border_box.y,
+        _ => panic!("expected block box"),
+    };
+    assert!(
+        (block_y - 20.0).abs() < 0.1,
+        "block child y should be 20, got {}",
+        block_y
+    );
+}
+
+/// Block parent with multi-line inline followed by block child.
+#[test]
+fn block_with_multiline_inline_then_block_child() {
+    let inline = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline").unwrap(),
+            line_height: Length::Px(20.0),
+            ..Default::default()
+        },
+        [
+            fragment(60.0, 10.0),
+            fragment(50.0, 10.0),
+            fragment(30.0, 10.0),
+        ],
+    );
+
+    let block_child = LayoutNode::new(Style {
+        display: Display::parse("block").unwrap(),
+        size: SizeStyle {
+            width: LengthOrAuto::Length(Length::Px(100.0)),
+            height: LengthOrAuto::Length(Length::Px(100.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(100.0)),
+                height: LengthOrAuto::Auto,
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        [inline, block_child],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    // Inline wraps to 2 lines (60 then 50+30), total inline height = 40px
+    // Block child should start at y=40, total = 140
+    let root_height = root.layout_box.height();
+    assert!(
+        (root_height - 140.0).abs() < 0.1,
+        "expected height 140, got {}",
+        root_height
+    );
+
+    let block_child = node(&root, 1);
+    let block_y = match &block_child.layout_box {
+        LayoutBox::BlockBox(b) => b.border_box.y,
+        _ => panic!("expected block box"),
+    };
+    assert!(
+        (block_y - 40.0).abs() < 0.1,
+        "block child y should be 40, got {}",
+        block_y
+    );
+}
