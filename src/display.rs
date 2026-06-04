@@ -109,7 +109,11 @@ impl fmt::Display for BoxSizing {
 
 impl fmt::Display for Placement {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "({}, {}) @line {}", self.offset.0, self.offset.1, self.line_index)
+        write!(
+            f,
+            "({}, {}) @line {}",
+            self.offset.0, self.offset.1, self.line_index
+        )
     }
 }
 
@@ -120,7 +124,11 @@ impl fmt::Display for LayoutBox {
             LayoutBox::BlockBox(b) => {
                 let w = self.width_box();
                 let h = self.height_box();
-                write!(f, "block({}x{} @{},{})", w, h, b.border_box.x, b.border_box.y)
+                write!(
+                    f,
+                    "block({}x{} @{},{})",
+                    w, h, b.border_box.x, b.border_box.y
+                )
             }
             LayoutBox::InlineBox(inline) => {
                 let w = self.width_box();
