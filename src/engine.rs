@@ -821,12 +821,13 @@ impl LayoutEngine {
                 padding,
                 border,
             );
+            let block_height = box_model.border_box.height;
 
             node.layout_box = LayoutBox::BlockBox(box_model);
 
             // Update cursor.
             cursor_x = 0.0;
-            cursor_y = end_y + content_height;
+            cursor_y = end_y + block_height;
         }
 
         LineContext {

@@ -315,18 +315,9 @@ fn flex_justify_content_space_evenly() {
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
-    assert!(approx_eq(
-        block_box(node(&root, 0)).border_box.x,
-        37.5
-    ));
-    assert!(approx_eq(
-        block_box(node(&root, 1)).border_box.x,
-        125.0
-    ));
-    assert!(approx_eq(
-        block_box(node(&root, 2)).border_box.x,
-        222.5
-    ));
+    assert!(approx_eq(block_box(node(&root, 0)).border_box.x, 37.5));
+    assert!(approx_eq(block_box(node(&root, 1)).border_box.x, 125.0));
+    assert!(approx_eq(block_box(node(&root, 2)).border_box.x, 222.5));
 }
 
 // --- Column direction ---
@@ -860,10 +851,7 @@ fn flex_shrink_with_explicit_width() {
         block_box(node(&root, 0)).content_box.width,
         120.0
     ));
-    assert!(approx_eq(
-        block_box(node(&root, 1)).content_box.width,
-        90.0
-    ));
+    assert!(approx_eq(block_box(node(&root, 1)).content_box.width, 90.0));
 }
 
 #[test]

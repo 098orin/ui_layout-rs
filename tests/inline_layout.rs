@@ -492,8 +492,10 @@ fn block_flow_parent_uses_nested_inline_multiline_height() {
     let mut root = LayoutNode::with_children(Style::default(), [block_parent]);
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
-    let inline_boxes: Vec<BoxModel> =
-        node(&root.children[0].node().unwrap(), 0).layout_box.iter().collect();
+    let inline_boxes: Vec<BoxModel> = node(&root.children[0].node().unwrap(), 0)
+        .layout_box
+        .iter()
+        .collect();
     assert_eq!(inline_boxes.len(), 2);
     assert_eq!(inline_boxes[0].border_box.y, 0.0);
     assert_eq!(inline_boxes[1].border_box.y, 20.0);
@@ -608,7 +610,10 @@ fn none_and_block_iterators_report_len_and_end_correctly() {
 
     let mut iter = block.iter();
     assert_eq!(iter.len(), 1);
-    assert_eq!(iter.next_back().unwrap().content_box, rect(1.0, 2.0, 30.0, 40.0));
+    assert_eq!(
+        iter.next_back().unwrap().content_box,
+        rect(1.0, 2.0, 30.0, 40.0)
+    );
     assert_eq!(iter.len(), 0);
     assert!(iter.next().is_none());
 }
@@ -937,6 +942,17 @@ fn block_with_inline_children_cursor_tracks_correctly() {
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
     assert!((block_box(&root).content_box.height - 20.0).abs() < 0.1);
+    // Debug: check child positions
+    let c1 = node(&root, 0);
+    let c2 = node(&root, 1);
+    let c1_boxes: Vec<BoxModel> = c1.layout_box.iter().collect();
+    let c2_boxes: Vec<BoxModel> = c2.layout_box.iter().collect();
+    eprintln!("c1 boxes: {:?}", c1_boxes);
+    eprintln!("c2 boxes: {:?}", c2_boxes);
+    assert_eq!(c1_boxes.len(), 1);
+    assert_eq!(c2_boxes.len(), 1);
+    assert_eq!(c1_boxes[0].border_box.y, 0.0);
+    assert_eq!(c2_boxes[0].border_box.y, 0.0);
 }
 
 #[test]

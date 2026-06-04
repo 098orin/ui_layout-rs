@@ -485,3 +485,177 @@ fn three_block_siblings_margin_collapse_auto_height() {
     assert_eq!(block_box(node(&root, 1)).border_box.y, 40.0);
     assert_eq!(block_box(node(&root, 2)).border_box.y, 70.0);
 }
+
+#[test]
+fn block_children_y_positions_are_consecutive() {
+    let child1 = LayoutNode::new(Style {
+        size: SizeStyle {
+            height: LengthOrAuto::Length(Length::Px(30.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let child2 = LayoutNode::new(Style {
+        size: SizeStyle {
+            height: LengthOrAuto::Length(Length::Px(50.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let child3 = LayoutNode::new(Style {
+        size: SizeStyle {
+            height: LengthOrAuto::Length(Length::Px(20.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Auto,
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        [child1, child2, child3],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    let c1 = block_box(node(&root, 0));
+    let c2 = block_box(node(&root, 1));
+    let c3 = block_box(node(&root, 2));
+
+    // Each child's y should be the sum of all previous children's heights.
+    assert_eq!(c1.border_box.y, 0.0);
+    assert_eq!(c2.border_box.y, c1.border_box.height);
+    assert_eq!(c3.border_box.y, c1.border_box.height + c2.border_box.height);
+    assert!((block_box(&root).content_box.height - 100.0).abs() < 0.1);
+}
+
+#[test]
+fn three_block_children_with_margins_y_positions() {
+    let child1 = LayoutNode::new(Style {
+        size: SizeStyle {
+            height: LengthOrAuto::Length(Length::Px(20.0)),
+            ..Default::default()
+        },
+        spacing: Spacing {
+            margin_bottom: LengthOrAuto::Length(Length::Px(10.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let child2 = LayoutNode::new(Style {
+        size: SizeStyle {
+            height: LengthOrAuto::Length(Length::Px(30.0)),
+            ..Default::default()
+        },
+        spacing: Spacing {
+            margin_top: LengthOrAuto::Length(Length::Px(5.0)),
+            margin_bottom: LengthOrAuto::Length(Length::Px(15.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let child3 = LayoutNode::new(Style {
+        size: SizeStyle {
+            height: LengthOrAuto::Length(Length::Px(10.0)),
+            ..Default::default()
+        },
+        spacing: Spacing {
+            margin_top: LengthOrAuto::Length(Length::Px(8.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Auto,
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        [child1, child2, child3],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    // Collapsed margins:
+    // between 1-2: max(10, 5) = 10
+    // between 2-3: max(15, 8) = 15
+    // child1: y=0, h=20, mb=10
+    // child2: y=20+10=30, h=30, mb=15
+    // child3: y=30+30+15=75, h=10
+    // total: 20+10+30+15+10 = 85
+    assert_eq!(block_box(node(&root, 0)).border_box.y, 0.0);
+    assert_eq!(block_box(node(&root, 1)).border_box.y, 30.0);
+    assert_eq!(block_box(node(&root, 2)).border_box.y, 75.0);
+    assert!((block_box(&root).content_box.height - 85.0).abs() < 0.1);
+}
+
+#[test]
+fn block_child_with_padding_followed_by_block_child() {
+    let child1 = LayoutNode::new(Style {
+        size: SizeStyle {
+            width: LengthOrAuto::Auto,
+            height: LengthOrAuto::Length(Length::Px(30.0)),
+            ..Default::default()
+        },
+        spacing: Spacing {
+            padding_top: Length::Px(10.0),
+            padding_bottom: Length::Px(10.0),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let child2 = LayoutNode::new(Style {
+        size: SizeStyle {
+            width: LengthOrAuto::Auto,
+            height: LengthOrAuto::Length(Length::Px(50.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Auto,
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        [child1, child2],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    let root_box = block_box(&root);
+    let c1 = block_box(node(&root, 0));
+    let c2 = block_box(node(&root, 1));
+
+    // child1: padding_top=10, height=30, padding_bottom=10 → total border height = 50
+    // child2: height=50, no padding
+    // Total should be: child1 height(50) + child2 height(50) = 100
+    assert_eq!(c1.border_box.y, 0.0, "child1 y should be 0");
+    assert_eq!(
+        c2.border_box.y, 50.0,
+        "child2 y should be 50 (child1's full border height)"
+    );
+    assert!(
+        (root_box.content_box.height - 100.0).abs() < 0.1,
+        "root height should be 100"
+    );
+}
