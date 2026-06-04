@@ -315,19 +315,21 @@ pub(crate) struct LineContext {
     /// End position of current line: (x, y)
     pub end_pos: (f32, f32),
 
-    /// (parent_current_x, line_start_x)
-    ///
-    /// Zero for non-inline contexts.
-    pub inline_pos: (f32, f32),
+    /// Current x offset in the flat inline coordinate space.
+    pub current_x: f32,
 
     /// Current line index
     pub line_index: usize,
+
+    /// Whether the layout started with a newline (leading line break)
+    pub has_leading_newline: bool,
 }
 
 pub(crate) const EMPTY_LINE_CONTEXT: LineContext = LineContext {
     end_pos: (0.0, 0.0),
-    inline_pos: (0.0, 0.0),
+    current_x: 0.0,
     line_index: 0,
+    has_leading_newline: false,
 };
 
 impl LayoutEngine {
@@ -526,12 +528,10 @@ impl LayoutEngine {
 
         let LineContext {
             end_pos: (end_x, end_y),
-            inline_pos: (parent_current_x, mut line_start_x),
+            current_x: parent_current_x,
             line_index: parent_line_index,
+            has_leading_newline,
         } = line_ctx;
-
-        let mut has_wrapped = false;
-        let input_line_start_x = line_start_x;
 
         let (mut cursor_x, mut cursor_y) = (end_x, end_y);
         let mut current_x = 0.0;
@@ -579,8 +579,9 @@ impl LayoutEngine {
 
                     let line_ctx_for_child = LineContext {
                         end_pos: (cursor_x, cursor_y),
-                        inline_pos: (current_x, line_start_x),
+                        current_x,
                         line_index,
+                        has_leading_newline: false,
                     };
 
                     let (line_spans, updated_line_ctx) = Self::flow_fragments(
@@ -596,18 +597,15 @@ impl LayoutEngine {
 
                     let LineContext {
                         end_pos: (cx, cy),
-                        inline_pos: (ix, ils),
+                        current_x: ix,
                         line_index: li,
+                        ..
                     } = updated_line_ctx;
 
                     cursor_x = cx;
                     cursor_y = cy;
                     current_x = ix;
-                    line_start_x = ils;
                     line_index = li;
-                    if li > 0 {
-                        has_wrapped = true;
-                    }
 
                     for span in line_spans {
                         push_or_merge_line_span(&mut line_span_buf, span);
@@ -637,8 +635,9 @@ impl LayoutEngine {
 
                     let line_ctx_for_child = LineContext {
                         end_pos: (cursor_x, cursor_y),
-                        inline_pos: (current_x, line_start_x),
+                        current_x,
                         line_index,
+                        has_leading_newline: false,
                     };
 
                     let child_is_block = child_node.style.display.outer == OuterDisplay::Block;
@@ -669,12 +668,10 @@ impl LayoutEngine {
                     } else {
                         LineContext {
                             end_pos: (cursor_x, cursor_y),
-                            inline_pos: (current_x, line_start_x),
+                            current_x,
                             line_index,
+                            ..
                         } = updated_line_ctx;
-                        if line_index > 0 {
-                            has_wrapped = true;
-                        }
                     }
 
                     let EdgeOption {
@@ -729,7 +726,7 @@ impl LayoutEngine {
                         && child_node.style.display.outer == OuterDisplay::Inline
                         && let LayoutBox::InlineBox(child_inline) = &child_node.layout_box
                     {
-                        let x_offset = line_ctx_for_child.inline_pos.0;
+                        let x_offset = line_ctx_for_child.current_x;
 
                         for child_span in &child_inline.line_spans {
                             push_or_merge_line_span(
@@ -841,15 +838,9 @@ impl LayoutEngine {
 
         LineContext {
             end_pos: (cursor_x, cursor_y),
-            inline_pos: (
-                parent_current_x + current_x,
-                if has_wrapped {
-                    parent_current_x + line_start_x
-                } else {
-                    input_line_start_x
-                },
-            ),
+            current_x: parent_current_x + current_x,
             line_index: parent_line_index + line_index,
+            has_leading_newline,
         }
     }
 
@@ -969,11 +960,9 @@ impl LayoutEngine {
                 line_ctx.end_pos.0 + node.layout_box.width(),
                 line_ctx.end_pos.1,
             ),
-            inline_pos: (
-                line_ctx.inline_pos.0 + node.layout_box.width(),
-                line_ctx.inline_pos.1,
-            ),
+            current_x: line_ctx.current_x + node.layout_box.width(),
             line_index: line_ctx.line_index,
+            has_leading_newline: line_ctx.has_leading_newline,
         }
     }
 
@@ -1658,13 +1647,15 @@ impl LayoutEngine {
                     let line_ctx = match axis {
                         Axis::Horizontal => LineContext {
                             end_pos: (child_main_pos, child_cross_pos),
-                            inline_pos: (child_main_pos, child_main_pos),
+                            current_x: child_main_pos,
                             line_index: 0,
+                            has_leading_newline: false,
                         },
                         Axis::Vertical => LineContext {
                             end_pos: (child_cross_pos, child_main_pos),
-                            inline_pos: (child_cross_pos, child_cross_pos),
+                            current_x: child_cross_pos,
                             line_index: 0,
+                            has_leading_newline: false,
                         },
                     };
 
@@ -1696,19 +1687,24 @@ impl LayoutEngine {
         let mut cursor_x = line_ctx.end_pos.0;
         let mut cursor_y = line_ctx.end_pos.1;
 
-        let mut current_x = line_ctx.inline_pos.0;
-        let mut line_start_x = line_ctx.inline_pos.1;
-        let mut visual_line_start_x = cursor_x - (current_x - line_start_x);
+        let mut current_x = line_ctx.current_x;
+        let mut line_start_x = line_ctx.current_x;
+        let mut visual_line_start_x = cursor_x;
 
         let mut line_index = line_ctx.line_index;
 
-        let mut if_first_of_line = current_x == line_start_x;
+        let mut if_first_of_line = true;
 
         let mut line_span_buf = Vec::new();
+        let mut has_leading_newline = false;
 
         for fragment_node in fragments {
             match fragment_node.node {
                 ItemFragment::LineBreak => {
+                    if line_span_buf.is_empty() && if_first_of_line {
+                        has_leading_newline = true;
+                    }
+
                     push_or_merge_line_span(
                         &mut line_span_buf,
                         LineSpan {
@@ -1785,8 +1781,9 @@ impl LayoutEngine {
             line_span_buf,
             LineContext {
                 end_pos: (cursor_x, cursor_y),
-                inline_pos: (current_x, line_start_x),
+                current_x,
                 line_index,
+                has_leading_newline,
             },
         )
     }
@@ -2088,6 +2085,7 @@ fn push_or_merge_line_span(spans: &mut Vec<LineSpan>, span: LineSpan) {
     if let Some(last) = spans.last_mut()
         && last.line_index == span.line_index
         && last.line_pos.1 == span.line_pos.1
+        && last.x_range.end >= span.x_range.start
     {
         last.x_range.end = last.x_range.end.max(span.x_range.end);
         last.x_range.start = last.x_range.start.min(span.x_range.start);
