@@ -530,6 +530,9 @@ impl LayoutEngine {
             line_index: parent_line_index,
         } = line_ctx;
 
+        let mut has_wrapped = false;
+        let input_line_start_x = line_start_x;
+
         let (mut cursor_x, mut cursor_y) = (end_x, end_y);
         let mut current_x = 0.0;
         let mut line_index = 0;
@@ -602,6 +605,9 @@ impl LayoutEngine {
                     current_x = ix;
                     line_start_x = ils;
                     line_index = li;
+                    if li > 0 {
+                        has_wrapped = true;
+                    }
 
                     for span in line_spans {
                         push_or_merge_line_span(&mut line_span_buf, span);
@@ -666,6 +672,9 @@ impl LayoutEngine {
                             inline_pos: (current_x, line_start_x),
                             line_index,
                         } = updated_line_ctx;
+                        if line_index > 0 {
+                            has_wrapped = true;
+                        }
                     }
 
                     let EdgeOption {
@@ -728,8 +737,8 @@ impl LayoutEngine {
                                 LineSpan {
                                     x_range: (child_span.x_range.start + x_offset)
                                         ..(child_span.x_range.end + x_offset),
-                                    line_pos: child_span.line_pos,
-                                    line_index: child_span.line_index,
+                                    line_pos: (child_span.line_pos.0 + x_offset, child_span.line_pos.1),
+                                    line_index: child_span.line_index + line_ctx_for_child.line_index,
                                 },
                             );
                         }
@@ -834,7 +843,11 @@ impl LayoutEngine {
             end_pos: (cursor_x, cursor_y),
             inline_pos: (
                 parent_current_x + current_x,
-                parent_current_x + line_start_x,
+                if has_wrapped {
+                    parent_current_x + line_start_x
+                } else {
+                    input_line_start_x
+                },
             ),
             line_index: parent_line_index + line_index,
         }
