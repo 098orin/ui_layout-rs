@@ -240,7 +240,13 @@ impl LayoutBox {
         match self {
             LayoutBox::None => 0,
             LayoutBox::BlockBox(_) => 1,
-            LayoutBox::InlineBox(v) => v.line_spans.len(),
+            LayoutBox::InlineBox(v) => {
+                if v.line_spans.is_empty() {
+                    1
+                } else {
+                    v.line_spans.len()
+                }
+            }
         }
     }
 
@@ -262,7 +268,8 @@ fn inline_box_height(inline: &InlineBox) -> f32 {
     if let (Some(first), Some(last)) = (inline.line_spans.first(), inline.line_spans.last()) {
         last.line_pos.1 - first.line_pos.1 + inline.box_model.height()
     } else {
-        0.0
+        // Fall back to box_model height when there are no line spans.
+        inline.box_model.height()
     }
 }
 
@@ -308,12 +315,19 @@ impl<'a> IntoIterator for &'a LayoutBox {
             inner: match self {
                 LayoutBox::None => LayoutBoxIterInner::Empty,
                 LayoutBox::BlockBox(b) => LayoutBoxIterInner::Block(Some(b)),
-                LayoutBox::InlineBox(inline) => LayoutBoxIterInner::Inline {
-                    base: &inline.box_model,
-                    spans: inline.line_spans.iter(),
-                    len: inline.line_spans.len(),
-                    edges: InlineBoxEdges::new(&inline.box_model),
-                },
+                LayoutBox::InlineBox(inline) => {
+                    if inline.line_spans.is_empty() {
+                        // No line spans: yield base box model once.
+                        LayoutBoxIterInner::Block(Some(&inline.box_model))
+                    } else {
+                        LayoutBoxIterInner::Inline {
+                            base: &inline.box_model,
+                            spans: inline.line_spans.iter(),
+                            len: inline.line_spans.len(),
+                            edges: InlineBoxEdges::new(&inline.box_model),
+                        }
+                    }
+                }
             },
         }
     }
@@ -380,12 +394,17 @@ impl IntoIterator for LayoutBox {
                 LayoutBox::None => LayoutBoxIntoIterInner::Empty,
                 LayoutBox::BlockBox(b) => LayoutBoxIntoIterInner::Block(Some(b)),
                 LayoutBox::InlineBox(inline) => {
-                    let edges = InlineBoxEdges::new(&inline.box_model);
-                    LayoutBoxIntoIterInner::Inline {
-                        base: inline.box_model,
-                        len: inline.line_spans.len(),
-                        spans: inline.line_spans.into_iter(),
-                        edges,
+                    if inline.line_spans.is_empty() {
+                        // No line spans: yield base box model once.
+                        LayoutBoxIntoIterInner::Block(Some(inline.box_model))
+                    } else {
+                        let edges = InlineBoxEdges::new(&inline.box_model);
+                        LayoutBoxIntoIterInner::Inline {
+                            base: inline.box_model,
+                            len: inline.line_spans.len(),
+                            spans: inline.line_spans.into_iter(),
+                            edges,
+                        }
                     }
                 }
             },

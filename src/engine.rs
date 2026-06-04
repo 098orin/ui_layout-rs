@@ -741,14 +741,13 @@ impl LayoutEngine {
                         });
 
                     children_width = children_width.max(child_right);
-                    children_height = children_height.max(
-                        child_bottom
-                            + if child_is_block {
-                                previous_child_margin
-                            } else {
-                                0.0
-                            },
-                    );
+                    // `child_bottom` omits block children inside inline, so also check `cursor_y`.
+                    let inline_extent = if child_is_block {
+                        child_bottom + previous_child_margin
+                    } else {
+                        child_bottom.max(cursor_y)
+                    };
+                    children_height = children_height.max(inline_extent);
                 }
             }
         }
@@ -757,11 +756,24 @@ impl LayoutEngine {
         // 3. Inline final box creation
         // -------------------------------
         if node.style.display.outer == OuterDisplay::Inline {
+            // Use children bounds when inline has only block children (no line spans).
+            let has_only_blocks = line_span_buf.is_empty();
+            let content_w = if has_only_blocks {
+                children_width.max(current_x)
+            } else {
+                current_x
+            };
+            let content_h = if has_only_blocks {
+                children_height.max(max_inline_line_height)
+            } else {
+                max_inline_line_height
+            };
+
             let mut box_model = create_box_model(
-                current_x,
-                max_inline_line_height,
-                current_x,
-                max_inline_line_height,
+                content_w,
+                content_h,
+                children_width,
+                children_height,
                 padding,
                 border,
             );
@@ -1656,7 +1668,11 @@ impl LayoutEngine {
                 }
 
                 ItemFragment::Fragment(fragment_item) => {
-                    if cursor_x + fragment_item.width > outbox_width && !if_first_of_line {
+                    // Wrap if fragment doesn't fit and line isn't physically empty (cursor_x > 0
+                    // catches inline child mid-line after previous siblings).
+                    if cursor_x + fragment_item.width > outbox_width
+                        && (!if_first_of_line || cursor_x > 0.0)
+                    {
                         push_or_merge_line_span(
                             &mut line_span_buf,
                             LineSpan {
