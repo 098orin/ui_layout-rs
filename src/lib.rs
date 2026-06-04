@@ -79,6 +79,7 @@
 //! positioned across multiple lines.
 
 mod cache;
+mod display;
 mod engine;
 mod fragment;
 mod geometry;
