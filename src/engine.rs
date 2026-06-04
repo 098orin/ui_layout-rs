@@ -888,6 +888,14 @@ impl LayoutEngine {
             || Some(final_height) != content_height_opt)
             && !intrinsic_pass;
 
+        // Only relayout if children actually use percentage-based sizes
+        // that would resolve differently with the actual containing block.
+        let relayout_needed = relayout_needed
+            && node
+                .children
+                .iter()
+                .any(|c| c.node().is_some_and(|n| n.style.has_percentage_size()));
+
         if relayout_needed {
             // Update context
             let base_ctx_for_children = LayoutContext {
@@ -900,6 +908,23 @@ impl LayoutEngine {
 
             let (new_main, new_cross) =
                 self.layout_flex_children(node, axis, intrinsic_pass, &base_ctx_for_children);
+
+            // Re-key children's cache so the next layout's initial call hits.
+            // The relayout stores entries with hash(Some(final_w), ...), but the
+            // initial call on the next layout uses hash(content_width_opt, ...).
+            let initial_ctx = LayoutContext {
+                containing_block_width: content_width_opt,
+                containing_block_height: content_height_opt,
+                available_width: None,
+                parent_assigned_border_width: None,
+                parent_assigned_border_height: None,
+            };
+            let initial_key = crate::cache::make_layout_key(&initial_ctx, self);
+            for child in &mut node.children {
+                if let LayoutChild::Node(child_node) = child {
+                    child_node.layout_box_cache.0 = initial_key;
+                }
+            }
 
             (children_width, children_height) = match axis {
                 Axis::Horizontal => (new_main, new_cross),

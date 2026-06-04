@@ -450,6 +450,22 @@ pub enum AlignItems {
     Stretch,
 }
 
+trait PercentCheck {
+    fn is_pct(&self) -> bool;
+}
+
+impl PercentCheck for Length {
+    fn is_pct(&self) -> bool {
+        matches!(self, Length::Percent(_))
+    }
+}
+
+impl PercentCheck for LengthOrAuto {
+    fn is_pct(&self) -> bool {
+        matches!(self, LengthOrAuto::Length(Length::Percent(_)))
+    }
+}
+
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Style {
     pub display: Display,
@@ -467,6 +483,33 @@ pub struct Style {
     pub flex_direction: FlexDirection,
     pub column_gap: LengthOrAuto,
     pub row_gap: LengthOrAuto,
+}
+
+impl Style {
+    pub(crate) fn has_percentage_size(&self) -> bool {
+        self.size.width.is_pct()
+            || self.size.height.is_pct()
+            || self.size.min_width.is_pct()
+            || self.size.max_width.is_pct()
+            || self.size.min_height.is_pct()
+            || self.size.max_height.is_pct()
+            || self.spacing.margin_top.is_pct()
+            || self.spacing.margin_bottom.is_pct()
+            || self.spacing.margin_left.is_pct()
+            || self.spacing.margin_right.is_pct()
+            || self.spacing.padding_top.is_pct()
+            || self.spacing.padding_bottom.is_pct()
+            || self.spacing.padding_left.is_pct()
+            || self.spacing.padding_right.is_pct()
+            || self.spacing.border_top.is_pct()
+            || self.spacing.border_bottom.is_pct()
+            || self.spacing.border_left.is_pct()
+            || self.spacing.border_right.is_pct()
+            || self.item_style.flex_basis.is_pct()
+            || self.column_gap.is_pct()
+            || self.row_gap.is_pct()
+            || self.line_height.is_pct()
+    }
 }
 
 // =======================
