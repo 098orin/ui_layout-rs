@@ -331,15 +331,11 @@ pub(crate) struct LineContext {
 
     /// Current x offset in the flat inline coordinate space.
     pub current_x: f32,
-
-    /// Current line index
-    pub line_index: usize,
 }
 
 pub(crate) const EMPTY_LINE_CONTEXT: LineContext = LineContext {
     end_pos: (0.0, 0.0),
     current_x: 0.0,
-    line_index: 0,
 };
 
 impl LayoutEngine {
@@ -461,7 +457,6 @@ impl LayoutEngine {
 
             return LineContext {
                 end_pos: (0.0, line_ctx.end_pos.1 + content_height_opt.unwrap()),
-                line_index: line_ctx.line_index + 1,
                 ..line_ctx
             };
         }
@@ -539,7 +534,6 @@ impl LayoutEngine {
         let LineContext {
             end_pos: (end_x, end_y),
             current_x: parent_current_x,
-            line_index: parent_line_index,
         } = line_ctx;
 
         let (mut cursor_x, mut cursor_y) = (end_x, end_y);
@@ -589,12 +583,12 @@ impl LayoutEngine {
                     let line_ctx_for_child = LineContext {
                         end_pos: (cursor_x, cursor_y),
                         current_x,
-                        line_index,
                     };
 
                     let (line_spans, updated_line_ctx) = Self::flow_fragments(
                         &mut fragment_node_buffer,
                         line_ctx_for_child,
+                        line_index,
                         line_height,
                         content_width_opt
                             .or(ctx.available_width)
@@ -606,14 +600,13 @@ impl LayoutEngine {
                     let LineContext {
                         end_pos: (cx, cy),
                         current_x: ix,
-                        line_index: li,
                         ..
                     } = updated_line_ctx;
 
                     cursor_x = cx;
                     cursor_y = cy;
                     current_x = ix;
-                    line_index = li;
+                    line_index += line_spans.len();
 
                     for span in line_spans {
                         push_or_merge_line_span(&mut line_span_buf, span);
@@ -644,7 +637,6 @@ impl LayoutEngine {
                     let line_ctx_for_child = LineContext {
                         end_pos: (cursor_x, cursor_y),
                         current_x,
-                        line_index,
                     };
 
                     let child_is_block = child_node.style.display.outer == OuterDisplay::Block;
@@ -676,7 +668,6 @@ impl LayoutEngine {
                         LineContext {
                             end_pos: (cursor_x, cursor_y),
                             current_x,
-                            line_index,
                             ..
                         } = updated_line_ctx;
                     }
@@ -853,7 +844,6 @@ impl LayoutEngine {
         LineContext {
             end_pos: (cursor_x, cursor_y),
             current_x: parent_current_x + current_x,
-            line_index: parent_line_index + line_index,
         }
     }
 
@@ -974,7 +964,6 @@ impl LayoutEngine {
                 line_ctx.end_pos.1,
             ),
             current_x: line_ctx.current_x + node.layout_box.width_box(),
-            line_index: line_ctx.line_index,
         }
     }
 
@@ -1096,6 +1085,7 @@ impl LayoutEngine {
                         &mut node.children,
                         range.clone(),
                         EMPTY_LINE_CONTEXT,
+                        0,
                         line_height,
                         base_ctx_for_children.containing_block_width.unwrap_or(vw),
                     );
@@ -1348,6 +1338,7 @@ impl LayoutEngine {
                         &mut node.children,
                         range.clone(),
                         EMPTY_LINE_CONTEXT,
+                        0,
                         line_height,
                         base_ctx_for_children.containing_block_width.unwrap_or(vw),
                     );
@@ -1654,12 +1645,10 @@ impl LayoutEngine {
                         Axis::Horizontal => LineContext {
                             end_pos: (child_main_pos, child_cross_pos),
                             current_x: child_main_pos,
-                            line_index: 0,
                         },
                         Axis::Vertical => LineContext {
                             end_pos: (child_cross_pos, child_main_pos),
                             current_x: child_cross_pos,
-                            line_index: 0,
                         },
                     };
 
@@ -1672,6 +1661,7 @@ impl LayoutEngine {
                         &mut node.children,
                         range,
                         line_ctx,
+                        0,
                         line_height,
                         outbox_width,
                     );
@@ -1685,6 +1675,7 @@ impl LayoutEngine {
     fn flow_fragments(
         fragments: &mut Vec<&mut FragmentNode>,
         line_ctx: LineContext,
+        line_index: usize,
         line_height: f32,
         outbox_width: f32,
     ) -> (Vec<LineSpan>, LineContext) {
@@ -1695,7 +1686,7 @@ impl LayoutEngine {
         let mut line_start_x = line_ctx.current_x;
         let mut visual_line_start_x = cursor_x;
 
-        let mut line_index = line_ctx.line_index;
+        let mut line_index = line_index;
 
         let mut if_first_of_line = true;
 
@@ -1781,7 +1772,6 @@ impl LayoutEngine {
             LineContext {
                 end_pos: (cursor_x, cursor_y),
                 current_x,
-                line_index,
             },
         )
     }
@@ -2044,6 +2034,7 @@ fn flow_fragment_range(
     children: &mut [LayoutChild],
     range: std::ops::Range<usize>,
     line_ctx: LineContext,
+    line_index: usize,
     line_height: f32,
     outbox_width: f32,
 ) -> (f32, f32, LineContext) {
@@ -2055,6 +2046,7 @@ fn flow_fragment_range(
     let (line_spans, line_ctx) = LayoutEngine::flow_fragments(
         &mut fragment_node_buffer,
         line_ctx,
+        line_index,
         line_height,
         outbox_width,
     );
