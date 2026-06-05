@@ -1379,10 +1379,9 @@ impl LayoutEngine {
             .iter()
             .map(|item| match item {
                 LayoutItem::Node(index) => {
-                    match &node.children[*index].node().unwrap().layout_box {
-                        LayoutBox::BlockBox(box_model) => axis.rect_main(&box_model.border_box),
-                        _ => 0.0,
-                    }
+                    let child = node.children[*index].node().unwrap();
+                    let tuple = (child.layout_box.width_box(), child.layout_box.height_box());
+                    axis.tuple_main(tuple)
                 }
                 LayoutItem::Fragments(range) => match axis {
                     Axis::Horizontal => node.children[range.clone()]
@@ -1515,10 +1514,10 @@ impl LayoutEngine {
                     };
 
                     // Position child along cross axis (align-items / align-self)
-                    let child_cross_size = match &child_node.layout_box {
-                        LayoutBox::BlockBox(box_model) => axis.rect_cross(&box_model.border_box),
-                        _ => 0.0,
-                    };
+                    let child_cross_size = axis.tuple_cross((
+                        child_node.layout_box.width_box(),
+                        child_node.layout_box.height_box(),
+                    ));
                     let available_cross = axis.rect_cross(content_box);
 
                     // --- Cross-axis auto margin handling ---
@@ -1579,10 +1578,10 @@ impl LayoutEngine {
                     child_node.layout_box.shift(relative_x, relative_y);
 
                     // Move cursor forward for next child
-                    let child_main_size = match &child_node.layout_box {
-                        LayoutBox::BlockBox(box_model) => axis.rect_main(&box_model.border_box),
-                        _ => 0.0,
-                    };
+                    let child_main_size = axis.tuple_main((
+                        child_node.layout_box.width_box(),
+                        child_node.layout_box.height_box(),
+                    ));
 
                     cursor_main += child_main_size + margin_end + gap + gap_between;
                 }
