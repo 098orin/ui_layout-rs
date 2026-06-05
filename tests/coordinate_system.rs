@@ -50,11 +50,8 @@ fn test_child_coordinates_relative_to_parent_content_box() {
     let parent_box = block_box(&parent);
     let child_box = block_box(node(&parent, 0));
 
-    // content box origin = border + padding
-    assert_eq!(parent_box.content_box.x, 25.0); // border_left(5) + padding_left(20)
-    assert_eq!(parent_box.content_box.y, 18.0); // border_top(3) + padding_top(15)
-
-    // child border-box is relative to parent content-box origin
+    assert_eq!(parent_box.content_box.x, 25.0);
+    assert_eq!(parent_box.content_box.y, 18.0);
     assert_eq!(child_box.border_box.x, 0.0);
     assert_eq!(child_box.border_box.y, 0.0);
 }
@@ -119,16 +116,10 @@ fn test_nested_coordinate_system() {
 
     assert_eq!(root_box.content_box.x, 20.0);
     assert_eq!(root_box.content_box.y, 25.0);
-
-    // child is positioned at its margin relative to root's content box
     assert_eq!(child_box.border_box.x, 15.0);
     assert_eq!(child_box.border_box.y, 12.0);
-
-    // child's content box is relative to child's border box
-    assert_eq!(child_box.content_box.x, 15.0 + 10.0);
-    assert_eq!(child_box.content_box.y, 12.0 + 8.0);
-
-    // grandchild is positioned at its margin relative to child's content box
+    assert_eq!(child_box.content_box.x, 25.0);
+    assert_eq!(child_box.content_box.y, 20.0);
     assert_eq!(grandchild_box.border_box.x, 5.0);
     assert_eq!(grandchild_box.border_box.y, 3.0);
 }
@@ -184,14 +175,11 @@ fn test_flex_children_coordinates() {
     let child1_box = block_box(node(&flex_container, 0));
     let child2_box = block_box(node(&flex_container, 1));
 
-    // container content box is inset by padding
     assert_eq!(container_box.content_box.x, 15.0);
     assert_eq!(container_box.content_box.y, 10.0);
-
-    // children are positioned relative to container content box
     assert_eq!(child1_box.border_box.x, 0.0);
     assert_eq!(child1_box.border_box.y, 0.0);
-    assert_eq!(child2_box.border_box.x, 40.0 + 20.0);
+    assert_eq!(child2_box.border_box.x, 60.0);
     assert_eq!(child2_box.border_box.y, 0.0);
 }
 
@@ -250,9 +238,8 @@ fn test_block_children_coordinates_with_margins() {
     assert_eq!(parent_box.content_box.y, 20.0);
     assert_eq!(child1_box.border_box.x, 0.0);
     assert_eq!(child1_box.border_box.y, 0.0);
-    // margin-bottom(20) and margin-top(15) collapse to max(20, 15) = 20
     assert_eq!(child2_box.border_box.x, 0.0);
-    assert_eq!(child2_box.border_box.y, 40.0 + 20.0);
+    assert_eq!(child2_box.border_box.y, 60.0);
 }
 
 #[test]
@@ -299,7 +286,6 @@ fn test_coordinate_system_with_auto_margins() {
     assert_eq!(parent_box.content_box.y, 10.0);
     assert_eq!(parent_box.content_box.width, 200.0);
 
-    // auto margins center the child within parent's content width
     let expected_child_x = (200.0 - 60.0) / 2.0;
     assert_eq!(child_box.border_box.x, expected_child_x);
     assert_eq!(child_box.border_box.y, 0.0);
