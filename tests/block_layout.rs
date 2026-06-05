@@ -105,7 +105,7 @@ fn block_auto_height_from_children() {
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
     assert_eq!(block_box(node(&root, 0)).content_box.height, 40.0);
-    assert!((block_box(&root).content_box.height - 40.0).abs() < 0.1);
+    assert_eq!(block_box(&root).content_box.height, 40.0);
 }
 
 #[test]
@@ -280,7 +280,7 @@ fn three_siblings_with_margin_collapse() {
     assert_eq!(block_box(node(&root, 0)).border_box.y, 0.0);
     assert_eq!(block_box(node(&root, 1)).border_box.y, 30.0);
     assert_eq!(block_box(node(&root, 2)).border_box.y, 75.0);
-    assert!((block_box(&root).content_box.height - 85.0).abs() < 0.1);
+    assert_eq!(block_box(&root).content_box.height, 85.0);
 }
 
 #[test]
@@ -299,7 +299,7 @@ fn auto_height_with_multiple_children() {
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
-    assert!((block_box(&root).content_box.height - 100.0).abs() < 0.1);
+    assert_eq!(block_box(&root).content_box.height, 100.0);
     assert_eq!(block_box(node(&root, 0)).border_box.y, 0.0);
     assert_eq!(block_box(node(&root, 1)).border_box.y, 30.0);
     assert_eq!(block_box(node(&root, 2)).border_box.y, 80.0);
@@ -353,8 +353,8 @@ fn auto_height_with_padding_and_margins() {
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
     let root_box = block_box(&root);
-    assert!((root_box.content_box.height - 75.0).abs() < 0.1);
-    assert!((root_box.border_box.height - 91.0).abs() < 0.1);
+    assert_eq!(root_box.content_box.height, 75.0);
+    assert_eq!(root_box.border_box.height, 91.0);
     assert_eq!(root_box.content_box.y, 8.0);
 }
 
@@ -399,5 +399,5 @@ fn block_child_with_padding_followed_by_block_child() {
 
     assert_eq!(block_box(node(&root, 0)).border_box.y, 0.0);
     assert_eq!(block_box(node(&root, 1)).border_box.y, 50.0);
-    assert!((block_box(&root).content_box.height - 100.0).abs() < 0.1);
+    assert_eq!(block_box(&root).content_box.height, 100.0);
 }

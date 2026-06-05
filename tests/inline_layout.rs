@@ -112,15 +112,15 @@ fn inline_text_wraps_across_lines() {
     let mut root = LayoutNode::with_children(Style::default(), [block]);
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
-    assert!((block_box(node(&root, 0)).content_box.height - 60.0).abs() < 0.1);
+    assert_eq!(block_box(node(&root, 0)).content_box.height, 60.0);
 
     let inline_node = node(node(&root, 0), 0);
     let boxes: Vec<BoxModel> = inline_node.layout_box.iter().collect();
 
     assert_eq!(boxes.len(), 3);
-    assert!((boxes[0].content_box.width - 98.0).abs() < 0.1);
-    assert!((boxes[1].content_box.width - 77.0).abs() < 0.1);
-    assert!((boxes[2].content_box.width - 56.0).abs() < 0.1);
+    assert_eq!(boxes[0].content_box.width, 98.0);
+    assert_eq!(boxes[1].content_box.width, 77.0);
+    assert_eq!(boxes[2].content_box.width, 56.0);
     for (i, b) in boxes.iter().enumerate() {
         assert_eq!(b.border_box.y, i as f32 * 20.0);
     }
@@ -182,9 +182,9 @@ fn leading_linebreak_creates_empty_line_span() {
 
     let boxes: Vec<BoxModel> = node(&root, 0).layout_box.iter().collect();
     assert_eq!(boxes.len(), 2);
-    assert!((boxes[0].content_box.width - 0.0).abs() < 0.001);
+    assert_eq!(boxes[0].content_box.width, 0.0);
     assert_eq!(boxes[0].border_box.y, 0.0);
-    assert!((boxes[1].content_box.width - 40.0).abs() < 0.1);
+    assert_eq!(boxes[1].content_box.width, 40.0);
     assert_eq!(boxes[1].border_box.x, 0.0);
     assert_eq!(boxes[1].border_box.y, 16.0);
 }
@@ -240,7 +240,7 @@ fn nested_block_contains_inline_text() {
     match &inline_node.layout_box {
         LayoutBox::InlineBox(inline) => {
             assert_eq!(inline.line_spans.len(), 1);
-            assert!((inline.line_spans[0].width() - 35.0).abs() < 0.1);
+            assert_eq!(inline.line_spans[0].width(), 35.0);
         }
         _ => panic!("expected inline box"),
     }
@@ -297,7 +297,7 @@ fn inline_contains_block_contains_inline() {
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
-    assert!((block_box(&root).content_box.height - 20.0).abs() < 0.1);
+    assert_eq!(block_box(&root).content_box.height, 20.0);
 }
 
 // --- Multiple inline siblings ---
@@ -391,7 +391,7 @@ fn inline_sibling_wraps_to_next_line() {
     assert_eq!(c2.len(), 1);
     assert_eq!(c2[0].border_box.x, 0.0);
     assert_eq!(c2[0].border_box.y, 20.0);
-    assert!((block_box(&root).content_box.height - 40.0).abs() < 0.1);
+    assert_eq!(block_box(&root).content_box.height, 40.0);
 }
 
 // --- Single-line inline ---
@@ -544,7 +544,7 @@ fn inline_multi_line_height_reflected_in_block_parent() {
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
-    assert!((block_box(&root).content_box.height - 60.0).abs() < 0.1);
+    assert_eq!(block_box(&root).content_box.height, 60.0);
 
     let inline_boxes: Vec<BoxModel> = node(&root, 0).layout_box.iter().collect();
     assert_eq!(inline_boxes.len(), 3);
@@ -561,11 +561,7 @@ fn block_with_multiline_inline_then_block_child() {
             line_height: Length::Px(20.0),
             ..Default::default()
         },
-        [
-            fragment(60.0, 10.0),
-            fragment(50.0, 10.0),
-            fragment(30.0, 10.0),
-        ],
+        [fragment(60.0, 10.0), fragment(50.0, 10.0), fragment(30.0, 10.0)],
     );
 
     let block_child = LayoutNode::new(Style {
@@ -632,11 +628,11 @@ fn inline_with_block_child_height_reflected() {
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
-    assert!((block_box(&root).content_box.height - 40.0).abs() < 0.1);
+    assert_eq!(block_box(&root).content_box.height, 40.0);
 
     let inline_boxes: Vec<BoxModel> = node(&root, 0).layout_box.iter().collect();
     assert_eq!(inline_boxes.len(), 1);
-    assert!((inline_boxes[0].border_box.height - 40.0).abs() < 0.1);
+    assert_eq!(inline_boxes[0].border_box.height, 40.0);
 }
 
 #[test]
@@ -677,7 +673,7 @@ fn inline_with_fragment_then_block_child() {
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
-    assert!((block_box(&root).content_box.height - 30.0).abs() < 0.1);
+    assert_eq!(block_box(&root).content_box.height, 30.0);
 }
 
 // --- Merge scenarios ---
@@ -725,7 +721,7 @@ fn push_or_merge_merges_continuation_spans_from_child_inline() {
 
     let pboxes: Vec<BoxModel> = node(&root, 0).layout_box.iter().collect();
     assert_eq!(pboxes.len(), 1);
-    assert!((pboxes[0].content_box.width - 70.0).abs() < 0.1);
+    assert_eq!(pboxes[0].content_box.width, 70.0);
     assert_eq!(pboxes[0].border_box.y, 0.0);
 }
 
@@ -830,14 +826,14 @@ fn line_index_is_local_within_each_inline_box() {
     let nboxes: Vec<BoxModel> = node(node(&root, 0), 1).layout_box.iter().collect();
     assert_eq!(nboxes.len(), 2);
 
-    assert!((pboxes[0].content_box.width - 70.0).abs() < 0.1);
+    assert_eq!(pboxes[0].content_box.width, 70.0);
     assert_eq!(pboxes[0].border_box.y, 0.0);
-    assert!((pboxes[1].content_box.width - 50.0).abs() < 0.1);
+    assert_eq!(pboxes[1].content_box.width, 50.0);
     assert_eq!(pboxes[1].border_box.y, 20.0);
 
-    assert!((nboxes[0].content_box.width - 30.0).abs() < 0.1);
+    assert_eq!(nboxes[0].content_box.width, 30.0);
     assert_eq!(nboxes[0].border_box.y, 0.0);
-    assert!((nboxes[1].content_box.width - 50.0).abs() < 0.1);
+    assert_eq!(nboxes[1].content_box.width, 50.0);
     assert_eq!(nboxes[1].border_box.y, 20.0);
 }
 
