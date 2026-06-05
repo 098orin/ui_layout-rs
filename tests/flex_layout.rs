@@ -15,6 +15,13 @@ fn fragment(width: f32, height: f32) -> ItemFragment {
     ItemFragment::Fragment(Fragment { width, height })
 }
 
+fn inline_node_box(n: &LayoutNode) -> &BoxModel {
+    match &n.layout_box {
+        LayoutBox::InlineBox(inline) => &inline.box_model,
+        _ => panic!("expected inline box"),
+    }
+}
+
 fn approx_eq(a: f32, b: f32) -> bool {
     (a - b).abs() < 0.1
 }
@@ -675,4 +682,332 @@ fn flex_row_places_fragments_and_nodes() {
         (20.0, 0.0)
     );
     assert_eq!(block_box(node(&root, 2)).border_box.x, 50.0);
+}
+
+#[test]
+fn flex_row_with_only_fragments() {
+    let mut root = LayoutNode::with_children(
+        Style {
+            display: Display {
+                outer: OuterDisplay::Block,
+                inner: InnerDisplay::Flex,
+            },
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(300.0)),
+                height: LengthOrAuto::Length(Length::Px(50.0)),
+                ..Default::default()
+            },
+            line_height: Length::Px(20.0),
+            flex_direction: FlexDirection::Row,
+            ..Default::default()
+        },
+        [
+            LayoutChild::from(fragment(50.0, 10.0)),
+            LayoutChild::from(fragment(70.0, 10.0)),
+            LayoutChild::from(fragment(30.0, 10.0)),
+        ],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    assert_eq!(
+        root.children[0].fragment().unwrap().placement.offset,
+        (0.0, 0.0)
+    );
+    assert_eq!(
+        root.children[1].fragment().unwrap().placement.offset,
+        (50.0, 0.0)
+    );
+    assert_eq!(
+        root.children[2].fragment().unwrap().placement.offset,
+        (120.0, 0.0)
+    );
+}
+
+#[test]
+fn flex_column_with_only_fragments() {
+    let mut root = LayoutNode::with_children(
+        Style {
+            display: Display {
+                outer: OuterDisplay::Block,
+                inner: InnerDisplay::Flex,
+            },
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Length(Length::Px(200.0)),
+                ..Default::default()
+            },
+            line_height: Length::Px(20.0),
+            flex_direction: FlexDirection::Column,
+            ..Default::default()
+        },
+        [
+            LayoutChild::from(fragment(30.0, 40.0)),
+            LayoutChild::from(fragment(30.0, 60.0)),
+            LayoutChild::from(fragment(30.0, 30.0)),
+        ],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    // In a column, fragments within the single flex item flow left-to-right
+    // since fragments are placed by flow_fragment_range (always horizontal flow).
+    assert_eq!(
+        root.children[0].fragment().unwrap().placement.offset,
+        (0.0, 0.0)
+    );
+    assert_eq!(
+        root.children[1].fragment().unwrap().placement.offset,
+        (30.0, 0.0)
+    );
+    assert_eq!(
+        root.children[2].fragment().unwrap().placement.offset,
+        (60.0, 0.0)
+    );
+}
+
+#[test]
+fn flex_row_with_inline_children() {
+    let inline1 = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline").unwrap(),
+            line_height: Length::Px(20.0),
+            ..Default::default()
+        },
+        [fragment(40.0, 15.0)],
+    );
+
+    let inline2 = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline").unwrap(),
+            line_height: Length::Px(20.0),
+            ..Default::default()
+        },
+        [fragment(60.0, 15.0)],
+    );
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            display: Display {
+                outer: OuterDisplay::Block,
+                inner: InnerDisplay::Flex,
+            },
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(300.0)),
+                height: LengthOrAuto::Length(Length::Px(50.0)),
+                ..Default::default()
+            },
+            flex_direction: FlexDirection::Row,
+            ..Default::default()
+        },
+        [inline1, inline2],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    assert_eq!(inline_node_box(node(&root, 0)).border_box.x, 0.0);
+    assert_eq!(inline_node_box(node(&root, 1)).border_box.x, 40.0);
+}
+
+#[test]
+fn flex_column_with_inline_children() {
+    let inline1 = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline").unwrap(),
+            line_height: Length::Px(20.0),
+            ..Default::default()
+        },
+        [fragment(50.0, 30.0)],
+    );
+
+    let inline2 = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline").unwrap(),
+            line_height: Length::Px(20.0),
+            ..Default::default()
+        },
+        [fragment(50.0, 50.0)],
+    );
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            display: Display {
+                outer: OuterDisplay::Block,
+                inner: InnerDisplay::Flex,
+            },
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(100.0)),
+                height: LengthOrAuto::Length(Length::Px(200.0)),
+                ..Default::default()
+            },
+            flex_direction: FlexDirection::Column,
+            ..Default::default()
+        },
+        [inline1, inline2],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    assert_eq!(inline_node_box(node(&root, 0)).border_box.y, 0.0);
+    // Inline box height is determined by line_height (20px), not fragment height
+    assert_eq!(inline_node_box(node(&root, 1)).border_box.y, 20.0);
+}
+
+#[test]
+fn flex_row_with_fragments_and_inline_children() {
+    let inline_child = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline").unwrap(),
+            line_height: Length::Px(20.0),
+            ..Default::default()
+        },
+        [fragment(50.0, 15.0)],
+    );
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            display: Display {
+                outer: OuterDisplay::Block,
+                inner: InnerDisplay::Flex,
+            },
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(300.0)),
+                height: LengthOrAuto::Length(Length::Px(50.0)),
+                ..Default::default()
+            },
+            line_height: Length::Px(20.0),
+            flex_direction: FlexDirection::Row,
+            ..Default::default()
+        },
+        [
+            LayoutChild::from(fragment(30.0, 10.0)),
+            LayoutChild::from(inline_child),
+            LayoutChild::from(fragment(40.0, 10.0)),
+        ],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    assert_eq!(
+        root.children[0].fragment().unwrap().placement.offset,
+        (0.0, 0.0)
+    );
+    assert_eq!(inline_node_box(node(&root, 1)).border_box.x, 30.0);
+    assert_eq!(
+        root.children[2].fragment().unwrap().placement.offset,
+        (80.0, 0.0)
+    );
+}
+
+#[test]
+fn flex_gap_with_fragments() {
+    let middle_node = LayoutNode::new(Style {
+        size: SizeStyle {
+            width: LengthOrAuto::Length(Length::Px(10.0)),
+            height: LengthOrAuto::Length(Length::Px(20.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            display: Display {
+                outer: OuterDisplay::Block,
+                inner: InnerDisplay::Flex,
+            },
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(300.0)),
+                height: LengthOrAuto::Length(Length::Px(40.0)),
+                ..Default::default()
+            },
+            line_height: Length::Px(20.0),
+            flex_direction: FlexDirection::Row,
+            column_gap: LengthOrAuto::Length(Length::Px(15.0)),
+            ..Default::default()
+        },
+        [
+            LayoutChild::from(fragment(30.0, 10.0)),
+            LayoutChild::from(fragment(20.0, 10.0)),
+            LayoutChild::from(middle_node),
+            LayoutChild::from(fragment(40.0, 10.0)),
+        ],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    assert_eq!(
+        root.children[0].fragment().unwrap().placement.offset,
+        (0.0, 0.0)
+    );
+    assert_eq!(
+        root.children[1].fragment().unwrap().placement.offset,
+        (30.0, 0.0)
+    );
+    // Gap of 15 between the fragment group and node
+    assert_eq!(block_box(node(&root, 2)).border_box.x, 65.0);
+    // Gap of 15 between node and second fragment group
+    assert_eq!(
+        root.children[3].fragment().unwrap().placement.offset,
+        (90.0, 0.0)
+    );
+}
+
+#[test]
+fn flex_multiple_fragment_groups() {
+    let middle_node = LayoutNode::new(Style {
+        size: SizeStyle {
+            width: LengthOrAuto::Length(Length::Px(50.0)),
+            height: LengthOrAuto::Length(Length::Px(20.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            display: Display {
+                outer: OuterDisplay::Block,
+                inner: InnerDisplay::Flex,
+            },
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(300.0)),
+                height: LengthOrAuto::Length(Length::Px(40.0)),
+                ..Default::default()
+            },
+            line_height: Length::Px(20.0),
+            flex_direction: FlexDirection::Row,
+            ..Default::default()
+        },
+        [
+            LayoutChild::from(fragment(20.0, 10.0)),
+            LayoutChild::from(fragment(30.0, 10.0)),
+            LayoutChild::from(middle_node),
+            LayoutChild::from(fragment(40.0, 10.0)),
+            LayoutChild::from(fragment(10.0, 10.0)),
+        ],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    // First fragment group (2 fragments)
+    assert_eq!(
+        root.children[0].fragment().unwrap().placement.offset,
+        (0.0, 0.0)
+    );
+    assert_eq!(
+        root.children[1].fragment().unwrap().placement.offset,
+        (20.0, 0.0)
+    );
+    // Middle node
+    assert_eq!(block_box(node(&root, 2)).border_box.x, 50.0);
+    // Second fragment group (2 fragments)
+    assert_eq!(
+        root.children[3].fragment().unwrap().placement.offset,
+        (100.0, 0.0)
+    );
+    assert_eq!(
+        root.children[4].fragment().unwrap().placement.offset,
+        (140.0, 0.0)
+    );
 }
