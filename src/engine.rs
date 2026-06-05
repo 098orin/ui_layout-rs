@@ -254,6 +254,20 @@ impl Axis {
         }
     }
 
+    fn tuple_main(&self, (width, height): (f32, f32)) -> f32 {
+        match self {
+            Axis::Horizontal => width,
+            Axis::Vertical => height,
+        }
+    }
+
+    fn tuple_cross(&self, (width, height): (f32, f32)) -> f32 {
+        match self {
+            Axis::Horizontal => height,
+            Axis::Vertical => width,
+        }
+    }
+
     fn size_main<'a>(&self, size: &'a crate::SizeStyle) -> &'a LengthOrAuto {
         match self {
             Axis::Horizontal => &size.width,
@@ -1319,10 +1333,10 @@ impl LayoutEngine {
                     let _ =
                         self.layout_node(child, &ctx_for_child, EMPTY_LINE_CONTEXT, intrinsic_pass);
 
-                    if let LayoutBox::BlockBox(box_model) = &child.layout_box {
-                        total_border_main += axis.rect_main(&box_model.border_box);
-                        max_cross = max_cross.max(axis.rect_cross(&box_model.border_box));
-                    }
+                    let tuple = (child.layout_box.width_box(), child.layout_box.height_box());
+
+                    total_border_main += axis.tuple_main(tuple);
+                    max_cross = max_cross.max(axis.tuple_cross(tuple));
                 }
                 LayoutItem::Fragments(range) => {
                     let line_height = resolved_fragment_line_height(
@@ -1338,15 +1352,9 @@ impl LayoutEngine {
                         base_ctx_for_children.containing_block_width.unwrap_or(vw),
                     );
 
-                    total_border_main += match axis {
-                        Axis::Horizontal => fragment_width,
-                        Axis::Vertical => fragment_height,
-                    };
+                    total_border_main += axis.tuple_main((fragment_width, fragment_height));
 
-                    let cross = match axis {
-                        Axis::Horizontal => fragment_height,
-                        Axis::Vertical => fragment_width,
-                    };
+                    let cross = axis.tuple_cross((fragment_width, fragment_height));
 
                     max_cross = max_cross.max(cross);
                 }
