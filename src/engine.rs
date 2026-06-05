@@ -653,7 +653,7 @@ impl LayoutEngine {
                     );
 
                     let (child_position_x, child_position_y) =
-                        if child_is_block && node.style.display.outer == OuterDisplay::Block {
+                        if child_is_block {
                             (0.0, line_ctx_for_child.end_pos.1 + pending_line_advance)
                         } else {
                             line_ctx_for_child.end_pos
