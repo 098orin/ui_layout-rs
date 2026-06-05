@@ -4,12 +4,6 @@ fn fragment(width: f32, height: f32) -> ItemFragment {
     ItemFragment::Fragment(Fragment { width, height })
 }
 
-fn text_fragments(text: &str) -> Vec<ItemFragment> {
-    text.split_whitespace()
-        .map(|word| fragment((7 * word.len()) as f32, 12.0))
-        .collect()
-}
-
 fn node<'a>(n: &'a LayoutNode, idx: usize) -> &'a LayoutNode {
     n.children[idx].node().expect("expected node child")
 }
@@ -104,7 +98,14 @@ fn inline_text_wraps_across_lines() {
                 line_height: Length::Px(20.0),
                 ..Default::default()
             },
-            text_fragments("Rust is a systems programming language"),
+            [
+                fragment(28.0, 12.0),
+                fragment(14.0, 12.0),
+                fragment(7.0, 12.0),
+                fragment(49.0, 12.0),
+                fragment(77.0, 12.0),
+                fragment(56.0, 12.0),
+            ],
         )],
     );
 
@@ -227,7 +228,7 @@ fn nested_block_contains_inline_text() {
                     line_height: Length::Px(20.0),
                     ..Default::default()
                 },
-                text_fragments("Hello"),
+                [fragment(35.0, 12.0)],
             )],
         )],
     );
@@ -320,7 +321,7 @@ fn multiple_inline_siblings_in_block() {
                     line_height: Length::Px(20.0),
                     ..Default::default()
                 },
-                text_fragments("Hello"),
+                [fragment(35.0, 12.0)],
             ),
             LayoutNode::with_children(
                 Style {
@@ -328,7 +329,7 @@ fn multiple_inline_siblings_in_block() {
                     line_height: Length::Px(20.0),
                     ..Default::default()
                 },
-                text_fragments("World"),
+                [fragment(35.0, 12.0)],
             ),
         ],
     );
@@ -519,7 +520,14 @@ fn inline_multi_line_height_reflected_in_block_parent() {
             line_height: Length::Px(20.0),
             ..Default::default()
         },
-        text_fragments("Rust is a systems programming language"),
+        [
+            fragment(28.0, 12.0),
+            fragment(14.0, 12.0),
+            fragment(7.0, 12.0),
+            fragment(49.0, 12.0),
+            fragment(77.0, 12.0),
+            fragment(56.0, 12.0),
+        ],
     );
 
     let mut root = LayoutNode::with_children(
