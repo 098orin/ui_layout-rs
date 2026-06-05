@@ -320,16 +320,12 @@ pub(crate) struct LineContext {
 
     /// Current line index
     pub line_index: usize,
-
-    /// Whether the layout started with a newline (leading line break)
-    pub has_leading_newline: bool,
 }
 
 pub(crate) const EMPTY_LINE_CONTEXT: LineContext = LineContext {
     end_pos: (0.0, 0.0),
     current_x: 0.0,
     line_index: 0,
-    has_leading_newline: false,
 };
 
 impl LayoutEngine {
@@ -530,7 +526,6 @@ impl LayoutEngine {
             end_pos: (end_x, end_y),
             current_x: parent_current_x,
             line_index: parent_line_index,
-            has_leading_newline,
         } = line_ctx;
 
         let (mut cursor_x, mut cursor_y) = (end_x, end_y);
@@ -581,7 +576,6 @@ impl LayoutEngine {
                         end_pos: (cursor_x, cursor_y),
                         current_x,
                         line_index,
-                        has_leading_newline: false,
                     };
 
                     let (line_spans, updated_line_ctx) = Self::flow_fragments(
@@ -637,7 +631,6 @@ impl LayoutEngine {
                         end_pos: (cursor_x, cursor_y),
                         current_x,
                         line_index,
-                        has_leading_newline: false,
                     };
 
                     let child_is_block = child_node.style.display.outer == OuterDisplay::Block;
@@ -734,8 +727,11 @@ impl LayoutEngine {
                                 LineSpan {
                                     x_range: (child_span.x_range.start + x_offset)
                                         ..(child_span.x_range.end + x_offset),
-                                    line_pos: (child_span.line_pos.0 + x_offset, child_span.line_pos.1),
-                                    line_index: child_span.line_index + line_ctx_for_child.line_index,
+                                    line_pos: (
+                                        child_span.line_pos.0 + x_offset,
+                                        child_span.line_pos.1,
+                                    ),
+                                    line_index: child_span.line_index,
                                 },
                             );
                         }
@@ -811,6 +807,10 @@ impl LayoutEngine {
 
             box_model.shift(-(border.left + padding.left), -(border.top + padding.top));
 
+            for (i, span) in line_span_buf.iter_mut().enumerate() {
+                span.line_index = i;
+            }
+
             node.layout_box = LayoutBox::InlineBox(InlineBox {
                 box_model,
                 line_spans: line_span_buf,
@@ -840,7 +840,6 @@ impl LayoutEngine {
             end_pos: (cursor_x, cursor_y),
             current_x: parent_current_x + current_x,
             line_index: parent_line_index + line_index,
-            has_leading_newline,
         }
     }
 
@@ -962,7 +961,6 @@ impl LayoutEngine {
             ),
             current_x: line_ctx.current_x + node.layout_box.width(),
             line_index: line_ctx.line_index,
-            has_leading_newline: line_ctx.has_leading_newline,
         }
     }
 
@@ -1649,13 +1647,11 @@ impl LayoutEngine {
                             end_pos: (child_main_pos, child_cross_pos),
                             current_x: child_main_pos,
                             line_index: 0,
-                            has_leading_newline: false,
                         },
                         Axis::Vertical => LineContext {
                             end_pos: (child_cross_pos, child_main_pos),
                             current_x: child_cross_pos,
                             line_index: 0,
-                            has_leading_newline: false,
                         },
                     };
 
@@ -1696,23 +1692,21 @@ impl LayoutEngine {
         let mut if_first_of_line = true;
 
         let mut line_span_buf = Vec::new();
-        let mut has_leading_newline = false;
 
         for fragment_node in fragments {
             match fragment_node.node {
                 ItemFragment::LineBreak => {
-                    if line_span_buf.is_empty() && if_first_of_line {
-                        has_leading_newline = true;
-                    }
+                    let span = LineSpan {
+                        x_range: line_start_x..current_x,
+                        line_pos: (visual_line_start_x, cursor_y),
+                        line_index,
+                    };
 
-                    push_or_merge_line_span(
-                        &mut line_span_buf,
-                        LineSpan {
-                            x_range: line_start_x..current_x,
-                            line_pos: (visual_line_start_x, cursor_y),
-                            line_index,
-                        },
-                    );
+                    if line_span_buf.is_empty() {
+                        line_span_buf.push(span);
+                    } else {
+                        push_or_merge_line_span(&mut line_span_buf, span);
+                    }
 
                     fragment_node.placement = Placement {
                         offset: (cursor_x, cursor_y),
@@ -1733,19 +1727,16 @@ impl LayoutEngine {
                     if cursor_x + fragment_item.width > outbox_width
                         && (!if_first_of_line || cursor_x > 0.0)
                     {
-                        push_or_merge_line_span(
-                            &mut line_span_buf,
-                            LineSpan {
-                                x_range: line_start_x..current_x,
-                                line_pos: (visual_line_start_x, cursor_y),
-                                line_index,
-                            },
-                        );
-
-                        fragment_node.placement = Placement {
-                            offset: (cursor_x, cursor_y),
-                            line_index,
-                        };
+                        if line_start_x != current_x {
+                            push_or_merge_line_span(
+                                &mut line_span_buf,
+                                LineSpan {
+                                    x_range: line_start_x..current_x,
+                                    line_pos: (visual_line_start_x, cursor_y),
+                                    line_index,
+                                },
+                            );
+                        }
 
                         cursor_x = 0.0;
                         cursor_y += line_height;
@@ -1783,7 +1774,6 @@ impl LayoutEngine {
                 end_pos: (cursor_x, cursor_y),
                 current_x,
                 line_index,
-                has_leading_newline,
             },
         )
     }
@@ -2078,12 +2068,7 @@ fn flow_fragment_range(
 }
 
 fn push_or_merge_line_span(spans: &mut Vec<LineSpan>, span: LineSpan) {
-    if span.x_range.end <= span.x_range.start {
-        return;
-    }
-
     if let Some(last) = spans.last_mut()
-        && last.line_index == span.line_index
         && last.line_pos.1 == span.line_pos.1
         && last.x_range.end >= span.x_range.start
     {
