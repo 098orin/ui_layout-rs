@@ -7,10 +7,30 @@ fn display_default_node() {
 
     let mut node2 = LayoutNode::new(Style::default());
     node2.layout_box = LayoutBox::BlockBox(BoxModel {
-        border_box: Rect { x: 10.0, y: 20.0, width: 100.0, height: 50.0 },
-        padding_box: Rect { x: 12.0, y: 22.0, width: 96.0, height: 46.0 },
-        content_box: Rect { x: 14.0, y: 24.0, width: 92.0, height: 42.0 },
-        children_box: Rect { x: 14.0, y: 24.0, width: 92.0, height: 42.0 },
+        border_box: Rect {
+            x: 10.0,
+            y: 20.0,
+            width: 100.0,
+            height: 50.0,
+        },
+        padding_box: Rect {
+            x: 12.0,
+            y: 22.0,
+            width: 96.0,
+            height: 46.0,
+        },
+        content_box: Rect {
+            x: 14.0,
+            y: 24.0,
+            width: 92.0,
+            height: 42.0,
+        },
+        children_box: Rect {
+            x: 14.0,
+            y: 24.0,
+            width: 92.0,
+            height: 42.0,
+        },
     });
     assert_eq!(format!("{}", node2), "LayoutNode\n");
     assert_eq!(format!("{:#}", node2), "LayoutNode block(100x50 @10,20)\n");
@@ -121,10 +141,30 @@ fn display_alternate_with_style_and_box() {
     node.style.display = Display::parse("flex").unwrap();
     node.style.flex_direction = FlexDirection::Row;
     node.layout_box = LayoutBox::BlockBox(BoxModel {
-        border_box: Rect { x: 0.0, y: 0.0, width: 800.0, height: 600.0 },
-        padding_box: Rect { x: 0.0, y: 0.0, width: 800.0, height: 600.0 },
-        content_box: Rect { x: 0.0, y: 0.0, width: 800.0, height: 600.0 },
-        children_box: Rect { x: 0.0, y: 0.0, width: 800.0, height: 600.0 },
+        border_box: Rect {
+            x: 0.0,
+            y: 0.0,
+            width: 800.0,
+            height: 600.0,
+        },
+        padding_box: Rect {
+            x: 0.0,
+            y: 0.0,
+            width: 800.0,
+            height: 600.0,
+        },
+        content_box: Rect {
+            x: 0.0,
+            y: 0.0,
+            width: 800.0,
+            height: 600.0,
+        },
+        children_box: Rect {
+            x: 0.0,
+            y: 0.0,
+            width: 800.0,
+            height: 600.0,
+        },
     });
     let s = format!("{:#}", node);
     assert_eq!(
@@ -138,10 +178,30 @@ fn display_alternate_inline_box() {
     let mut node = LayoutNode::new(Style::default());
     node.layout_box = LayoutBox::InlineBox(InlineBox {
         box_model: BoxModel {
-            border_box: Rect { x: 5.0, y: 10.0, width: 200.0, height: 30.0 },
-            padding_box: Rect { x: 5.0, y: 10.0, width: 200.0, height: 30.0 },
-            content_box: Rect { x: 5.0, y: 10.0, width: 200.0, height: 30.0 },
-            children_box: Rect { x: 5.0, y: 10.0, width: 200.0, height: 30.0 },
+            border_box: Rect {
+                x: 5.0,
+                y: 10.0,
+                width: 200.0,
+                height: 30.0,
+            },
+            padding_box: Rect {
+                x: 5.0,
+                y: 10.0,
+                width: 200.0,
+                height: 30.0,
+            },
+            content_box: Rect {
+                x: 5.0,
+                y: 10.0,
+                width: 200.0,
+                height: 30.0,
+            },
+            children_box: Rect {
+                x: 5.0,
+                y: 10.0,
+                width: 200.0,
+                height: 30.0,
+            },
         },
         line_spans: vec![
             LineSpan {
