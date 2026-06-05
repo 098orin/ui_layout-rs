@@ -1033,6 +1033,8 @@ fn block_with_multiline_inline_then_block_child() {
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
+    println!("{:#}", root);
+
     assert_eq!(root.layout_box.height_box(), 140.0);
     assert_eq!(block_box(node(&root, 1)).border_box.y, 40.0);
 }
