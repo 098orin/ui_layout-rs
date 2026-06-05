@@ -675,7 +675,7 @@ impl LayoutEngine {
                     } = child_margin;
 
                     let (ml, _mr) = if child_is_block {
-                        let child_width = child_node.layout_box.width();
+                        let child_width = child_node.layout_box.width_box();
                         match (ml_opt, mr_opt, content_width_opt) {
                             (None, None, Some(cw)) => {
                                 let auto = (cw - child_width) / 2.0;
@@ -956,10 +956,10 @@ impl LayoutEngine {
 
         LineContext {
             end_pos: (
-                line_ctx.end_pos.0 + node.layout_box.width(),
+                line_ctx.end_pos.0 + node.layout_box.width_box(),
                 line_ctx.end_pos.1,
             ),
-            current_x: line_ctx.current_x + node.layout_box.width(),
+            current_x: line_ctx.current_x + node.layout_box.width_box(),
             line_index: line_ctx.line_index,
         }
     }

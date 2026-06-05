@@ -365,7 +365,7 @@ fn inline_fragments_wrap_into_line_boxes_with_max_line_width() {
 
     let child = node(&root, 0);
     assert_eq!(child.layout_box.width_box(), 80.0);
-    assert_eq!(child.layout_box.height(), 40.0);
+    assert_eq!(child.layout_box.height_box(), 40.0);
 
     let boxes: Vec<BoxModel> = child.layout_box.iter().collect();
     assert_eq!(boxes.len(), 2);
@@ -990,7 +990,7 @@ fn block_with_inline_then_block_child_height() {
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
-    assert!((root.layout_box.height() - 120.0).abs() < 0.1);
+    assert!((root.layout_box.height_box() - 120.0).abs() < 0.1);
     assert_eq!(block_box(node(&root, 1)).border_box.y, 20.0);
 }
 
@@ -1033,7 +1033,7 @@ fn block_with_multiline_inline_then_block_child() {
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
-    assert!((root.layout_box.height() - 140.0).abs() < 0.1);
+    assert!((root.layout_box.height_box() - 140.0).abs() < 0.1);
     assert_eq!(block_box(node(&root, 1)).border_box.y, 40.0);
 }
 
@@ -1152,10 +1152,7 @@ fn leading_linebreak_creates_empty_line_span() {
             line_height: Length::Px(16.0),
             ..Default::default()
         },
-        [
-            ItemFragment::LineBreak,
-            fragment(40.0, 10.0),
-        ],
+        [ItemFragment::LineBreak, fragment(40.0, 10.0)],
     );
 
     let mut root = LayoutNode::with_children(

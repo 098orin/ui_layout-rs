@@ -198,8 +198,9 @@ impl LayoutBox {
         }
     }
 
-    /// Returns the width of box.
+    /// Returns the width of a raw box.
     /// See [`BoxModel::width`].
+    #[deprecated]
     pub fn width(&self) -> f32 {
         match self {
             LayoutBox::None => 0.0,
@@ -219,13 +220,14 @@ impl LayoutBox {
         }
     }
 
-    /// Returns the total height.
+    /// Returns the height of a raw box.
     /// See [`BoxModel::height`].
+    #[deprecated]
     pub fn height(&self) -> f32 {
         match self {
             LayoutBox::None => 0.0,
             LayoutBox::BlockBox(b) => b.height(),
-            LayoutBox::InlineBox(l) => inline_box_height(l),
+            LayoutBox::InlineBox(l) => l.box_model.height(),
         }
     }
 
