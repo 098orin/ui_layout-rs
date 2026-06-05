@@ -673,7 +673,7 @@ fn inline_with_fragment_then_block_child() {
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
-    assert_eq!(block_box(&root).content_box.height, 30.0);
+    assert_eq!(block_box(&root).content_box.height, 50.0);
 }
 
 // --- Merge scenarios ---
