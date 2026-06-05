@@ -1113,6 +1113,14 @@ fn push_or_merge_does_not_merge_spans_on_different_lines() {
         },
         [fragment(50.0, 10.0)],
     );
+    let inline3 = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline").unwrap(),
+            line_height: Length::Px(20.0),
+            ..Default::default()
+        },
+        [fragment(40.0, 10.0)],
+    );
 
     let parent = LayoutNode::with_children(
         Style {
@@ -1120,7 +1128,7 @@ fn push_or_merge_does_not_merge_spans_on_different_lines() {
             line_height: Length::Px(20.0),
             ..Default::default()
         },
-        [LayoutChild::from(inline1), LayoutChild::from(inline2)],
+        [inline1, inline2, inline3],
     );
 
     let mut root = LayoutNode::with_children(
@@ -1137,11 +1145,11 @@ fn push_or_merge_does_not_merge_spans_on_different_lines() {
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
     let pboxes: Vec<BoxModel> = node(&root, 0).layout_box.iter().collect();
-    // inline1: 70px (fits), inline2: 50px (wraps) → 2 spans on different Y
+
     assert_eq!(pboxes.len(), 2);
-    assert!((pboxes[0].content_box.width - 70.0).abs() < 0.1);
+    assert_eq!(pboxes[0].content_box.width, 70.0);
     assert_eq!(pboxes[0].border_box.y, 0.0);
-    assert!((pboxes[1].content_box.width - 50.0).abs() < 0.1);
+    assert_eq!(pboxes[1].content_box.width, 90.0);
     assert_eq!(pboxes[1].border_box.y, 20.0);
 }
 
