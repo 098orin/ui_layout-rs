@@ -1036,3 +1036,207 @@ fn block_with_multiline_inline_then_block_child() {
     assert!((root.layout_box.height() - 140.0).abs() < 0.1);
     assert_eq!(block_box(node(&root, 1)).border_box.y, 40.0);
 }
+
+// --- Merge scenarios ---
+
+#[test]
+fn push_or_merge_merges_continuation_spans_from_child_inline() {
+    // Two inline siblings whose content fits on one line.
+    // The second sibling's first span is a continuation of
+    // the first sibling's last span on the same Y position.
+    let inline1 = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline").unwrap(),
+            line_height: Length::Px(20.0),
+            ..Default::default()
+        },
+        [fragment(30.0, 10.0)],
+    );
+    let inline2 = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline").unwrap(),
+            line_height: Length::Px(20.0),
+            ..Default::default()
+        },
+        [fragment(40.0, 10.0)],
+    );
+
+    let parent = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline").unwrap(),
+            line_height: Length::Px(20.0),
+            ..Default::default()
+        },
+        [LayoutChild::from(inline1), LayoutChild::from(inline2)],
+    );
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        [parent],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    let pboxes: Vec<BoxModel> = node(&root, 0).layout_box.iter().collect();
+    // Both siblings fit on one line → parent has 1 merged span.
+    assert_eq!(pboxes.len(), 1);
+    assert!((pboxes[0].content_box.width - 70.0).abs() < 0.1);
+    assert_eq!(pboxes[0].border_box.y, 0.0);
+}
+
+#[test]
+fn push_or_merge_does_not_merge_spans_on_different_lines() {
+    // Two inline siblings where the second wraps to a new line.
+    // The second sibling's span starts at a different Y,
+    // so it should NOT merge.
+    let inline1 = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline").unwrap(),
+            line_height: Length::Px(20.0),
+            ..Default::default()
+        },
+        [fragment(70.0, 10.0)],
+    );
+    let inline2 = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline").unwrap(),
+            line_height: Length::Px(20.0),
+            ..Default::default()
+        },
+        [fragment(50.0, 10.0)],
+    );
+
+    let parent = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline").unwrap(),
+            line_height: Length::Px(20.0),
+            ..Default::default()
+        },
+        [LayoutChild::from(inline1), LayoutChild::from(inline2)],
+    );
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(100.0)),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        [parent],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    let pboxes: Vec<BoxModel> = node(&root, 0).layout_box.iter().collect();
+    // inline1: 70px (fits), inline2: 50px (wraps) → 2 spans on different Y
+    assert_eq!(pboxes.len(), 2);
+    assert!((pboxes[0].content_box.width - 70.0).abs() < 0.1);
+    assert_eq!(pboxes[0].border_box.y, 0.0);
+    assert!((pboxes[1].content_box.width - 50.0).abs() < 0.1);
+    assert_eq!(pboxes[1].border_box.y, 20.0);
+}
+
+#[test]
+fn leading_linebreak_creates_empty_line_span() {
+    // Inline node that starts with a LineBreak → empty first line.
+    let child = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline").unwrap(),
+            line_height: Length::Px(16.0),
+            ..Default::default()
+        },
+        [
+            ItemFragment::LineBreak,
+            fragment(40.0, 10.0),
+        ],
+    );
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        [child],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    let boxes: Vec<BoxModel> = node(&root, 0).layout_box.iter().collect();
+    // Empty first line (y=0) + content on second line (y=16)
+    assert_eq!(boxes.len(), 2);
+    assert!((boxes[0].content_box.width - 0.0).abs() < 0.001);
+    assert_eq!(boxes[0].border_box.y, 0.0);
+    assert!((boxes[1].content_box.width - 40.0).abs() < 0.1);
+    assert_eq!(boxes[1].border_box.x, 0.0);
+    assert_eq!(boxes[1].border_box.y, 16.0);
+}
+
+#[test]
+fn line_index_is_local_within_each_inline_box() {
+    // Nested inline inside an inline parent.
+    // Each should have its own local line_index starting from 0.
+    let nested = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline").unwrap(),
+            line_height: Length::Px(20.0),
+            ..Default::default()
+        },
+        [fragment(30.0, 10.0), fragment(50.0, 10.0)],
+    );
+
+    let parent = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline").unwrap(),
+            line_height: Length::Px(20.0),
+            ..Default::default()
+        },
+        [
+            LayoutChild::from(fragment(40.0, 10.0)),
+            LayoutChild::from(nested),
+        ],
+    );
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(100.0)),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        [parent],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    // Parent: 40px (fits) + 30px (fits) = 70px on line 0, then 50px wraps to line 1
+    // → parent has 2 line spans
+    let pboxes: Vec<BoxModel> = node(&root, 0).layout_box.iter().collect();
+    assert_eq!(pboxes.len(), 2);
+    // Nested: 30px on line 0, 50px on line 1
+    // → nested has 2 line spans with local line_index 0, 1
+    let nboxes: Vec<BoxModel> = node(node(&root, 0), 1).layout_box.iter().collect();
+    assert_eq!(nboxes.len(), 2);
+    // Parent line 0 = 70px (40+30 merged), y=0
+    assert!((pboxes[0].content_box.width - 70.0).abs() < 0.1);
+    assert_eq!(pboxes[0].border_box.y, 0.0);
+    // Parent line 1 = 50px, y=20
+    assert!((pboxes[1].content_box.width - 50.0).abs() < 0.1);
+    assert_eq!(pboxes[1].border_box.y, 20.0);
+    // Nested line 0 = 30px, y=0
+    assert!((nboxes[0].content_box.width - 30.0).abs() < 0.1);
+    assert_eq!(nboxes[0].border_box.y, 0.0);
+    // Nested line 1 = 50px, y=20
+    assert!((nboxes[1].content_box.width - 50.0).abs() < 0.1);
+    assert_eq!(nboxes[1].border_box.y, 20.0);
+}
