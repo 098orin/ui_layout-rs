@@ -837,6 +837,66 @@ fn line_index_is_local_within_each_inline_box() {
     assert_eq!(nboxes[1].border_box.y, 20.0);
 }
 
+#[test]
+fn inline_with_mixed_fragments_and_inline_node_line_index() {
+    let inline_span = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline").unwrap(),
+            line_height: Length::Px(20.0),
+            ..Default::default()
+        },
+        [fragment(30.0, 15.0)],
+    );
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(800.0)),
+                height: LengthOrAuto::Auto,
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        [LayoutNode::with_children(
+            Style {
+                display: Display::parse("block").unwrap(),
+                size: SizeStyle {
+                    width: LengthOrAuto::Auto,
+                    height: LengthOrAuto::Auto,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            [
+                LayoutChild::from(fragment(50.0, 15.0)),
+                LayoutChild::from(fragment(30.0, 15.0)),
+                LayoutChild::from(inline_span),
+                LayoutChild::from(fragment(40.0, 15.0)),
+                LayoutChild::from(fragment(20.0, 15.0)),
+            ],
+        )],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    let block = node(&root, 0);
+    assert_eq!(block_box(block).content_box.height, 20.0);
+
+    let frag3 = block.children[3].fragment().unwrap();
+    let frag4 = block.children[4].fragment().unwrap();
+
+    assert_eq!(
+        frag3.placement.line_index, 0,
+        "fragment after inline node should be on line 0, not line 1"
+    );
+    assert_eq!(
+        frag4.placement.line_index, 0,
+        "second after-inline fragment should also be on line 0"
+    );
+    assert_eq!(frag3.placement.offset.1, 0.0);
+    assert_eq!(frag4.placement.offset.1, 0.0);
+}
+
 // --- LayoutBox iterator ---
 
 #[test]
