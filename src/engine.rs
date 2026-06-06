@@ -1374,14 +1374,18 @@ impl LayoutEngine {
 
         let items = collect_layout_items(&node.children);
 
-        // Calculate total size of all flex items along the main axis
+        // Calculate total size of all flex items along the main axis (including margins)
         let children_main_total: f32 = items
             .iter()
             .map(|item| match item {
                 LayoutItem::Node(index) => {
                     let child = node.children[*index].node().unwrap();
                     let tuple = (child.layout_box.width_box(), child.layout_box.height_box());
-                    axis.tuple_main(tuple)
+                    let margin = self
+                        .resolve_margin(&child.style.spacing, ctx)
+                        .unwrap_or_default();
+                    let margin_main = axis.edge_main(&margin);
+                    axis.tuple_main(tuple) + margin_main.0 + margin_main.1
                 }
                 LayoutItem::Fragments(range) => match axis {
                     Axis::Horizontal => node.children[range.clone()]
