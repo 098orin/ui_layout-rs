@@ -617,7 +617,7 @@ impl LayoutEngine {
                     cursor_x = cx;
                     cursor_y = cy;
                     current_x = ix;
-                    line_index += line_spans.len();
+                    line_index += line_spans.len() - 1;
 
                     for span in line_spans {
                         push_or_merge_line_span(&mut line_span_buf, span);
@@ -663,12 +663,11 @@ impl LayoutEngine {
                         intrinsic_pass,
                     );
 
-                    let (child_position_x, child_position_y) =
-                        if child_is_block {
-                            (0.0, line_ctx_for_child.end_pos.1 + pending_line_advance)
-                        } else {
-                            line_ctx_for_child.end_pos
-                        };
+                    let (child_position_x, child_position_y) = if child_is_block {
+                        (0.0, line_ctx_for_child.end_pos.1 + pending_line_advance)
+                    } else {
+                        line_ctx_for_child.end_pos
+                    };
 
                     if child_is_block {
                         cursor_x = 0.0;
