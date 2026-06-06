@@ -603,6 +603,17 @@ impl LayoutEngine {
                         ..
                     } = updated_line_ctx;
 
+                    if had_line_spans {
+                        let max_span_width = line_spans
+                            .iter()
+                            .map(|s| s.width())
+                            .filter(|w| !w.is_nan())
+                            .max_by(f32::total_cmp)
+                            .unwrap_or(0.0);
+                        children_width = children_width.max(max_span_width);
+                        children_height = children_height.max(cy + max_inline_line_height);
+                    }
+
                     cursor_x = cx;
                     cursor_y = cy;
                     current_x = ix;
