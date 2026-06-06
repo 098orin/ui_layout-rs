@@ -21,6 +21,10 @@ fn new_child(height: f32) -> LayoutNode {
     })
 }
 
+fn fragment(width: f32, height: f32) -> ItemFragment {
+    ItemFragment::Fragment(Fragment { width, height })
+}
+
 #[test]
 fn block_basic_box_model() {
     let mut root = LayoutNode::new(Style {
@@ -400,4 +404,52 @@ fn block_child_with_padding_followed_by_block_child() {
     assert_eq!(block_box(node(&root, 0)).border_box.y, 0.0);
     assert_eq!(block_box(node(&root, 1)).border_box.y, 50.0);
     assert_eq!(block_box(&root).content_box.height, 100.0);
+}
+
+#[test]
+fn block_auto_height_from_direct_fragments_single_line() {
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(800.0)),
+                height: LengthOrAuto::Auto,
+                ..Default::default()
+            },
+            line_height: Length::Px(38.4),
+            ..Default::default()
+        },
+        [fragment(79.578125, 38.4)],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    let b = block_box(&root);
+    assert_eq!(b.content_box.height, 38.4);
+    assert!(b.content_box.width >= 79.578125);
+}
+
+#[test]
+fn block_auto_height_from_direct_fragments_multi_line() {
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(100.0)),
+                height: LengthOrAuto::Auto,
+                ..Default::default()
+            },
+            line_height: Length::Px(20.0),
+            ..Default::default()
+        },
+        [
+            fragment(60.0, 10.0),
+            fragment(50.0, 10.0),
+            fragment(30.0, 10.0),
+        ],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    // 60px wraps, then 50+30 fit on second line = 2 lines * 20px
+    let b = block_box(&root);
+    assert_eq!(b.content_box.height, 40.0);
 }
