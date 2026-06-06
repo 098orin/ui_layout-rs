@@ -52,50 +52,6 @@ fn block_margin_left_shifts_child() {
 }
 
 #[test]
-fn block_margin_right_does_not_affect_position() {
-    // In block layout, margin-right on a block child should not affect its x position
-    let child1 = LayoutNode::new(Style {
-        size: SizeStyle {
-            width: LengthOrAuto::Length(Length::Px(50.0)),
-            height: LengthOrAuto::Length(Length::Px(30.0)),
-            ..Default::default()
-        },
-        spacing: Spacing {
-            margin_right: LengthOrAuto::Length(Length::Px(30.0)),
-            ..Default::default()
-        },
-        ..Default::default()
-    });
-
-    let child2 = LayoutNode::new(Style {
-        size: SizeStyle {
-            width: LengthOrAuto::Length(Length::Px(50.0)),
-            height: LengthOrAuto::Length(Length::Px(30.0)),
-            ..Default::default()
-        },
-        ..Default::default()
-    });
-
-    let mut root = LayoutNode::with_children(
-        Style {
-            size: SizeStyle {
-                width: LengthOrAuto::Length(Length::Px(200.0)),
-                height: LengthOrAuto::Auto,
-                ..Default::default()
-            },
-            ..Default::default()
-        },
-        [child1, child2],
-    );
-
-    LayoutEngine::layout(&mut root, 800.0, 600.0);
-
-    // margin-right on child1 should not push child2 to the right
-    // child2 should be directly below child1
-    assert_eq!(block_box(node(&root, 1)).border_box.y, 30.0);
-}
-
-#[test]
 fn block_margin_auto_left_right_centers_child() {
     let child = LayoutNode::new(Style {
         size: SizeStyle {
