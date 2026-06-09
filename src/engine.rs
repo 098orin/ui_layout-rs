@@ -1496,7 +1496,24 @@ impl LayoutEngine {
                     let basis = node.style.item_style.flex_basis.resolve_with(cbm, vw, vh);
 
                     let base_content_main = match basis {
-                        Some(v) => v,
+                        Some(v) => {
+                            if cbm.is_none() && node.style.item_style.flex_grow > 0.0 {
+                                let _ = self.layout_node(
+                                    node,
+                                    base_ctx_for_children,
+                                    EMPTY_LINE_CONTEXT,
+                                    true,
+                                );
+                                if let LayoutBox::BlockBox(ref box_model) = node.layout_box {
+                                    let content_main = axis.rect_main(&box_model.content_box);
+                                    v.max(content_main)
+                                } else {
+                                    v
+                                }
+                            } else {
+                                v
+                            }
+                        }
                         None => {
                             let explicit = axis
                                 .size_main(&node.style.size)
