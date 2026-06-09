@@ -49,7 +49,12 @@ pub fn flex_container(width: f32, height: f32, direction: FlexDirection) -> Styl
 }
 
 pub fn rect(x: f32, y: f32, width: f32, height: f32) -> Rect {
-    Rect { x, y, width, height }
+    Rect {
+        x,
+        y,
+        width,
+        height,
+    }
 }
 
 pub fn approx_eq(a: f32, b: f32) -> bool {
