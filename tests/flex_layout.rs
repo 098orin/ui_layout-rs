@@ -977,3 +977,127 @@ fn flex_multiple_fragment_groups() {
         (140.0, 0.0)
     );
 }
+
+// --- Nested flex stress ---
+
+fn block_flex() -> Display {
+    Display {
+        outer: OuterDisplay::Block,
+        inner: InnerDisplay::Flex,
+    }
+}
+
+fn panel(width_scale: f32, w: f32, h: f32) -> LayoutNode {
+    let width = if width_scale > 0.0 {
+        LengthOrAuto::Length(Length::Percent(width_scale * 100.0))
+    } else {
+        LengthOrAuto::Length(Length::Px(w))
+    };
+    LayoutNode::new(Style {
+        size: SizeStyle {
+            width,
+            height: LengthOrAuto::Length(Length::Px(h)),
+            ..Default::default()
+        },
+        ..Default::default()
+    })
+}
+
+fn branch(depth: usize, max_depth: usize) -> LayoutNode {
+    if depth == max_depth {
+        return panel(0.0, 40.0, 28.0 + depth as f32 * 4.0);
+    }
+    LayoutNode::with_children(
+        Style {
+            display: block_flex(),
+            flex_direction: if depth % 2 == 0 {
+                FlexDirection::Row
+            } else {
+                FlexDirection::Column
+            },
+            row_gap: Length::Px(6.0).into(),
+            column_gap: Length::Px(6.0).into(),
+            item_style: ItemStyle {
+                flex_grow: 1.0,
+                flex_basis: Length::Px(60.0).into(),
+                ..Default::default()
+            },
+            spacing: Spacing {
+                padding_top: Length::Px(6.0),
+                padding_bottom: Length::Px(6.0),
+                padding_left: Length::Px(6.0),
+                padding_right: Length::Px(6.0),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        vec![
+            branch(depth + 1, max_depth),
+            branch(depth + 1, max_depth),
+            panel(0.5, 50.0, 36.0),
+        ],
+    )
+}
+
+fn complex_nested_stress() -> LayoutNode {
+    branch(0, 4)
+}
+
+#[test]
+fn nested_stress_leaf_panels_have_full_size() {
+    let mut root = complex_nested_stress();
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    fn check_leaf_heights(node: &LayoutNode, depth: usize, max_depth: usize) {
+        if depth == max_depth {
+            let h = block_box(node).content_box.height;
+            assert!(
+                h >= 35.0,
+                "Leaf panel at depth {} has content height {}, expected >= 35.0",
+                depth,
+                h
+            );
+            return;
+        }
+        for child in &node.children {
+            if let LayoutChild::Node(n) = child {
+                check_leaf_heights(n, depth + 1, max_depth);
+            }
+        }
+    }
+
+    check_leaf_heights(&root, 0, 4);
+
+    let root_box = block_box(&root);
+    assert!(
+        root_box.content_box.height >= 350.0,
+        "Root Row content height should be large enough for nested content, got {}",
+        root_box.content_box.height
+    );
+
+    for i in 0..3 {
+        let d1 = node(&root, i);
+        if d1.children.len() >= 2 {
+            let d2_0 = node(d1, 0);
+            let h0 = block_box(d2_0).content_box.height;
+            assert!(
+                h0 >= 100.0,
+                "depth-2 child[{}] should have content height >= 100, got {}",
+                i,
+                h0
+            );
+        }
+    }
+}
+
+#[test]
+fn nested_stress_alternating_directions() {
+    let mut root = complex_nested_stress();
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    assert!(block_box(&root).content_box.width > 0.0);
+    assert!(block_box(&root).content_box.height > 0.0);
+
+    assert_eq!(block_box(&root).border_box.x, 0.0);
+    assert_eq!(block_box(&root).border_box.y, 0.0);
+}
