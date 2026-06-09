@@ -563,254 +563,288 @@ impl LayoutEngine {
         let mut line_span_buf = Vec::new();
         let mut max_inline_line_height = line_height;
 
-        // -------------------------------
-        // 1. Build LayoutItem stream
-        // -------------------------------
+        let outbox_width = content_width_opt
+            .or(ctx.available_width)
+            .unwrap_or(self.viewport_width);
+
         let items = collect_layout_items(&node.children);
 
-        // -------------------------------
-        // 2. Process LayoutItems
-        // -------------------------------
         for item in items {
             match item {
-                LayoutItem::Fragments(range) => {
-                    let mut fragment_node_buffer = node.children[range.clone()]
-                        .iter_mut()
-                        .filter_map(|c| match c {
-                            LayoutChild::Fragment(f) => Some(f),
-                            _ => None,
-                        })
-                        .collect();
-
-                    let line_ctx_for_child = LineContext {
-                        end_pos: (cursor_x, cursor_y),
-                        current_x,
-                    };
-
-                    let (line_spans, updated_line_ctx) = Self::flow_fragments(
-                        &mut fragment_node_buffer,
-                        line_ctx_for_child,
-                        line_index,
-                        line_height,
-                        content_width_opt
-                            .or(ctx.available_width)
-                            .unwrap_or(self.viewport_width),
-                    );
-
-                    let had_line_spans = !line_spans.is_empty();
-
-                    let LineContext {
-                        end_pos: (cx, cy),
-                        current_x: ix,
-                        ..
-                    } = updated_line_ctx;
-
-                    if had_line_spans {
-                        let max_span_width = line_spans
-                            .iter()
-                            .map(|s| s.width())
-                            .filter(|w| !w.is_nan())
-                            .max_by(f32::total_cmp)
-                            .unwrap_or(0.0);
-                        children_width = children_width.max(max_span_width);
-                        children_height = children_height.max(cy + max_inline_line_height);
-                    }
-
-                    cursor_x = cx;
-                    cursor_y = cy;
-                    current_x = ix;
-                    line_index += line_spans.len() - 1;
-
-                    for span in line_spans {
-                        push_or_merge_line_span(&mut line_span_buf, span);
-                    }
-
-                    max_inline_line_height = max_inline_line_height.max(line_height);
-                    if had_line_spans {
-                        pending_line_advance = max_inline_line_height;
-                    }
-                }
-
-                LayoutItem::Node(i) => {
-                    let child_node = match &mut node.children[i] {
-                        LayoutChild::Node(n) => n,
-                        _ => unreachable!(),
-                    };
-
-                    let child_margin = self.resolve_margin(&child_node.style.spacing, ctx);
-
-                    let ctx_for_child = LayoutContext {
-                        available_width: content_width_opt.or(ctx.available_width).map(|v| {
-                            v - child_margin.left.unwrap_or(0.0) - child_margin.right.unwrap_or(0.0)
-                        }),
-                        ..base_ctx_for_child
-                    };
-
-                    let line_ctx_for_child = LineContext {
-                        end_pos: (cursor_x, cursor_y),
-                        current_x,
-                    };
-
-                    let child_is_block = child_node.style.display.outer == OuterDisplay::Block;
-                    let layout_line_ctx = if child_is_block {
-                        EMPTY_LINE_CONTEXT
-                    } else {
-                        line_ctx_for_child
-                    };
-
-                    let updated_line_ctx = self.layout_node(
-                        child_node,
-                        &ctx_for_child,
-                        layout_line_ctx,
-                        intrinsic_pass,
-                    );
-
-                    let (child_position_x, child_position_y) = if child_is_block {
-                        (0.0, line_ctx_for_child.end_pos.1 + pending_line_advance)
-                    } else {
-                        line_ctx_for_child.end_pos
-                    };
-
-                    if child_is_block {
-                        cursor_x = 0.0;
-                        cursor_y = child_position_y + updated_line_ctx.end_pos.1;
-                    } else {
-                        LineContext {
-                            end_pos: (cursor_x, cursor_y),
-                            current_x,
-                            ..
-                        } = updated_line_ctx;
-                    }
-
-                    let EdgeOption {
-                        left: ml_opt,
-                        top,
-                        right: mr_opt,
-                        bottom,
-                    } = child_margin;
-
-                    let (ml, _mr) = if child_is_block {
-                        let child_width = child_node.layout_box.width_box();
-                        match (ml_opt, mr_opt, content_width_opt) {
-                            (None, None, Some(cw)) => {
-                                let auto = (cw - child_width) / 2.0;
-                                (auto, auto)
-                            }
-                            (None, Some(mr), Some(cw)) => {
-                                let auto = cw - child_width - mr;
-                                (auto, mr)
-                            }
-                            (Some(ml), None, Some(cw)) => {
-                                let auto = cw - child_width - ml;
-                                (ml, auto)
-                            }
-                            _ => (ml_opt.unwrap_or(0.0), mr_opt.unwrap_or(0.0)),
-                        }
-                    } else {
-                        (ml_opt.unwrap_or(0.0), mr_opt.unwrap_or(0.0))
-                    };
-
-                    child_node.layout_box.shift(ml, 0.0);
-
-                    if child_is_block {
-                        child_node
-                            .layout_box
-                            .shift(0.0, previous_child_margin.max(top.unwrap_or_default()));
-                        cursor_y += previous_child_margin.max(top.unwrap_or_default());
-                        previous_child_margin = bottom.unwrap_or_default();
-                    }
-
-                    // Process shift
-                    if child_node.style.display.outer == OuterDisplay::Inline {
-                        child_node.layout_box.shift(child_position_x, 0.0);
-                    } else {
-                        child_node
-                            .layout_box
-                            .shift(child_position_x, child_position_y);
-                    }
-
-                    // Collect child's line_spans if the outer display is Inline.
-                    if node.style.display.outer == OuterDisplay::Inline
-                        && child_node.style.display.outer == OuterDisplay::Inline
-                        && let LayoutBox::InlineBox(child_inline) = &child_node.layout_box
-                    {
-                        let x_offset = line_ctx_for_child.current_x;
-
-                        for child_span in &child_inline.line_spans {
-                            push_or_merge_line_span(
-                                &mut line_span_buf,
-                                LineSpan {
-                                    x_range: (child_span.x_range.start + x_offset)
-                                        ..(child_span.x_range.end + x_offset),
-                                    line_pos: (
-                                        child_span.line_pos.0 + x_offset,
-                                        child_span.line_pos.1,
-                                    ),
-                                    line_index: child_span.line_index,
-                                },
-                            );
-                        }
-                    }
-
-                    if child_node.style.display.outer == OuterDisplay::Inline {
-                        for line_box in child_node.layout_box.iter() {
-                            max_inline_line_height =
-                                max_inline_line_height.max(line_box.border_box.height);
-                        }
-                    }
-
-                    // Update children bounds after all shifts have been applied.
-                    let (child_right, child_bottom) = child_node
-                        .layout_box
-                        .iter()
-                        .map(|box_model| {
-                            (box_model.border_box.right(), box_model.border_box.bottom())
-                        })
-                        .fold((0.0_f32, 0.0_f32), |acc, extent| {
-                            (acc.0.max(extent.0), acc.1.max(extent.1))
-                        });
-
-                    children_width = children_width.max(child_right);
-                    // `child_bottom` omits block children inside inline, so also check `cursor_y`.
-                    let inline_extent = if child_is_block {
-                        child_bottom + previous_child_margin
-                    } else if cursor_y > child_bottom {
-                        // When `cursor_y > child_bottom`, block children or mixed content pushed
-                        // the cursor past the last line box, use cursor_y directly.
-                        cursor_y
-                    } else if cursor_y == child_bottom {
-                        // When `cursor_y == child_bottom` on an inline child that has line spans,
-                        // the cursor advanced due to a trailing LineBreak — add one line height.
-                        let has_line_spans = match &child_node.layout_box {
-                            LayoutBox::InlineBox(b) => !b.line_spans.is_empty(),
-                            _ => false,
-                        };
-                        if has_line_spans {
-                            cursor_y + max_inline_line_height
-                        } else {
-                            child_bottom
-                        }
-                    } else {
-                        child_bottom
-                    };
-                    children_height = children_height.max(inline_extent);
-
-                    // For inline children with line content, track pending line advance
-                    // for the next block sibling.  Reset when a block child is seen.
-                    if child_node.style.display.outer == OuterDisplay::Inline {
-                        pending_line_advance = child_node.layout_box.height()
-                    } else {
-                        pending_line_advance = 0.0;
-                    }
-                }
+                LayoutItem::Fragments(range) => self.process_flow_fragment_item(
+                    node,
+                    range,
+                    outbox_width,
+                    line_height,
+                    &mut cursor_x,
+                    &mut cursor_y,
+                    &mut current_x,
+                    &mut line_index,
+                    &mut line_span_buf,
+                    &mut max_inline_line_height,
+                    &mut children_width,
+                    &mut children_height,
+                    &mut pending_line_advance,
+                ),
+                LayoutItem::Node(i) => self.process_flow_node_item(
+                    node,
+                    i,
+                    ctx,
+                    &base_ctx_for_child,
+                    content_width_opt,
+                    intrinsic_pass,
+                    &mut cursor_x,
+                    &mut cursor_y,
+                    &mut current_x,
+                    &mut line_span_buf,
+                    &mut max_inline_line_height,
+                    &mut children_width,
+                    &mut children_height,
+                    &mut previous_child_margin,
+                    &mut pending_line_advance,
+                ),
             }
         }
 
-        // -------------------------------
-        // 3. Inline final box creation
-        // -------------------------------
+        self.finalize_flow_box(
+            node,
+            content_width_opt,
+            content_height_opt,
+            padding,
+            border,
+            end_y,
+            parent_current_x,
+            cursor_x,
+            cursor_y,
+            current_x,
+            children_width,
+            children_height,
+            max_inline_line_height,
+            line_span_buf,
+        )
+    }
+
+    fn process_flow_fragment_item(
+        &self,
+        node: &mut LayoutNode,
+        range: std::ops::Range<usize>,
+        outbox_width: f32,
+        line_height: f32,
+        cursor_x: &mut f32,
+        cursor_y: &mut f32,
+        current_x: &mut f32,
+        line_index: &mut usize,
+        line_span_buf: &mut Vec<LineSpan>,
+        max_inline_line_height: &mut f32,
+        children_width: &mut f32,
+        children_height: &mut f32,
+        pending_line_advance: &mut f32,
+    ) {
+        let mut fragment_node_buffer = node.children[range.clone()]
+            .iter_mut()
+            .filter_map(|c| match c {
+                LayoutChild::Fragment(f) => Some(f),
+                _ => None,
+            })
+            .collect();
+
+        let line_ctx_for_child = LineContext {
+            end_pos: (*cursor_x, *cursor_y),
+            current_x: *current_x,
+        };
+
+        let (line_spans, updated_line_ctx) = Self::flow_fragments(
+            &mut fragment_node_buffer,
+            line_ctx_for_child,
+            *line_index,
+            line_height,
+            outbox_width,
+        );
+
+        let had_line_spans = !line_spans.is_empty();
+
+        let LineContext {
+            end_pos: (cx, cy),
+            current_x: ix,
+            ..
+        } = updated_line_ctx;
+
+        if had_line_spans {
+            let max_span_width = line_spans
+                .iter()
+                .map(|s| s.width())
+                .filter(|w| !w.is_nan())
+                .max_by(f32::total_cmp)
+                .unwrap_or(0.0);
+            *children_width = children_width.max(max_span_width);
+            *children_height = children_height.max(cy + *max_inline_line_height);
+        }
+
+        *cursor_x = cx;
+        *cursor_y = cy;
+        *current_x = ix;
+        *line_index += line_spans.len().saturating_sub(1);
+
+        for span in line_spans {
+            push_or_merge_line_span(line_span_buf, span);
+        }
+
+        *max_inline_line_height = max_inline_line_height.max(line_height);
+        if had_line_spans {
+            *pending_line_advance = *max_inline_line_height;
+        }
+    }
+
+    fn process_flow_node_item(
+        &self,
+        node: &mut LayoutNode,
+        i: usize,
+        ctx: &LayoutContext,
+        base_ctx_for_child: &LayoutContext,
+        content_width_opt: Option<f32>,
+        intrinsic_pass: bool,
+        cursor_x: &mut f32,
+        cursor_y: &mut f32,
+        current_x: &mut f32,
+        line_span_buf: &mut Vec<LineSpan>,
+        max_inline_line_height: &mut f32,
+        children_width: &mut f32,
+        children_height: &mut f32,
+        previous_child_margin: &mut f32,
+        pending_line_advance: &mut f32,
+    ) {
+        let child_node = match &mut node.children[i] {
+            LayoutChild::Node(n) => n,
+            _ => unreachable!(),
+        };
+
+        let child_margin = self.resolve_margin(&child_node.style.spacing, ctx);
+
+        let ctx_for_child = LayoutContext {
+            available_width: content_width_opt
+                .or(ctx.available_width)
+                .map(|v| v - child_margin.left.unwrap_or(0.0) - child_margin.right.unwrap_or(0.0)),
+            ..*base_ctx_for_child
+        };
+
+        let line_ctx_for_child = LineContext {
+            end_pos: (*cursor_x, *cursor_y),
+            current_x: *current_x,
+        };
+
+        let child_is_block = child_node.style.display.outer == OuterDisplay::Block;
+        let layout_line_ctx = if child_is_block {
+            EMPTY_LINE_CONTEXT
+        } else {
+            line_ctx_for_child
+        };
+
+        let updated_line_ctx =
+            self.layout_node(child_node, &ctx_for_child, layout_line_ctx, intrinsic_pass);
+
+        let (child_position_x, child_position_y) = if child_is_block {
+            (0.0, line_ctx_for_child.end_pos.1 + *pending_line_advance)
+        } else {
+            line_ctx_for_child.end_pos
+        };
+
+        if child_is_block {
+            *cursor_x = 0.0;
+            *cursor_y = child_position_y + updated_line_ctx.end_pos.1;
+        } else {
+            let LineContext {
+                end_pos: (cx, cy),
+                current_x: ix,
+                ..
+            } = updated_line_ctx;
+            *cursor_x = cx;
+            *cursor_y = cy;
+            *current_x = ix;
+        }
+
+        let EdgeOption {
+            left: ml_opt,
+            top,
+            right: mr_opt,
+            bottom,
+        } = child_margin;
+
+        let (ml, _mr) = resolve_flow_margin_auto(
+            ml_opt,
+            mr_opt,
+            content_width_opt,
+            child_node,
+            child_is_block,
+        );
+
+        child_node.layout_box.shift(ml, 0.0);
+
+        if child_is_block {
+            child_node
+                .layout_box
+                .shift(0.0, previous_child_margin.max(top.unwrap_or_default()));
+            *cursor_y += previous_child_margin.max(top.unwrap_or_default());
+            *previous_child_margin = bottom.unwrap_or_default();
+        }
+
+        if child_node.style.display.outer == OuterDisplay::Inline {
+            child_node.layout_box.shift(child_position_x, 0.0);
+        } else {
+            child_node
+                .layout_box
+                .shift(child_position_x, child_position_y);
+        }
+
+        if node.style.display.outer == OuterDisplay::Inline
+            && child_node.style.display.outer == OuterDisplay::Inline
+        {
+            collect_inline_spans_from_child(child_node, line_ctx_for_child, line_span_buf);
+        }
+
+        if child_node.style.display.outer == OuterDisplay::Inline {
+            for line_box in child_node.layout_box.iter() {
+                *max_inline_line_height = max_inline_line_height.max(line_box.border_box.height);
+            }
+        }
+
+        let (child_right, child_bottom) = compute_child_layout_extent(child_node);
+
+        *children_width = children_width.max(child_right);
+        let inline_extent = compute_inline_extent(
+            child_node,
+            child_is_block,
+            child_bottom,
+            *cursor_y,
+            *previous_child_margin,
+            *max_inline_line_height,
+        );
+        *children_height = children_height.max(inline_extent);
+
+        if child_node.style.display.outer == OuterDisplay::Inline {
+            *pending_line_advance = child_node.layout_box.height()
+        } else {
+            *pending_line_advance = 0.0;
+        }
+    }
+
+    fn finalize_flow_box(
+        &self,
+        node: &mut LayoutNode,
+        content_width_opt: Option<f32>,
+        content_height_opt: Option<f32>,
+        padding: Edge,
+        border: Edge,
+        end_y: f32,
+        parent_current_x: f32,
+        cursor_x: f32,
+        cursor_y: f32,
+        current_x: f32,
+        children_width: f32,
+        children_height: f32,
+        max_inline_line_height: f32,
+        mut line_span_buf: Vec<LineSpan>,
+    ) -> LineContext {
         if node.style.display.outer == OuterDisplay::Inline {
-            // Use children bounds when inline has only block children (no line spans).
             let has_only_blocks = line_span_buf.is_empty();
             let content_w = if has_only_blocks {
                 children_width.max(current_x)
@@ -842,6 +876,11 @@ impl LayoutEngine {
                 box_model,
                 line_spans: line_span_buf,
             });
+
+            LineContext {
+                end_pos: (cursor_x, cursor_y),
+                current_x: parent_current_x + current_x,
+            }
         } else {
             let content_width = content_width_opt.unwrap_or(children_width);
             let content_height = content_height_opt.unwrap_or(children_height);
@@ -858,14 +897,10 @@ impl LayoutEngine {
 
             node.layout_box = LayoutBox::BlockBox(box_model);
 
-            // Update cursor.
-            cursor_x = 0.0;
-            cursor_y = end_y + block_height;
-        }
-
-        LineContext {
-            end_pos: (cursor_x, cursor_y),
-            current_x: parent_current_x + current_x,
+            LineContext {
+                end_pos: (0.0, end_y + block_height),
+                current_x: parent_current_x + current_x,
+            }
         }
     }
 
@@ -2315,5 +2350,93 @@ fn resolve_align_position(align: AlignItems, child_size: f32, available: f32) ->
         AlignItems::Center => ((available - child_size) / 2.0).max(0.0),
         AlignItems::End => (available - child_size).max(0.0),
         AlignItems::Stretch => 0.0,
+    }
+}
+
+fn resolve_flow_margin_auto(
+    ml_opt: Option<f32>,
+    mr_opt: Option<f32>,
+    content_width_opt: Option<f32>,
+    child_node: &LayoutNode,
+    child_is_block: bool,
+) -> (f32, f32) {
+    if child_is_block {
+        let child_width = child_node.layout_box.width_box();
+        match (ml_opt, mr_opt, content_width_opt) {
+            (None, None, Some(cw)) => {
+                let auto = (cw - child_width) / 2.0;
+                (auto, auto)
+            }
+            (None, Some(mr), Some(cw)) => {
+                let auto = cw - child_width - mr;
+                (auto, mr)
+            }
+            (Some(ml), None, Some(cw)) => {
+                let auto = cw - child_width - ml;
+                (ml, auto)
+            }
+            _ => (ml_opt.unwrap_or(0.0), mr_opt.unwrap_or(0.0)),
+        }
+    } else {
+        (ml_opt.unwrap_or(0.0), mr_opt.unwrap_or(0.0))
+    }
+}
+
+fn collect_inline_spans_from_child(
+    child_node: &LayoutNode,
+    line_ctx_for_child: LineContext,
+    line_span_buf: &mut Vec<LineSpan>,
+) {
+    if let LayoutBox::InlineBox(child_inline) = &child_node.layout_box {
+        let x_offset = line_ctx_for_child.current_x;
+
+        for child_span in &child_inline.line_spans {
+            push_or_merge_line_span(
+                line_span_buf,
+                LineSpan {
+                    x_range: (child_span.x_range.start + x_offset)
+                        ..(child_span.x_range.end + x_offset),
+                    line_pos: (child_span.line_pos.0 + x_offset, child_span.line_pos.1),
+                    line_index: child_span.line_index,
+                },
+            );
+        }
+    }
+}
+
+fn compute_child_layout_extent(child_node: &LayoutNode) -> (f32, f32) {
+    child_node
+        .layout_box
+        .iter()
+        .map(|box_model| (box_model.border_box.right(), box_model.border_box.bottom()))
+        .fold((0.0_f32, 0.0_f32), |acc, extent| {
+            (acc.0.max(extent.0), acc.1.max(extent.1))
+        })
+}
+
+fn compute_inline_extent(
+    child_node: &LayoutNode,
+    child_is_block: bool,
+    child_bottom: f32,
+    cursor_y: f32,
+    previous_child_margin: f32,
+    max_inline_line_height: f32,
+) -> f32 {
+    if child_is_block {
+        child_bottom + previous_child_margin
+    } else if cursor_y > child_bottom {
+        cursor_y
+    } else if cursor_y == child_bottom {
+        let has_line_spans = match &child_node.layout_box {
+            LayoutBox::InlineBox(b) => !b.line_spans.is_empty(),
+            _ => false,
+        };
+        if has_line_spans {
+            cursor_y + max_inline_line_height
+        } else {
+            child_bottom
+        }
+    } else {
+        child_bottom
     }
 }
