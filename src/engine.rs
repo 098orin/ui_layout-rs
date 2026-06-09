@@ -772,8 +772,24 @@ impl LayoutEngine {
                     // `child_bottom` omits block children inside inline, so also check `cursor_y`.
                     let inline_extent = if child_is_block {
                         child_bottom + previous_child_margin
+                    } else if cursor_y > child_bottom {
+                        // When `cursor_y > child_bottom`, block children or mixed content pushed
+                        // the cursor past the last line box, use cursor_y directly.
+                        cursor_y
+                    } else if cursor_y == child_bottom {
+                        // When `cursor_y == child_bottom` on an inline child that has line spans,
+                        // the cursor advanced due to a trailing LineBreak — add one line height.
+                        let has_line_spans = match &child_node.layout_box {
+                            LayoutBox::InlineBox(b) => !b.line_spans.is_empty(),
+                            _ => false,
+                        };
+                        if has_line_spans {
+                            cursor_y + max_inline_line_height
+                        } else {
+                            child_bottom
+                        }
                     } else {
-                        child_bottom.max(cursor_y)
+                        child_bottom
                     };
                     children_height = children_height.max(inline_extent);
 
