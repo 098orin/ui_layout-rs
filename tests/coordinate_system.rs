@@ -1,18 +1,11 @@
+mod common;
+use common::*;
 use ui_layout::*;
 
-fn node<'a>(n: &'a LayoutNode, idx: usize) -> &'a LayoutNode {
-    n.children[idx].node().expect("expected node child")
-}
-
-fn block_box(n: &LayoutNode) -> &BoxModel {
-    match &n.layout_box {
-        LayoutBox::BlockBox(b) => b,
-        _ => panic!("expected block box"),
-    }
-}
+// --- Basic coordinates ---
 
 #[test]
-fn test_child_coordinates_relative_to_parent_content_box() {
+fn child_coordinates_relative_to_parent_content_box() {
     let child = LayoutNode::new(Style {
         size: SizeStyle {
             width: LengthOrAuto::Length(Length::Px(50.0)),
@@ -57,7 +50,7 @@ fn test_child_coordinates_relative_to_parent_content_box() {
 }
 
 #[test]
-fn test_nested_coordinate_system() {
+fn nested_coordinate_system() {
     let grandchild = LayoutNode::new(Style {
         size: SizeStyle {
             width: LengthOrAuto::Length(Length::Px(20.0)),
@@ -124,8 +117,10 @@ fn test_nested_coordinate_system() {
     assert_eq!(grandchild_box.border_box.y, 3.0);
 }
 
+// --- Flex children coordinates ---
+
 #[test]
-fn test_flex_children_coordinates() {
+fn flex_children_coordinates() {
     let child1 = LayoutNode::new(Style {
         size: SizeStyle {
             width: LengthOrAuto::Length(Length::Px(40.0)),
@@ -183,8 +178,10 @@ fn test_flex_children_coordinates() {
     assert_eq!(child2_box.border_box.y, 0.0);
 }
 
+// --- Block children coordinates with margins ---
+
 #[test]
-fn test_block_children_coordinates_with_margins() {
+fn block_children_coordinates_with_margins() {
     let child1 = LayoutNode::new(Style {
         size: SizeStyle {
             width: LengthOrAuto::Length(Length::Px(100.0)),
@@ -242,8 +239,10 @@ fn test_block_children_coordinates_with_margins() {
     assert_eq!(child2_box.border_box.y, 60.0);
 }
 
+// --- Auto margins ---
+
 #[test]
-fn test_coordinate_system_with_auto_margins() {
+fn coordinate_system_with_auto_margins() {
     let child = LayoutNode::new(Style {
         size: SizeStyle {
             width: LengthOrAuto::Length(Length::Px(60.0)),

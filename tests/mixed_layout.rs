@@ -1,19 +1,8 @@
+mod common;
+use common::*;
 use ui_layout::*;
 
-fn node<'a>(n: &'a LayoutNode, idx: usize) -> &'a LayoutNode {
-    n.children[idx].node().expect("expected node child")
-}
-
-fn block_box(n: &LayoutNode) -> &BoxModel {
-    match &n.layout_box {
-        LayoutBox::BlockBox(b) => b,
-        _ => panic!("expected block box"),
-    }
-}
-
-fn fragment(width: f32, height: f32) -> ItemFragment {
-    ItemFragment::Fragment(Fragment { width, height })
-}
+// --- Block and inline ordering ---
 
 #[test]
 fn block_then_inline() {
@@ -158,6 +147,8 @@ fn inline_with_fragment_and_block() {
 
     assert_eq!(inline_child.layout_box.width_box(), 70.0);
 }
+
+// --- Consecutive inline ---
 
 #[test]
 fn consecutive_inline() {

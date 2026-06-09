@@ -1,56 +1,6 @@
+mod common;
+use common::*;
 use ui_layout::*;
-
-fn fragment(width: f32, height: f32) -> ItemFragment {
-    ItemFragment::Fragment(Fragment { width, height })
-}
-
-fn node<'a>(n: &'a LayoutNode, idx: usize) -> &'a LayoutNode {
-    n.children[idx].node().expect("expected node child")
-}
-
-fn block_box(n: &LayoutNode) -> &BoxModel {
-    match &n.layout_box {
-        LayoutBox::BlockBox(b) => b,
-        _ => panic!("expected block box"),
-    }
-}
-
-fn rect(x: f32, y: f32, width: f32, height: f32) -> Rect {
-    Rect {
-        x,
-        y,
-        width,
-        height,
-    }
-}
-
-fn mock_inline_box() -> LayoutBox {
-    LayoutBox::InlineBox(InlineBox {
-        box_model: BoxModel {
-            border_box: rect(0.0, 0.0, 114.0, 20.0),
-            padding_box: rect(2.0, 0.0, 110.0, 20.0),
-            content_box: rect(6.0, 0.0, 100.0, 20.0),
-            children_box: rect(6.0, 0.0, 100.0, 20.0),
-        },
-        line_spans: vec![
-            LineSpan {
-                x_range: 0.0..40.0,
-                line_pos: (6.0, 0.0),
-                line_index: 0,
-            },
-            LineSpan {
-                x_range: 40.0..70.0,
-                line_pos: (0.0, 20.0),
-                line_index: 1,
-            },
-            LineSpan {
-                x_range: 70.0..100.0,
-                line_pos: (0.0, 40.0),
-                line_index: 2,
-            },
-        ],
-    })
-}
 
 // --- ItemFragment API ---
 
@@ -126,6 +76,8 @@ fn inline_text_wraps_across_lines() {
     }
 }
 
+// --- Line breaks ---
+
 #[test]
 fn inline_forced_line_break() {
     let block = LayoutNode::with_children(
@@ -187,6 +139,113 @@ fn leading_linebreak_creates_empty_line_span() {
     assert_eq!(boxes[1].content_box.width, 40.0);
     assert_eq!(boxes[1].border_box.x, 0.0);
     assert_eq!(boxes[1].border_box.y, 16.0);
+}
+
+#[test]
+fn trailing_linebreak_after_fragment() {
+    let child = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline").unwrap(),
+            line_height: Length::Px(16.0),
+            ..Default::default()
+        },
+        [fragment(30.0, 10.0), ItemFragment::LineBreak],
+    );
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Auto,
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        [child],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    let boxes: Vec<BoxModel> = node(&root, 0).layout_box.iter().collect();
+    assert_eq!(boxes.len(), 1);
+    assert_eq!(boxes[0].content_box.width, 30.0);
+    assert_eq!(boxes[0].border_box.y, 0.0);
+
+    let lb = node(&root, 0).children[1].fragment().unwrap();
+    assert!(lb.node.is_line_break());
+    assert_eq!(lb.placement.offset, (30.0, 0.0));
+    assert_eq!(lb.placement.line_index, 0);
+}
+
+#[test]
+fn multiple_consecutive_linebreaks() {
+    let child = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline").unwrap(),
+            line_height: Length::Px(16.0),
+            ..Default::default()
+        },
+        [
+            fragment(30.0, 10.0),
+            ItemFragment::LineBreak,
+            ItemFragment::LineBreak,
+            fragment(40.0, 10.0),
+        ],
+    );
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Auto,
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        [child],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    let boxes: Vec<BoxModel> = node(&root, 0).layout_box.iter().collect();
+    assert_eq!(boxes.len(), 3);
+    assert_eq!(boxes[0].content_box.width, 30.0);
+    assert_eq!(boxes[0].border_box.y, 0.0);
+    assert_eq!(boxes[1].content_box.width, 0.0);
+    assert_eq!(boxes[1].border_box.y, 16.0);
+    assert_eq!(boxes[2].content_box.width, 40.0);
+    assert_eq!(boxes[2].border_box.x, 0.0);
+    assert_eq!(boxes[2].border_box.y, 32.0);
+}
+
+#[test]
+fn linebreak_only() {
+    let child = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline").unwrap(),
+            line_height: Length::Px(16.0),
+            ..Default::default()
+        },
+        [ItemFragment::LineBreak],
+    );
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Auto,
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        [child],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    let boxes: Vec<BoxModel> = node(&root, 0).layout_box.iter().collect();
+    assert_eq!(boxes.len(), 1);
+    assert_eq!(boxes[0].content_box.width, 0.0);
 }
 
 // --- Nested block + inline ---
@@ -459,7 +518,6 @@ fn inline_fragments_wrap_into_line_boxes_with_max_line_width() {
     let child = node(&root, 0);
     assert_eq!(child.layout_box.width_box(), 80.0);
     assert_eq!(child.layout_box.height_box(), 40.0);
-    assert_eq!(child.layout_box.height_box(), 40.0);
 
     let boxes: Vec<BoxModel> = child.layout_box.iter().collect();
     assert_eq!(boxes.len(), 2);
@@ -554,14 +612,18 @@ fn inline_multi_line_height_reflected_in_block_parent() {
 }
 
 #[test]
-fn block_with_multiline_inline_then_block_child() {
+fn block_with_multiline_inline_then_block_node() {
     let inline = LayoutNode::with_children(
         Style {
             display: Display::parse("inline").unwrap(),
             line_height: Length::Px(20.0),
             ..Default::default()
         },
-        [fragment(60.0, 10.0), fragment(50.0, 10.0), fragment(30.0, 10.0)],
+        [
+            fragment(60.0, 10.0),
+            fragment(50.0, 10.0),
+            fragment(30.0, 10.0),
+        ],
     );
 
     let block_child = LayoutNode::new(Style {
@@ -636,7 +698,7 @@ fn inline_with_block_child_height_reflected() {
 }
 
 #[test]
-fn inline_with_fragment_then_block_child() {
+fn inline_with_fragment_then_block_node() {
     let inner_block = LayoutNode::new(Style {
         display: Display::parse("block").unwrap(),
         size: SizeStyle {
@@ -887,7 +949,7 @@ fn inline_with_mixed_fragments_and_inline_node_line_index() {
 
     assert_eq!(
         frag3.placement.line_index, 0,
-        "fragment after inline node should be on line 0, not line 1"
+        "fragment after inline node should be on line 0"
     );
     assert_eq!(
         frag4.placement.line_index, 0,
@@ -942,6 +1004,375 @@ fn owned_layout_box_into_iter_yields_line_boxes_lazily() {
 
     assert_eq!(iter.len(), 0);
     assert!(iter.next().is_none());
+}
+
+// --- Line break inside nested inline child ---
+
+#[test]
+fn nested_inline_child_with_linebreak() {
+    let child_inline = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline").unwrap(),
+            line_height: Length::Px(16.0),
+            ..Default::default()
+        },
+        [
+            fragment(30.0, 10.0),
+            ItemFragment::LineBreak,
+            fragment(40.0, 10.0),
+        ],
+    );
+
+    let parent_inline = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline").unwrap(),
+            line_height: Length::Px(16.0),
+            ..Default::default()
+        },
+        [
+            LayoutChild::from(child_inline),
+            LayoutChild::from(fragment(50.0, 10.0)),
+        ],
+    );
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Auto,
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        [parent_inline],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    let boxes: Vec<BoxModel> = node(&root, 0).layout_box.iter().collect();
+    assert_eq!(boxes.len(), 2);
+    assert_eq!(boxes[0].content_box.width, 30.0);
+    assert_eq!(boxes[0].border_box.y, 0.0);
+    assert_eq!(boxes[1].content_box.width, 90.0);
+    assert_eq!(boxes[1].border_box.x, 0.0);
+    assert_eq!(boxes[1].border_box.y, 16.0);
+}
+
+#[test]
+fn nested_inline_child_with_trailing_linebreak() {
+    let child_inline = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline").unwrap(),
+            line_height: Length::Px(16.0),
+            ..Default::default()
+        },
+        [fragment(30.0, 10.0), ItemFragment::LineBreak],
+    );
+
+    let parent_inline = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline").unwrap(),
+            line_height: Length::Px(16.0),
+            ..Default::default()
+        },
+        [
+            LayoutChild::from(child_inline),
+            LayoutChild::from(fragment(50.0, 10.0)),
+        ],
+    );
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Auto,
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        [parent_inline],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    let boxes: Vec<BoxModel> = node(&root, 0).layout_box.iter().collect();
+    assert_eq!(boxes.len(), 2);
+    assert_eq!(boxes[0].content_box.width, 30.0);
+    assert_eq!(boxes[0].border_box.y, 0.0);
+    assert_eq!(boxes[1].content_box.width, 50.0);
+    assert_eq!(boxes[1].border_box.x, 0.0);
+    assert_eq!(boxes[1].border_box.y, 16.0);
+}
+
+#[test]
+fn nested_inline_child_linebreak_only() {
+    let child_inline = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline").unwrap(),
+            line_height: Length::Px(16.0),
+            ..Default::default()
+        },
+        [ItemFragment::LineBreak],
+    );
+
+    let parent_inline = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline").unwrap(),
+            line_height: Length::Px(16.0),
+            ..Default::default()
+        },
+        [
+            LayoutChild::from(child_inline),
+            LayoutChild::from(fragment(50.0, 10.0)),
+        ],
+    );
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Auto,
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        [parent_inline],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    let boxes: Vec<BoxModel> = node(&root, 0).layout_box.iter().collect();
+    assert_eq!(boxes.len(), 2);
+    assert_eq!(boxes[0].content_box.width, 0.0);
+    assert_eq!(boxes[0].border_box.y, 0.0);
+    assert_eq!(boxes[1].content_box.width, 50.0);
+    assert_eq!(boxes[1].border_box.y, 16.0);
+}
+
+// --- Deeply nested LineBreak propagation ---
+
+#[test]
+fn nested_inline_grandchild_with_linebreak() {
+    let l2 = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline").unwrap(),
+            line_height: Length::Px(16.0),
+            ..Default::default()
+        },
+        [
+            fragment(30.0, 10.0),
+            ItemFragment::LineBreak,
+            fragment(40.0, 10.0),
+        ],
+    );
+
+    let l1 = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline").unwrap(),
+            line_height: Length::Px(16.0),
+            ..Default::default()
+        },
+        [LayoutChild::from(l2)],
+    );
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Auto,
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        [l1],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    let boxes: Vec<BoxModel> = node(&root, 0).layout_box.iter().collect();
+    assert_eq!(boxes.len(), 2, "L1 should have 2 line boxes");
+    assert_eq!(boxes[0].content_box.width, 30.0);
+    assert_eq!(boxes[0].border_box.y, 0.0);
+    assert_eq!(boxes[1].content_box.width, 40.0);
+    assert_eq!(boxes[1].border_box.x, 0.0);
+    assert_eq!(boxes[1].border_box.y, 16.0);
+    assert_eq!(block_box(&root).content_box.height, 32.0);
+}
+
+#[test]
+fn nested_inline_grandchild_linebreak_with_sibling_at_parent() {
+    let l2 = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline").unwrap(),
+            line_height: Length::Px(16.0),
+            ..Default::default()
+        },
+        [fragment(30.0, 10.0), ItemFragment::LineBreak],
+    );
+
+    let l1 = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline").unwrap(),
+            line_height: Length::Px(16.0),
+            ..Default::default()
+        },
+        [
+            LayoutChild::from(l2),
+            LayoutChild::from(fragment(50.0, 10.0)),
+        ],
+    );
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Auto,
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        [l1],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    let boxes: Vec<BoxModel> = node(&root, 0).layout_box.iter().collect();
+    assert_eq!(boxes.len(), 2, "L1 should have 2 line boxes");
+    assert_eq!(boxes[0].content_box.width, 30.0);
+    assert_eq!(boxes[0].border_box.y, 0.0);
+    assert_eq!(boxes[1].content_box.width, 50.0);
+    assert_eq!(boxes[1].border_box.x, 0.0);
+    assert_eq!(boxes[1].border_box.y, 16.0);
+    assert_eq!(block_box(&root).content_box.height, 32.0);
+}
+
+#[test]
+fn nested_inline_grandchild_linebreak_with_preceding_sibling() {
+    let l2 = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline").unwrap(),
+            line_height: Length::Px(16.0),
+            ..Default::default()
+        },
+        [
+            fragment(30.0, 10.0),
+            ItemFragment::LineBreak,
+            fragment(40.0, 10.0),
+        ],
+    );
+
+    let l1 = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline").unwrap(),
+            line_height: Length::Px(16.0),
+            ..Default::default()
+        },
+        [
+            LayoutChild::from(fragment(20.0, 10.0)),
+            LayoutChild::from(l2),
+        ],
+    );
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Auto,
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        [l1],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    let boxes: Vec<BoxModel> = node(&root, 0).layout_box.iter().collect();
+    assert_eq!(boxes.len(), 2, "L1 should have 2 line boxes");
+    assert_eq!(boxes[0].content_box.width, 50.0);
+    assert_eq!(boxes[0].border_box.y, 0.0);
+    assert_eq!(boxes[1].content_box.width, 40.0);
+    assert_eq!(boxes[1].border_box.x, 20.0);
+    assert_eq!(boxes[1].border_box.y, 16.0);
+    assert_eq!(block_box(&root).content_box.height, 32.0);
+}
+
+#[test]
+fn deeply_nested_linebreak_should_propagate_to_parent() {
+    // Verifies that a trailing LineBreak inside a deeply nested inline (4 levels)
+    // propagates its line advance to the block parent's height.
+    //
+    // Structure:
+    //   block > L1(inline) > [frag(30), L2(inline) > [L3(inline) > [frag(40), L4(inline) > [LineBreak]]]]
+    //
+    // The LineBreak in L4 advances the cursor to a new (empty) line.  The block
+    // parent must account for this extra line height (32px = 2 lines x 16px).
+    // L1's line boxes remain unchanged (1 merged span) because the trailing
+    // LineBreak creates no new line span.
+
+    let l4 = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline").unwrap(),
+            line_height: Length::Px(16.0),
+            ..Default::default()
+        },
+        [ItemFragment::LineBreak],
+    );
+
+    let l3 = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline").unwrap(),
+            line_height: Length::Px(16.0),
+            ..Default::default()
+        },
+        [
+            LayoutChild::from(fragment(40.0, 10.0)),
+            LayoutChild::from(l4),
+        ],
+    );
+
+    let l2 = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline").unwrap(),
+            line_height: Length::Px(16.0),
+            ..Default::default()
+        },
+        [LayoutChild::from(l3)],
+    );
+
+    let l1 = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline").unwrap(),
+            line_height: Length::Px(16.0),
+            ..Default::default()
+        },
+        [
+            LayoutChild::from(fragment(30.0, 10.0)),
+            LayoutChild::from(l2),
+        ],
+    );
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Auto,
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        [l1],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    let boxes: Vec<BoxModel> = node(&root, 0).layout_box.iter().collect();
+    // Only 1 merged line box (trailing LineBreak creates no new line span).
+    assert_eq!(boxes.len(), 1);
+    assert_eq!(boxes[0].content_box.width, 70.0);
+    assert_eq!(boxes[0].border_box.y, 0.0);
+    // Block height includes the trailing LineBreak's empty line.
+    assert_eq!(block_box(&root).content_box.height, 32.0);
 }
 
 #[test]

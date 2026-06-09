@@ -1,46 +1,6 @@
+mod common;
+use common::*;
 use ui_layout::*;
-
-fn node<'a>(n: &'a LayoutNode, idx: usize) -> &'a LayoutNode {
-    n.children[idx].node().expect("expected node child")
-}
-
-fn block_box(n: &LayoutNode) -> &BoxModel {
-    match &n.layout_box {
-        LayoutBox::BlockBox(b) => b,
-        _ => panic!("expected block box"),
-    }
-}
-
-fn fragment(width: f32, height: f32) -> ItemFragment {
-    ItemFragment::Fragment(Fragment { width, height })
-}
-
-fn inline_node_box(n: &LayoutNode) -> &BoxModel {
-    match &n.layout_box {
-        LayoutBox::InlineBox(inline) => &inline.box_model,
-        _ => panic!("expected inline box"),
-    }
-}
-
-fn approx_eq(a: f32, b: f32) -> bool {
-    (a - b).abs() < 0.1
-}
-
-fn flex_container(width: f32, height: f32, direction: FlexDirection) -> Style {
-    Style {
-        display: Display {
-            outer: OuterDisplay::Block,
-            inner: InnerDisplay::Flex,
-        },
-        size: SizeStyle {
-            width: LengthOrAuto::Length(Length::Px(width)),
-            height: LengthOrAuto::Length(Length::Px(height)),
-            ..Default::default()
-        },
-        flex_direction: direction,
-        ..Default::default()
-    }
-}
 
 // --- Flex grow ---
 
@@ -751,7 +711,7 @@ fn flex_column_with_only_fragments() {
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
     // In a column, fragments within the single flex item flow left-to-right
-    // since fragments are placed by flow_fragment_range (always horizontal flow).
+    // since fragments are placed by flow_fragment_range (always horizontal).
     assert_eq!(
         root.children[0].fragment().unwrap().placement.offset,
         (0.0, 0.0)
@@ -765,6 +725,8 @@ fn flex_column_with_only_fragments() {
         (60.0, 0.0)
     );
 }
+
+// --- Inline children in flex ---
 
 #[test]
 fn flex_row_with_inline_children() {
@@ -805,8 +767,8 @@ fn flex_row_with_inline_children() {
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
-    assert_eq!(inline_node_box(node(&root, 0)).border_box.x, 0.0);
-    assert_eq!(inline_node_box(node(&root, 1)).border_box.x, 40.0);
+    assert_eq!(inline_box_model(node(&root, 0)).border_box.x, 0.0);
+    assert_eq!(inline_box_model(node(&root, 1)).border_box.x, 40.0);
 }
 
 #[test]
@@ -848,10 +810,12 @@ fn flex_column_with_inline_children() {
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
-    assert_eq!(inline_node_box(node(&root, 0)).border_box.y, 0.0);
+    assert_eq!(inline_box_model(node(&root, 0)).border_box.y, 0.0);
     // Inline box height is determined by line_height (20px), not fragment height
-    assert_eq!(inline_node_box(node(&root, 1)).border_box.y, 20.0);
+    assert_eq!(inline_box_model(node(&root, 1)).border_box.y, 20.0);
 }
+
+// --- Mixed fragments and inline children ---
 
 #[test]
 fn flex_row_with_fragments_and_inline_children() {
@@ -892,12 +856,14 @@ fn flex_row_with_fragments_and_inline_children() {
         root.children[0].fragment().unwrap().placement.offset,
         (0.0, 0.0)
     );
-    assert_eq!(inline_node_box(node(&root, 1)).border_box.x, 30.0);
+    assert_eq!(inline_box_model(node(&root, 1)).border_box.x, 30.0);
     assert_eq!(
         root.children[2].fragment().unwrap().placement.offset,
         (80.0, 0.0)
     );
 }
+
+// --- Gap with fragments ---
 
 #[test]
 fn flex_gap_with_fragments() {
