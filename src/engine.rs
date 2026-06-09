@@ -164,7 +164,6 @@ struct FlexItemState {
 impl Default for FlexItemState {
     fn default() -> Self {
         Self {
-            // Initially items are not frozen — they can grow/shrink.
             frozen_grow: false,
             frozen_shrink: false,
             main_size: 0.0,
@@ -177,6 +176,41 @@ impl Default for FlexItemState {
             shrink: 1.0,
         }
     }
+}
+
+struct FlowCursor {
+    x: f32,
+    y: f32,
+    current_x: f32,
+    line_index: usize,
+}
+
+struct FlowAccum {
+    prev_child_margin: f32,
+    pending_advance: f32,
+    children_width: f32,
+    children_height: f32,
+    max_inline_line_height: f32,
+    line_span_buf: Vec<LineSpan>,
+}
+
+struct FlowState {
+    cursor: FlowCursor,
+    accum: FlowAccum,
+    padding: Edge,
+    border: Edge,
+    end_y: f32,
+    parent_current_x: f32,
+    content_width_opt: Option<f32>,
+    intrinsic_pass: bool,
+}
+
+struct FlexPlacementCtx {
+    content_box: Rect,
+    cursor_main: f32,
+    auto_unit: f32,
+    gap_between: f32,
+    gap: f32,
 }
 
 /// The difference between containing_block_* and available_* is:
@@ -445,20 +479,13 @@ impl LayoutEngine {
             );
 
         // --- Intrinsic pass ---
-        if intrinsic_pass && content_width_opt.is_some() && content_height_opt.is_some() {
-            let box_model = create_box_model(
-                content_width_opt.unwrap(),
-                content_height_opt.unwrap(),
-                0.0,
-                0.0,
-                padding,
-                border,
-            );
+        if intrinsic_pass && let (Some(cw), Some(ch)) = (content_width_opt, content_height_opt) {
+            let box_model = create_box_model(cw, ch, 0.0, 0.0, padding, border);
 
             node.layout_box = LayoutBox::BlockBox(box_model);
 
             return LineContext {
-                end_pos: (0.0, line_ctx.end_pos.1 + content_height_opt.unwrap()),
+                end_pos: (0.0, line_ctx.end_pos.1 + ch),
                 ..line_ctx
             };
         }
@@ -534,17 +561,9 @@ impl LayoutEngine {
         let padding = self.resolve_padding(&node.style.spacing, ctx);
 
         let LineContext {
-            end_pos: (end_x, end_y),
+            end_pos: (_, end_y),
             current_x: parent_current_x,
         } = line_ctx;
-
-        let (mut cursor_x, mut cursor_y) = (end_x, end_y);
-        let mut current_x = 0.0;
-        let mut line_index = 0;
-
-        let mut previous_child_margin = 0.0_f32;
-        let mut pending_line_advance = 0.0_f32;
-        let (mut children_width, mut children_height) = (0.0_f32, 0.0_f32);
 
         let base_ctx_for_child = LayoutContext {
             containing_block_width: content_width_opt,
@@ -560,12 +579,32 @@ impl LayoutEngine {
             .resolve_with(None, self.viewport_width, self.viewport_height)
             .unwrap_or_default();
 
-        let mut line_span_buf = Vec::new();
-        let mut max_inline_line_height = line_height;
-
         let outbox_width = content_width_opt
             .or(ctx.available_width)
             .unwrap_or(self.viewport_width);
+
+        let mut state = FlowState {
+            cursor: FlowCursor {
+                x: line_ctx.end_pos.0,
+                y: end_y,
+                current_x: 0.0,
+                line_index: 0,
+            },
+            accum: FlowAccum {
+                prev_child_margin: 0.0,
+                pending_advance: 0.0,
+                children_width: 0.0,
+                children_height: 0.0,
+                max_inline_line_height: line_height,
+                line_span_buf: Vec::new(),
+            },
+            padding,
+            border,
+            end_y,
+            parent_current_x,
+            content_width_opt,
+            intrinsic_pass,
+        };
 
         let items = collect_layout_items(&node.children);
 
@@ -576,52 +615,15 @@ impl LayoutEngine {
                     range,
                     outbox_width,
                     line_height,
-                    &mut cursor_x,
-                    &mut cursor_y,
-                    &mut current_x,
-                    &mut line_index,
-                    &mut line_span_buf,
-                    &mut max_inline_line_height,
-                    &mut children_width,
-                    &mut children_height,
-                    &mut pending_line_advance,
+                    &mut state,
                 ),
-                LayoutItem::Node(i) => self.process_flow_node_item(
-                    node,
-                    i,
-                    ctx,
-                    &base_ctx_for_child,
-                    content_width_opt,
-                    intrinsic_pass,
-                    &mut cursor_x,
-                    &mut cursor_y,
-                    &mut current_x,
-                    &mut line_span_buf,
-                    &mut max_inline_line_height,
-                    &mut children_width,
-                    &mut children_height,
-                    &mut previous_child_margin,
-                    &mut pending_line_advance,
-                ),
+                LayoutItem::Node(i) => {
+                    self.process_flow_node_item(node, i, ctx, &base_ctx_for_child, &mut state)
+                }
             }
         }
 
-        self.finalize_flow_box(
-            node,
-            content_width_opt,
-            content_height_opt,
-            padding,
-            border,
-            end_y,
-            parent_current_x,
-            cursor_x,
-            cursor_y,
-            current_x,
-            children_width,
-            children_height,
-            max_inline_line_height,
-            line_span_buf,
-        )
+        self.finalize_flow_box(node, content_width_opt, content_height_opt, state)
     }
 
     fn process_flow_fragment_item(
@@ -630,15 +632,7 @@ impl LayoutEngine {
         range: std::ops::Range<usize>,
         outbox_width: f32,
         line_height: f32,
-        cursor_x: &mut f32,
-        cursor_y: &mut f32,
-        current_x: &mut f32,
-        line_index: &mut usize,
-        line_span_buf: &mut Vec<LineSpan>,
-        max_inline_line_height: &mut f32,
-        children_width: &mut f32,
-        children_height: &mut f32,
-        pending_line_advance: &mut f32,
+        state: &mut FlowState,
     ) {
         let mut fragment_node_buffer = node.children[range.clone()]
             .iter_mut()
@@ -649,14 +643,14 @@ impl LayoutEngine {
             .collect();
 
         let line_ctx_for_child = LineContext {
-            end_pos: (*cursor_x, *cursor_y),
-            current_x: *current_x,
+            end_pos: (state.cursor.x, state.cursor.y),
+            current_x: state.cursor.current_x,
         };
 
         let (line_spans, updated_line_ctx) = Self::flow_fragments(
             &mut fragment_node_buffer,
             line_ctx_for_child,
-            *line_index,
+            state.cursor.line_index,
             line_height,
             outbox_width,
         );
@@ -676,22 +670,25 @@ impl LayoutEngine {
                 .filter(|w| !w.is_nan())
                 .max_by(f32::total_cmp)
                 .unwrap_or(0.0);
-            *children_width = children_width.max(max_span_width);
-            *children_height = children_height.max(cy + *max_inline_line_height);
+            state.accum.children_width = state.accum.children_width.max(max_span_width);
+            state.accum.children_height = state
+                .accum
+                .children_height
+                .max(cy + state.accum.max_inline_line_height);
         }
 
-        *cursor_x = cx;
-        *cursor_y = cy;
-        *current_x = ix;
-        *line_index += line_spans.len().saturating_sub(1);
+        state.cursor.x = cx;
+        state.cursor.y = cy;
+        state.cursor.current_x = ix;
+        state.cursor.line_index += line_spans.len().saturating_sub(1);
 
         for span in line_spans {
-            push_or_merge_line_span(line_span_buf, span);
+            push_or_merge_line_span(&mut state.accum.line_span_buf, span);
         }
 
-        *max_inline_line_height = max_inline_line_height.max(line_height);
+        state.accum.max_inline_line_height = state.accum.max_inline_line_height.max(line_height);
         if had_line_spans {
-            *pending_line_advance = *max_inline_line_height;
+            state.accum.pending_advance = state.accum.max_inline_line_height;
         }
     }
 
@@ -701,17 +698,7 @@ impl LayoutEngine {
         i: usize,
         ctx: &LayoutContext,
         base_ctx_for_child: &LayoutContext,
-        content_width_opt: Option<f32>,
-        intrinsic_pass: bool,
-        cursor_x: &mut f32,
-        cursor_y: &mut f32,
-        current_x: &mut f32,
-        line_span_buf: &mut Vec<LineSpan>,
-        max_inline_line_height: &mut f32,
-        children_width: &mut f32,
-        children_height: &mut f32,
-        previous_child_margin: &mut f32,
-        pending_line_advance: &mut f32,
+        state: &mut FlowState,
     ) {
         let child_node = match &mut node.children[i] {
             LayoutChild::Node(n) => n,
@@ -721,15 +708,16 @@ impl LayoutEngine {
         let child_margin = self.resolve_margin(&child_node.style.spacing, ctx);
 
         let ctx_for_child = LayoutContext {
-            available_width: content_width_opt
+            available_width: state
+                .content_width_opt
                 .or(ctx.available_width)
                 .map(|v| v - child_margin.left.unwrap_or(0.0) - child_margin.right.unwrap_or(0.0)),
             ..*base_ctx_for_child
         };
 
         let line_ctx_for_child = LineContext {
-            end_pos: (*cursor_x, *cursor_y),
-            current_x: *current_x,
+            end_pos: (state.cursor.x, state.cursor.y),
+            current_x: state.cursor.current_x,
         };
 
         let child_is_block = child_node.style.display.outer == OuterDisplay::Block;
@@ -739,27 +727,34 @@ impl LayoutEngine {
             line_ctx_for_child
         };
 
-        let updated_line_ctx =
-            self.layout_node(child_node, &ctx_for_child, layout_line_ctx, intrinsic_pass);
+        let updated_line_ctx = self.layout_node(
+            child_node,
+            &ctx_for_child,
+            layout_line_ctx,
+            state.intrinsic_pass,
+        );
 
         let (child_position_x, child_position_y) = if child_is_block {
-            (0.0, line_ctx_for_child.end_pos.1 + *pending_line_advance)
+            (
+                0.0,
+                line_ctx_for_child.end_pos.1 + state.accum.pending_advance,
+            )
         } else {
             line_ctx_for_child.end_pos
         };
 
         if child_is_block {
-            *cursor_x = 0.0;
-            *cursor_y = child_position_y + updated_line_ctx.end_pos.1;
+            state.cursor.x = 0.0;
+            state.cursor.y = child_position_y + updated_line_ctx.end_pos.1;
         } else {
             let LineContext {
                 end_pos: (cx, cy),
                 current_x: ix,
                 ..
             } = updated_line_ctx;
-            *cursor_x = cx;
-            *cursor_y = cy;
-            *current_x = ix;
+            state.cursor.x = cx;
+            state.cursor.y = cy;
+            state.cursor.current_x = ix;
         }
 
         let EdgeOption {
@@ -772,7 +767,7 @@ impl LayoutEngine {
         let (ml, _mr) = resolve_flow_margin_auto(
             ml_opt,
             mr_opt,
-            content_width_opt,
+            state.content_width_opt,
             child_node,
             child_is_block,
         );
@@ -780,11 +775,12 @@ impl LayoutEngine {
         child_node.layout_box.shift(ml, 0.0);
 
         if child_is_block {
-            child_node
-                .layout_box
-                .shift(0.0, previous_child_margin.max(top.unwrap_or_default()));
-            *cursor_y += previous_child_margin.max(top.unwrap_or_default());
-            *previous_child_margin = bottom.unwrap_or_default();
+            child_node.layout_box.shift(
+                0.0,
+                state.accum.prev_child_margin.max(top.unwrap_or_default()),
+            );
+            state.cursor.y += state.accum.prev_child_margin.max(top.unwrap_or_default());
+            state.accum.prev_child_margin = bottom.unwrap_or_default();
         }
 
         if child_node.style.display.outer == OuterDisplay::Inline {
@@ -798,32 +794,39 @@ impl LayoutEngine {
         if node.style.display.outer == OuterDisplay::Inline
             && child_node.style.display.outer == OuterDisplay::Inline
         {
-            collect_inline_spans_from_child(child_node, line_ctx_for_child, line_span_buf);
+            collect_inline_spans_from_child(
+                child_node,
+                line_ctx_for_child,
+                &mut state.accum.line_span_buf,
+            );
         }
 
         if child_node.style.display.outer == OuterDisplay::Inline {
             for line_box in child_node.layout_box.iter() {
-                *max_inline_line_height = max_inline_line_height.max(line_box.border_box.height);
+                state.accum.max_inline_line_height = state
+                    .accum
+                    .max_inline_line_height
+                    .max(line_box.border_box.height);
             }
         }
 
         let (child_right, child_bottom) = compute_child_layout_extent(child_node);
 
-        *children_width = children_width.max(child_right);
+        state.accum.children_width = state.accum.children_width.max(child_right);
         let inline_extent = compute_inline_extent(
             child_node,
             child_is_block,
             child_bottom,
-            *cursor_y,
-            *previous_child_margin,
-            *max_inline_line_height,
+            state.cursor.y,
+            state.accum.prev_child_margin,
+            state.accum.max_inline_line_height,
         );
-        *children_height = children_height.max(inline_extent);
+        state.accum.children_height = state.accum.children_height.max(inline_extent);
 
         if child_node.style.display.outer == OuterDisplay::Inline {
-            *pending_line_advance = child_node.layout_box.height()
+            state.accum.pending_advance = child_node.layout_box.height()
         } else {
-            *pending_line_advance = 0.0;
+            state.accum.pending_advance = 0.0;
         }
     }
 
@@ -832,18 +835,31 @@ impl LayoutEngine {
         node: &mut LayoutNode,
         content_width_opt: Option<f32>,
         content_height_opt: Option<f32>,
-        padding: Edge,
-        border: Edge,
-        end_y: f32,
-        parent_current_x: f32,
-        cursor_x: f32,
-        cursor_y: f32,
-        current_x: f32,
-        children_width: f32,
-        children_height: f32,
-        max_inline_line_height: f32,
-        mut line_span_buf: Vec<LineSpan>,
+        state: FlowState,
     ) -> LineContext {
+        let FlowState {
+            cursor:
+                FlowCursor {
+                    x: cursor_x,
+                    y: cursor_y,
+                    current_x,
+                    ..
+                },
+            accum:
+                FlowAccum {
+                    children_width,
+                    children_height,
+                    max_inline_line_height,
+                    mut line_span_buf,
+                    ..
+                },
+            padding,
+            border,
+            end_y,
+            parent_current_x,
+            ..
+        } = state;
+
         if node.style.display.outer == OuterDisplay::Inline {
             let has_only_blocks = line_span_buf.is_empty();
             let content_w = if has_only_blocks {
@@ -1039,7 +1055,6 @@ impl LayoutEngine {
         }
 
         let cbm = base_ctx_for_children.containing_block_main(axis);
-        let cbc = base_ctx_for_children.containing_block_cross(axis);
         let vw = self.viewport_width;
         let vh = self.viewport_height;
 
@@ -1054,18 +1069,8 @@ impl LayoutEngine {
         let item_len = flex_items.len();
 
         let mut states = vec![FlexItemState::default(); item_len];
-        let mut total_grow = self.init_flex_item_states(
-            node,
-            axis,
-            base_ctx_for_children,
-            cbm,
-            vw,
-            vh,
-            &flex_items,
-            &mut states,
-        );
-
-        let gaps = gap * item_len.saturating_sub(1) as f32;
+        let mut total_grow =
+            self.init_flex_item_states(node, axis, base_ctx_for_children, &flex_items, &mut states);
 
         let mut remaining = compute_flex_remaining(cbm, &states, gap, item_len);
 
@@ -1108,11 +1113,7 @@ impl LayoutEngine {
             node,
             axis,
             base_ctx_for_children,
-            cbc,
-            vw,
-            vh,
             intrinsic_pass,
-            gaps,
             &flex_items,
             states,
         )
@@ -1199,12 +1200,8 @@ impl LayoutEngine {
         node: &mut LayoutNode,
         axis: Axis,
         ctx: &LayoutContext,
-        content_box: Rect,
-        cursor_main: &mut f32,
-        auto_unit: f32,
-        gap_between: f32,
-        gap: f32,
         index: usize,
+        placement: &mut FlexPlacementCtx,
     ) {
         let child_node = node.children[index].node_mut().unwrap();
 
@@ -1225,28 +1222,28 @@ impl LayoutEngine {
         };
 
         let margin_start = if margin_start_auto {
-            auto_unit
+            placement.auto_unit
         } else {
             margin_start_resolved
         };
         let margin_end = if margin_end_auto {
-            auto_unit
+            placement.auto_unit
         } else {
             margin_end_resolved
         };
 
-        *cursor_main += margin_start;
+        placement.cursor_main += margin_start;
 
         let child_main_pos = match axis {
-            Axis::Horizontal => content_box.x + *cursor_main,
-            Axis::Vertical => content_box.y + *cursor_main,
+            Axis::Horizontal => placement.content_box.x + placement.cursor_main,
+            Axis::Vertical => placement.content_box.y + placement.cursor_main,
         };
 
         let child_cross_size = axis.tuple_cross((
             child_node.layout_box.width_box(),
             child_node.layout_box.height_box(),
         ));
-        let available_cross = axis.rect_cross(&content_box);
+        let available_cross = axis.rect_cross(&placement.content_box);
 
         let margin_cross_start_auto = match axis {
             Axis::Horizontal => child_node.style.spacing.margin_top == crate::LengthOrAuto::Auto,
@@ -1279,8 +1276,8 @@ impl LayoutEngine {
         };
 
         let child_cross_pos = match axis {
-            Axis::Horizontal => content_box.y + cross_offset,
-            Axis::Vertical => content_box.x + cross_offset,
+            Axis::Horizontal => placement.content_box.y + cross_offset,
+            Axis::Vertical => placement.content_box.x + cross_offset,
         };
 
         let child_origin = match axis {
@@ -1288,8 +1285,8 @@ impl LayoutEngine {
             Axis::Vertical => (child_cross_pos, child_main_pos),
         };
 
-        let relative_x = child_origin.0 - content_box.x;
-        let relative_y = child_origin.1 - content_box.y;
+        let relative_x = child_origin.0 - placement.content_box.x;
+        let relative_y = child_origin.1 - placement.content_box.y;
         child_node.layout_box.shift(relative_x, relative_y);
 
         let child_main_size = axis.tuple_main((
@@ -1297,21 +1294,19 @@ impl LayoutEngine {
             child_node.layout_box.height_box(),
         ));
 
-        *cursor_main += child_main_size + margin_end + gap + gap_between;
+        placement.cursor_main +=
+            child_main_size + margin_end + placement.gap + placement.gap_between;
     }
 
     fn position_flex_fragments(
         &self,
         node: &mut LayoutNode,
         axis: Axis,
-        content_box: Rect,
-        cursor_main: &mut f32,
-        gap_between: f32,
-        gap: f32,
-        vw: f32,
-        vh: f32,
         range: std::ops::Range<usize>,
+        placement: &mut FlexPlacementCtx,
     ) {
+        let vw = self.viewport_width;
+        let vh = self.viewport_height;
         let line_height = resolved_fragment_line_height(
             &node.children,
             range.clone(),
@@ -1343,17 +1338,17 @@ impl LayoutEngine {
         };
 
         let child_main_pos = match axis {
-            Axis::Horizontal => content_box.x + *cursor_main,
-            Axis::Vertical => content_box.y + *cursor_main,
+            Axis::Horizontal => placement.content_box.x + placement.cursor_main,
+            Axis::Vertical => placement.content_box.y + placement.cursor_main,
         };
 
-        let available_cross = axis.rect_cross(&content_box);
+        let available_cross = axis.rect_cross(&placement.content_box);
         let cross_offset =
             resolve_align_position(node.style.align_items, item_cross_size, available_cross);
 
         let child_cross_pos = match axis {
-            Axis::Horizontal => content_box.y + cross_offset,
-            Axis::Vertical => content_box.x + cross_offset,
+            Axis::Horizontal => placement.content_box.y + cross_offset,
+            Axis::Vertical => placement.content_box.x + cross_offset,
         };
 
         let line_ctx = match axis {
@@ -1381,7 +1376,7 @@ impl LayoutEngine {
             outbox_width,
         );
 
-        *cursor_main += item_main_size + gap + gap_between;
+        placement.cursor_main += item_main_size + placement.gap + placement.gap_between;
     }
 
     /// Set child positions.
@@ -1395,11 +1390,13 @@ impl LayoutEngine {
             _ => return,
         };
 
-        let vw = self.viewport_width;
-        let vh = self.viewport_height;
         let gap = axis
             .gap(&node.style)
-            .resolve_with(ctx.containing_block_main(axis), vw, vh)
+            .resolve_with(
+                ctx.containing_block_main(axis),
+                self.viewport_width,
+                self.viewport_height,
+            )
             .unwrap_or(0.0)
             .max(0.0);
 
@@ -1435,32 +1432,22 @@ impl LayoutEngine {
             resolve_justify_content(node.style.justify_content, remaining_space, items.len())
         };
 
-        let mut cursor_main = start_offset;
+        let mut placement = FlexPlacementCtx {
+            content_box,
+            cursor_main: start_offset,
+            auto_unit,
+            gap_between,
+            gap,
+        };
 
         for item in items {
             match item {
-                LayoutItem::Node(index) => self.position_flex_node_child(
-                    node,
-                    axis,
-                    ctx,
-                    content_box,
-                    &mut cursor_main,
-                    auto_unit,
-                    gap_between,
-                    gap,
-                    index,
-                ),
-                LayoutItem::Fragments(range) => self.position_flex_fragments(
-                    node,
-                    axis,
-                    content_box,
-                    &mut cursor_main,
-                    gap_between,
-                    gap,
-                    vw,
-                    vh,
-                    range,
-                ),
+                LayoutItem::Node(index) => {
+                    self.position_flex_node_child(node, axis, ctx, index, &mut placement)
+                }
+                LayoutItem::Fragments(range) => {
+                    self.position_flex_fragments(node, axis, range, &mut placement)
+                }
             }
         }
     }
@@ -1470,12 +1457,12 @@ impl LayoutEngine {
         node: &mut LayoutNode,
         axis: Axis,
         base_ctx_for_children: &LayoutContext,
-        cbm: Option<f32>,
-        vw: f32,
-        vh: f32,
         flex_items: &[LayoutItem],
         states: &mut [FlexItemState],
     ) -> f32 {
+        let cbm = base_ctx_for_children.containing_block_main(axis);
+        let vw = self.viewport_width;
+        let vh = self.viewport_height;
         let mut total_grow = 0.0;
 
         for (item, state) in flex_items.iter().zip(states.iter_mut()) {
@@ -1684,14 +1671,19 @@ impl LayoutEngine {
         node: &mut LayoutNode,
         axis: Axis,
         base_ctx_for_children: &LayoutContext,
-        cbc: Option<f32>,
-        vw: f32,
-        vh: f32,
         intrinsic_pass: bool,
-        gaps: f32,
         flex_items: &[LayoutItem],
         states: Vec<FlexItemState>,
     ) -> (f32, f32) {
+        let cbc = base_ctx_for_children.containing_block_cross(axis);
+        let vw = self.viewport_width;
+        let vh = self.viewport_height;
+        let gap = axis
+            .gap(&node.style)
+            .resolve_with(base_ctx_for_children.containing_block_main(axis), vw, vh)
+            .unwrap_or(0.0)
+            .max(0.0);
+        let gaps = gap * flex_items.len().saturating_sub(1) as f32;
         let mut total_border_main: f32 = 0.0;
         let mut max_cross: f32 = 0.0;
 
