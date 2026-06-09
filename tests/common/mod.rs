@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use ui_layout::*;
 
 pub fn node<'a>(n: &'a LayoutNode, idx: usize) -> &'a LayoutNode {
