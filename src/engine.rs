@@ -257,6 +257,7 @@ pub(crate) struct LayoutContext {
     pub(crate) containing_block_width: Option<f32>,
     pub(crate) containing_block_height: Option<f32>,
     pub(crate) available_width: Option<f32>,
+    pub(crate) available_height: Option<f32>,
     pub(crate) parent_assigned_border_width: Option<f32>,
     pub(crate) parent_assigned_border_height: Option<f32>,
 }
@@ -411,6 +412,7 @@ impl LayoutEngine {
             containing_block_width: Some(width),
             containing_block_height: Some(height),
             available_width: Some(width),
+            available_height: Some(height),
             parent_assigned_border_width: None,
             parent_assigned_border_height: None,
         };
@@ -520,7 +522,11 @@ impl LayoutEngine {
 
         let content_width_opt = content_width_opt.or(ctx
             .available_width
-            .map(|v| v - border.left - border.right - padding.left - padding.right));
+            .map(|v| (v - border.left - border.right - padding.left - padding.right).max(0.0)));
+
+        let content_height_opt = content_height_opt.or(ctx
+            .available_height
+            .map(|v| (v - border.top - border.bottom - padding.top - padding.bottom).max(0.0)));
 
         self.layout_by_inner_display(
             node,
@@ -597,6 +603,7 @@ impl LayoutEngine {
             containing_block_width: content_width_opt,
             containing_block_height: content_height_opt,
             available_width: content_width_opt.or(ctx.available_width),
+            available_height: None,
             parent_assigned_border_width: None,
             parent_assigned_border_height: None,
         };
@@ -946,6 +953,7 @@ impl LayoutEngine {
                     containing_block_width: content_width_opt,
                     containing_block_height: content_height_opt,
                     available_width: None,
+                    available_height: None,
                     parent_assigned_border_width: None,
                     parent_assigned_border_height: None,
                 };
@@ -990,6 +998,7 @@ impl LayoutEngine {
                 containing_block_width: Some(final_width),
                 containing_block_height: Some(final_height),
                 available_width: None,
+                available_height: None,
                 parent_assigned_border_width: None,
                 parent_assigned_border_height: None,
             };
@@ -1004,6 +1013,7 @@ impl LayoutEngine {
                 containing_block_width: content_width_opt,
                 containing_block_height: content_height_opt,
                 available_width: None,
+                available_height: None,
                 parent_assigned_border_width: None,
                 parent_assigned_border_height: None,
             };
@@ -1936,7 +1946,7 @@ impl LayoutEngine {
         // Parent-assigned (flex) size takes priority over explicit size
         let content_width = ctx
             .parent_assigned_border_width
-            .map(|v| v - (padding.left + padding.right) - (border.left + border.right))
+            .map(|v| (v - (padding.left + padding.right) - (border.left + border.right)).max(0.0))
             .or(size_style
                 .width
                 .resolve_with(ctx.containing_block_width, vw, vh)
@@ -1956,7 +1966,7 @@ impl LayoutEngine {
         // Parent-assigned (flex) size takes priority over explicit size
         let content_height = ctx
             .parent_assigned_border_height
-            .map(|v| v - (padding.top + padding.bottom) - (border.top + border.bottom))
+            .map(|v| (v - (padding.top + padding.bottom) - (border.top + border.bottom)).max(0.0))
             .or(size_style
                 .height
                 .resolve_with(ctx.containing_block_height, vw, vh)
