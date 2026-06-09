@@ -978,6 +978,351 @@ fn flex_multiple_fragment_groups() {
     );
 }
 
+// --- JustifyContent variants ---
+
+#[test]
+fn flex_justify_content_space_around() {
+    let child1 = LayoutNode::new(Style {
+        size: SizeStyle {
+            width: LengthOrAuto::Length(Length::Px(50.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let child2 = LayoutNode::new(Style {
+        size: SizeStyle {
+            width: LengthOrAuto::Length(Length::Px(60.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let child3 = LayoutNode::new(Style {
+        size: SizeStyle {
+            width: LengthOrAuto::Length(Length::Px(40.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            display: Display {
+                outer: OuterDisplay::Block,
+                inner: InnerDisplay::Flex,
+            },
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(300.0)),
+                height: LengthOrAuto::Length(Length::Px(50.0)),
+                ..Default::default()
+            },
+            justify_content: JustifyContent::SpaceAround,
+            flex_direction: FlexDirection::Row,
+            ..Default::default()
+        },
+        [child1, child2, child3],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    // remaining = 300 - (50 + 60 + 40) = 150, gap = 150/3 = 50, start_offset = 25, gap_between = 50
+    assert!(approx_eq(block_box(node(&root, 0)).border_box.x, 25.0));
+    assert!(approx_eq(block_box(node(&root, 1)).border_box.x, 125.0));
+    assert!(approx_eq(block_box(node(&root, 2)).border_box.x, 235.0));
+}
+
+#[test]
+fn flex_justify_content_end() {
+    let child1 = LayoutNode::new(Style {
+        size: SizeStyle {
+            width: LengthOrAuto::Length(Length::Px(50.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let child2 = LayoutNode::new(Style {
+        size: SizeStyle {
+            width: LengthOrAuto::Length(Length::Px(60.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            display: Display {
+                outer: OuterDisplay::Block,
+                inner: InnerDisplay::Flex,
+            },
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(300.0)),
+                height: LengthOrAuto::Length(Length::Px(50.0)),
+                ..Default::default()
+            },
+            justify_content: JustifyContent::End,
+            flex_direction: FlexDirection::Row,
+            ..Default::default()
+        },
+        [child1, child2],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    // remaining = 300 - (50 + 60) = 190, start_offset = 190
+    assert_eq!(block_box(node(&root, 0)).border_box.x, 190.0);
+    assert_eq!(block_box(node(&root, 1)).border_box.x, 240.0);
+}
+
+// --- AlignItems variants ---
+
+#[test]
+fn flex_align_items_center() {
+    let child = LayoutNode::new(Style {
+        size: SizeStyle {
+            width: LengthOrAuto::Length(Length::Px(50.0)),
+            height: LengthOrAuto::Length(Length::Px(30.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            display: Display {
+                outer: OuterDisplay::Block,
+                inner: InnerDisplay::Flex,
+            },
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Length(Length::Px(100.0)),
+                ..Default::default()
+            },
+            flex_direction: FlexDirection::Row,
+            align_items: AlignItems::Center,
+            ..Default::default()
+        },
+        [child],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    // cross offset = (100 - 30) / 2 = 35
+    assert_eq!(block_box(node(&root, 0)).border_box.y, 35.0);
+}
+
+#[test]
+fn flex_align_items_end() {
+    let child = LayoutNode::new(Style {
+        size: SizeStyle {
+            width: LengthOrAuto::Length(Length::Px(50.0)),
+            height: LengthOrAuto::Length(Length::Px(30.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            display: Display {
+                outer: OuterDisplay::Block,
+                inner: InnerDisplay::Flex,
+            },
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Length(Length::Px(100.0)),
+                ..Default::default()
+            },
+            flex_direction: FlexDirection::Row,
+            align_items: AlignItems::End,
+            ..Default::default()
+        },
+        [child],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    // cross offset = 100 - 30 = 70
+    assert_eq!(block_box(node(&root, 0)).border_box.y, 70.0);
+}
+
+// --- Row gap in column ---
+
+#[test]
+fn flex_column_row_gap() {
+    let child1 = LayoutNode::new(Style {
+        size: SizeStyle {
+            width: LengthOrAuto::Length(Length::Px(100.0)),
+            height: LengthOrAuto::Length(Length::Px(30.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let child2 = LayoutNode::new(Style {
+        size: SizeStyle {
+            width: LengthOrAuto::Length(Length::Px(100.0)),
+            height: LengthOrAuto::Length(Length::Px(40.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            display: Display {
+                outer: OuterDisplay::Block,
+                inner: InnerDisplay::Flex,
+            },
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Length(Length::Px(200.0)),
+                ..Default::default()
+            },
+            flex_direction: FlexDirection::Column,
+            row_gap: LengthOrAuto::Length(Length::Px(20.0)),
+            ..Default::default()
+        },
+        [child1, child2],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    assert_eq!(block_box(node(&root, 0)).border_box.y, 0.0);
+    assert_eq!(block_box(node(&root, 1)).border_box.y, 50.0);
+}
+
+// --- Min/max height constraints ---
+
+#[test]
+fn flex_min_height_constraint() {
+    let child = LayoutNode::new(Style {
+        item_style: ItemStyle {
+            flex_grow: 1.0,
+            ..Default::default()
+        },
+        size: SizeStyle {
+            min_height: LengthOrAuto::Length(Length::Px(60.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let mut root =
+        LayoutNode::with_children(flex_container(200.0, 100.0, FlexDirection::Column), [child]);
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    assert!(block_box(node(&root, 0)).content_box.height >= 60.0);
+}
+
+#[test]
+fn flex_max_height_constraint() {
+    let child = LayoutNode::new(Style {
+        item_style: ItemStyle {
+            flex_grow: 1.0,
+            ..Default::default()
+        },
+        size: SizeStyle {
+            max_height: LengthOrAuto::Length(Length::Px(30.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let mut root =
+        LayoutNode::with_children(flex_container(200.0, 200.0, FlexDirection::Column), [child]);
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    assert!(block_box(node(&root, 0)).content_box.height <= 30.0);
+}
+
+// --- Empty container ---
+
+#[test]
+fn flex_empty_container() {
+    let mut root = LayoutNode::new(flex_container(200.0, 100.0, FlexDirection::Row));
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    let b = block_box(&root);
+    assert_eq!(b.content_box.width, 200.0);
+    assert_eq!(b.content_box.height, 100.0);
+}
+
+// --- Display none child ---
+
+#[test]
+fn flex_display_none_child() {
+    let visible = LayoutNode::new(Style {
+        size: SizeStyle {
+            width: LengthOrAuto::Length(Length::Px(50.0)),
+            height: LengthOrAuto::Length(Length::Px(30.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let hidden = LayoutNode::new(Style {
+        display: Display {
+            outer: OuterDisplay::None,
+            inner: InnerDisplay::Flow,
+        },
+        ..Default::default()
+    });
+
+    let mut root = LayoutNode::with_children(
+        flex_container(300.0, 50.0, FlexDirection::Row),
+        [visible, hidden],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    assert_eq!(block_box(node(&root, 0)).border_box.x, 0.0);
+    assert_eq!(node(&root, 0).layout_box.width(), 50.0);
+    assert!(node(&root, 1).layout_box.is_empty());
+}
+
+// --- inline-flex display ---
+
+#[test]
+fn flex_inline_flex_layout() {
+    let child = LayoutNode::new(Style {
+        size: SizeStyle {
+            width: LengthOrAuto::Length(Length::Px(50.0)),
+            height: LengthOrAuto::Length(Length::Px(30.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            display: Display {
+                outer: OuterDisplay::Inline,
+                inner: InnerDisplay::Flex,
+            },
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Length(Length::Px(50.0)),
+                ..Default::default()
+            },
+            flex_direction: FlexDirection::Row,
+            ..Default::default()
+        },
+        [child],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    let b = block_box(&root);
+    assert_eq!(b.content_box.width, 200.0);
+    assert_eq!(b.content_box.height, 50.0);
+    assert_eq!(block_box(node(&root, 0)).border_box.x, 0.0);
+}
+
 // --- Nested flex stress ---
 
 fn block_flex() -> Display {

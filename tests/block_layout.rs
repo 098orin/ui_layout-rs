@@ -440,3 +440,74 @@ fn three_siblings_with_margin_collapse() {
     assert_eq!(block_box(node(&root, 2)).border_box.y, 75.0);
     assert_eq!(block_box(&root).content_box.height, 85.0);
 }
+
+// --- BoxModel direct accessors ---
+
+#[test]
+fn box_model_width_height_accessors() {
+    let bm = BoxModel {
+        border_box: Rect {
+            x: 5.0,
+            y: 10.0,
+            width: 200.0,
+            height: 100.0,
+        },
+        padding_box: Rect {
+            x: 7.0,
+            y: 12.0,
+            width: 196.0,
+            height: 96.0,
+        },
+        content_box: Rect {
+            x: 9.0,
+            y: 14.0,
+            width: 192.0,
+            height: 92.0,
+        },
+        children_box: Rect {
+            x: 9.0,
+            y: 14.0,
+            width: 192.0,
+            height: 92.0,
+        },
+    };
+    assert_eq!(bm.width(), 200.0);
+    assert_eq!(bm.height(), 100.0);
+}
+
+// --- Edge cases ---
+
+#[test]
+fn block_empty_node() {
+    let mut root = LayoutNode::new(Style {
+        size: SizeStyle {
+            width: LengthOrAuto::Length(Length::Px(100.0)),
+            height: LengthOrAuto::Length(Length::Px(50.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    let b = block_box(&root);
+    assert_eq!(b.content_box.width, 100.0);
+    assert_eq!(b.content_box.height, 50.0);
+}
+
+#[test]
+fn block_display_none() {
+    let mut root = LayoutNode::new(Style {
+        display: Display {
+            outer: OuterDisplay::None,
+            inner: InnerDisplay::Flow,
+        },
+        ..Default::default()
+    });
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    assert!(root.layout_box.is_empty());
+    assert_eq!(root.layout_box.width(), 0.0);
+    assert_eq!(root.layout_box.height(), 0.0);
+}

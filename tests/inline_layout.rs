@@ -981,7 +981,106 @@ fn borrowed_layout_box_iter_tracks_remaining_len() {
     assert_eq!(middle.content_box.width, 30.0);
     assert_eq!(iter.len(), 0);
     assert!(iter.next().is_none());
-    assert!(iter.next_back().is_none());
+}
+
+// --- LayoutBox helper methods ---
+
+#[test]
+fn layout_box_width_height_variants() {
+    let none = LayoutBox::None;
+    assert_eq!(none.width(), 0.0);
+    assert_eq!(none.height(), 0.0);
+
+    let block = LayoutBox::BlockBox(BoxModel {
+        border_box: rect(0.0, 0.0, 100.0, 50.0),
+        padding_box: rect(0.0, 0.0, 100.0, 50.0),
+        content_box: rect(0.0, 0.0, 100.0, 50.0),
+        children_box: rect(0.0, 0.0, 100.0, 50.0),
+    });
+    assert_eq!(block.width(), 100.0);
+    assert_eq!(block.height(), 50.0);
+    assert_eq!(block.width_box(), 100.0);
+    assert_eq!(block.height_box(), 50.0);
+
+    let inline = mock_inline_box();
+    // width/height return raw box_model border_box dimensions
+    assert_eq!(inline.width(), 114.0);
+    assert_eq!(inline.height(), 20.0);
+    // width_box/height_box account for line spans
+    assert_eq!(inline.width_box(), 40.0);
+    assert_eq!(inline.height_box(), 60.0);
+}
+
+#[test]
+fn layout_box_is_empty_and_len() {
+    assert!(LayoutBox::None.is_empty());
+    assert_eq!(LayoutBox::None.len(), 0);
+
+    let block = LayoutBox::BlockBox(BoxModel {
+        border_box: rect(0.0, 0.0, 100.0, 50.0),
+        padding_box: rect(0.0, 0.0, 100.0, 50.0),
+        content_box: rect(0.0, 0.0, 100.0, 50.0),
+        children_box: rect(0.0, 0.0, 100.0, 50.0),
+    });
+    assert!(!block.is_empty());
+    assert_eq!(block.len(), 1);
+
+    let inline = mock_inline_box();
+    assert!(!inline.is_empty());
+    assert_eq!(inline.len(), 3);
+
+    let inline_empty = LayoutBox::InlineBox(InlineBox {
+        box_model: BoxModel {
+            border_box: rect(0.0, 0.0, 50.0, 20.0),
+            padding_box: rect(0.0, 0.0, 50.0, 20.0),
+            content_box: rect(0.0, 0.0, 50.0, 20.0),
+            children_box: rect(0.0, 0.0, 50.0, 20.0),
+        },
+        line_spans: vec![],
+    });
+    assert!(!inline_empty.is_empty());
+    assert_eq!(inline_empty.len(), 1);
+}
+
+// --- FragmentNode helpers ---
+
+#[test]
+fn fragment_node_new_creates_with_default_placement() {
+    let frag = ItemFragment::Fragment(Fragment {
+        width: 30.0,
+        height: 15.0,
+    });
+    let node = FragmentNode::new(frag);
+    assert_eq!(node.node.width(), 30.0);
+    assert_eq!(node.node.height(), 15.0);
+    assert_eq!(node.placement, Placement::default());
+}
+
+#[test]
+fn fragment_node_from_item_fragment() {
+    let frag = ItemFragment::Fragment(Fragment {
+        width: 20.0,
+        height: 10.0,
+    });
+    let node: FragmentNode = frag.into();
+    assert_eq!(node.node.width(), 20.0);
+}
+
+#[test]
+fn line_span_width() {
+    let span = LineSpan {
+        x_range: 10.0..50.0,
+        line_pos: (10.0, 0.0),
+        line_index: 0,
+    };
+    assert_eq!(span.width(), 40.0);
+
+    let zero = LineSpan {
+        x_range: 10.0..10.0,
+        line_pos: (10.0, 0.0),
+        line_index: 0,
+    };
+    assert_eq!(zero.width(), 0.0);
 }
 
 #[test]

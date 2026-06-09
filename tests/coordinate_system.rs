@@ -289,3 +289,32 @@ fn coordinate_system_with_auto_margins() {
     assert_eq!(child_box.border_box.x, expected_child_x);
     assert_eq!(child_box.border_box.y, 0.0);
 }
+
+// --- Geometry utilities ---
+
+#[test]
+fn rect_size_returns_width_height_tuple() {
+    let r = Rect {
+        x: 10.0,
+        y: 20.0,
+        width: 100.0,
+        height: 50.0,
+    };
+    assert_eq!(r.size(), (100.0, 50.0));
+}
+
+#[test]
+fn rect_right_and_bottom() {
+    let r = Rect {
+        x: 10.0,
+        y: 20.0,
+        width: 100.0,
+        height: 50.0,
+    };
+    assert_eq!(r.right(), 110.0);
+    assert_eq!(r.bottom(), 70.0);
+
+    let zero = Rect::default();
+    assert_eq!(zero.right(), 0.0);
+    assert_eq!(zero.bottom(), 0.0);
+}
