@@ -185,6 +185,34 @@ struct FlowCursor {
     line_index: usize,
 }
 
+impl FlowCursor {
+    fn line_ctx(&self) -> LineContext {
+        LineContext {
+            end_pos: (self.x, self.y),
+            current_x: self.current_x,
+        }
+    }
+
+    fn update_from(&mut self, ctx: &LineContext) {
+        self.x = ctx.end_pos.0;
+        self.y = ctx.end_pos.1;
+        self.current_x = ctx.current_x;
+    }
+
+    fn advance_line_index(&mut self, n: usize) {
+        self.line_index += n;
+    }
+
+    fn set_pos(&mut self, x: f32, y: f32) {
+        self.x = x;
+        self.y = y;
+    }
+
+    fn shift_y(&mut self, dy: f32) {
+        self.y += dy;
+    }
+}
+
 struct FlowAccum {
     prev_child_margin: f32,
     pending_advance: f32,
@@ -642,10 +670,7 @@ impl LayoutEngine {
             })
             .collect();
 
-        let line_ctx_for_child = LineContext {
-            end_pos: (state.cursor.x, state.cursor.y),
-            current_x: state.cursor.current_x,
-        };
+        let line_ctx_for_child = state.cursor.line_ctx();
 
         let (line_spans, updated_line_ctx) = Self::flow_fragments(
             &mut fragment_node_buffer,
@@ -656,12 +681,6 @@ impl LayoutEngine {
         );
 
         let had_line_spans = !line_spans.is_empty();
-
-        let LineContext {
-            end_pos: (cx, cy),
-            current_x: ix,
-            ..
-        } = updated_line_ctx;
 
         if had_line_spans {
             let max_span_width = line_spans
@@ -674,13 +693,13 @@ impl LayoutEngine {
             state.accum.children_height = state
                 .accum
                 .children_height
-                .max(cy + state.accum.max_inline_line_height);
+                .max(updated_line_ctx.end_pos.1 + state.accum.max_inline_line_height);
         }
 
-        state.cursor.x = cx;
-        state.cursor.y = cy;
-        state.cursor.current_x = ix;
-        state.cursor.line_index += line_spans.len().saturating_sub(1);
+        state.cursor.update_from(&updated_line_ctx);
+        state
+            .cursor
+            .advance_line_index(line_spans.len().saturating_sub(1));
 
         for span in line_spans {
             push_or_merge_line_span(&mut state.accum.line_span_buf, span);
@@ -715,10 +734,7 @@ impl LayoutEngine {
             ..*base_ctx_for_child
         };
 
-        let line_ctx_for_child = LineContext {
-            end_pos: (state.cursor.x, state.cursor.y),
-            current_x: state.cursor.current_x,
-        };
+        let line_ctx_for_child = state.cursor.line_ctx();
 
         let child_is_block = child_node.style.display.outer == OuterDisplay::Block;
         let layout_line_ctx = if child_is_block {
@@ -744,17 +760,11 @@ impl LayoutEngine {
         };
 
         if child_is_block {
-            state.cursor.x = 0.0;
-            state.cursor.y = child_position_y + updated_line_ctx.end_pos.1;
+            state
+                .cursor
+                .set_pos(0.0, child_position_y + updated_line_ctx.end_pos.1);
         } else {
-            let LineContext {
-                end_pos: (cx, cy),
-                current_x: ix,
-                ..
-            } = updated_line_ctx;
-            state.cursor.x = cx;
-            state.cursor.y = cy;
-            state.cursor.current_x = ix;
+            state.cursor.update_from(&updated_line_ctx);
         }
 
         let EdgeOption {
@@ -775,11 +785,9 @@ impl LayoutEngine {
         child_node.layout_box.shift(ml, 0.0);
 
         if child_is_block {
-            child_node.layout_box.shift(
-                0.0,
-                state.accum.prev_child_margin.max(top.unwrap_or_default()),
-            );
-            state.cursor.y += state.accum.prev_child_margin.max(top.unwrap_or_default());
+            let margin_top = state.accum.prev_child_margin.max(top.unwrap_or_default());
+            child_node.layout_box.shift(0.0, margin_top);
+            state.cursor.shift_y(margin_top);
             state.accum.prev_child_margin = bottom.unwrap_or_default();
         }
 
