@@ -4,6 +4,8 @@ use crate::{
     OuterDisplay, Placement, Rect, Spacing, Style,
 };
 
+const EPSILON: f32 = 0.001;
+
 //=====================
 // Benchmark
 //=====================
@@ -1178,10 +1180,7 @@ impl LayoutEngine {
                         delta,
                         min,
                         max,
-                        states[i].main_padding.0
-                            + states[i].main_padding.1
-                            + states[i].main_border.0
-                            + states[i].main_border.1,
+                        flex_padding_border(&states[i]),
                         if let LayoutItem::Node(index) = item {
                             Some(node.children[*index].node().unwrap().style.box_sizing)
                         } else {
@@ -1194,7 +1193,7 @@ impl LayoutEngine {
                     states[i].main_size = clamped_content;
                     used += actual;
 
-                    if (old_size + delta - clamped_content).abs() > 0.001 {
+                    if (old_size + delta - clamped_content).abs() > EPSILON {
                         states[i].frozen_grow = true;
                         total_grow -= grow;
                     }
@@ -1202,7 +1201,7 @@ impl LayoutEngine {
 
                 remaining -= used;
 
-                if used.abs() < 0.001 {
+                if used.abs() < EPSILON {
                     break;
                 }
             } else {
@@ -1249,10 +1248,7 @@ impl LayoutEngine {
                         delta,
                         min,
                         max,
-                        states[i].main_padding.0
-                            + states[i].main_padding.1
-                            + states[i].main_border.0
-                            + states[i].main_border.1,
+                        flex_padding_border(&states[i]),
                         if let LayoutItem::Node(index) = item {
                             Some(node.children[*index].node().unwrap().style.box_sizing)
                         } else {
@@ -1265,14 +1261,14 @@ impl LayoutEngine {
                     states[i].main_size = clamped_content;
                     used += actual;
 
-                    if (clamped_content - new_size).abs() > 0.001 {
+                    if (clamped_content - new_size).abs() > EPSILON {
                         states[i].frozen_shrink = true;
                     }
                 }
 
                 remaining -= used;
 
-                if used.abs() < 0.001 {
+                if used.abs() < EPSILON {
                     break;
                 }
             }
@@ -1867,28 +1863,19 @@ impl LayoutEngine {
         ctx: &LayoutContext,
         is_width: bool,
     ) -> f32 {
-        let vw = self.viewport_width;
-        let vh = self.viewport_height;
-
-        let (min_constraint, max_constraint) = if is_width {
-            (
-                size_style
-                    .min_width
-                    .resolve_with(ctx.containing_block_width, vw, vh),
-                size_style
-                    .max_width
-                    .resolve_with(ctx.containing_block_width, vw, vh),
-            )
+        let containing_size = if is_width {
+            ctx.containing_block_width
         } else {
-            (
-                size_style
-                    .min_height
-                    .resolve_with(ctx.containing_block_height, vw, vh),
-                size_style
-                    .max_height
-                    .resolve_with(ctx.containing_block_height, vw, vh),
-            )
+            ctx.containing_block_height
         };
+
+        let (min_constraint, max_constraint) = resolve_min_max(
+            size_style,
+            containing_size,
+            self.viewport_width,
+            self.viewport_height,
+            is_width,
+        );
 
         clamp(value, min_constraint, max_constraint)
     }
@@ -1965,6 +1952,30 @@ impl LayoutEngine {
 }
 
 // ==========================================
+
+fn flex_padding_border(state: &FlexItemState) -> f32 {
+    state.main_padding.0 + state.main_padding.1 + state.main_border.0 + state.main_border.1
+}
+
+fn resolve_min_max(
+    size_style: &crate::SizeStyle,
+    containing_size: Option<f32>,
+    vw: f32,
+    vh: f32,
+    is_width: bool,
+) -> (Option<f32>, Option<f32>) {
+    if is_width {
+        (
+            size_style.min_width.resolve_with(containing_size, vw, vh),
+            size_style.max_width.resolve_with(containing_size, vw, vh),
+        )
+    } else {
+        (
+            size_style.min_height.resolve_with(containing_size, vw, vh),
+            size_style.max_height.resolve_with(containing_size, vw, vh),
+        )
+    }
+}
 
 /// Resolves content size based on the box-sizing property.
 ///
