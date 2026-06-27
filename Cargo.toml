@@ -4,9 +4,9 @@ version = "0.10.0"
 edition = "2024"
 
 description = "A minimal Flexbox-inspired layout engine for Rust GUI"
-license = "MIT"
 repository = "https://github.com/098orin/ui_layout-rs"
-keywords = ["layout", "gui", "flexbox", "ui"]
+license = "MIT"
+keywords = ["flexbox", "gui", "layout", "ui"]
 categories = ["gui"]
 
 [features]
