@@ -190,6 +190,7 @@ impl FlowCursor {
         LineContext {
             end_pos: (self.x, self.y),
             current_x: self.current_x,
+            margin_end: 0.0,
         }
     }
 
@@ -396,15 +397,18 @@ pub(crate) struct LineContext {
 
     /// Current x offset in the flat inline coordinate space.
     pub current_x: f32,
+
+    /// Collapsed bottom margin of the last child for parent-child margin collapsing.
+    pub margin_end: f32,
 }
 
 pub(crate) const EMPTY_LINE_CONTEXT: LineContext = LineContext {
     end_pos: (0.0, 0.0),
     current_x: 0.0,
+    margin_end: 0.0,
 };
 
 impl LayoutEngine {
-    // TODO: implement parent_margin_end
     /// Main layout entry point.
     /// Initiates layout computation from the root node with specified viewport dimensions.
     pub fn layout(root: &mut LayoutNode, width: f32, height: f32) {
@@ -524,10 +528,6 @@ impl LayoutEngine {
             .available_width
             .map(|v| (v - border.left - border.right - padding.left - padding.right).max(0.0)));
 
-        let content_height_opt = content_height_opt.or(ctx
-            .available_height
-            .map(|v| (v - border.top - border.bottom - padding.top - padding.bottom).max(0.0)));
-
         self.layout_by_inner_display(
             node,
             ctx,
@@ -597,6 +597,7 @@ impl LayoutEngine {
         let LineContext {
             end_pos: (_, end_y),
             current_x: parent_current_x,
+            ..
         } = line_ctx;
 
         let base_ctx_for_child = LayoutContext {
@@ -641,7 +642,7 @@ impl LayoutEngine {
             intrinsic_pass,
         };
 
-        let items = collect_layout_items(&node.children);
+        let items: Vec<_> = LayoutItems::new(&node.children).collect();
 
         for item in items {
             match item {
@@ -795,7 +796,8 @@ impl LayoutEngine {
             let margin_top = state.accum.prev_child_margin.max(top.unwrap_or_default());
             child_node.layout_box.shift(0.0, margin_top);
             state.cursor.shift_y(margin_top);
-            state.accum.prev_child_margin = bottom.unwrap_or_default();
+            state.accum.prev_child_margin =
+                bottom.unwrap_or_default().max(updated_line_ctx.margin_end);
         }
 
         if child_node.style.display.outer == OuterDisplay::Inline {
@@ -865,6 +867,7 @@ impl LayoutEngine {
                     children_width,
                     children_height,
                     max_inline_line_height,
+                    prev_child_margin,
                     mut line_span_buf,
                     ..
                 },
@@ -911,6 +914,7 @@ impl LayoutEngine {
             LineContext {
                 end_pos: (cursor_x, cursor_y),
                 current_x: parent_current_x + current_x,
+                margin_end: 0.0,
             }
         } else {
             let content_width = content_width_opt.unwrap_or(children_width);
@@ -931,6 +935,7 @@ impl LayoutEngine {
             LineContext {
                 end_pos: (0.0, end_y + block_height),
                 current_x: parent_current_x + current_x,
+                margin_end: prev_child_margin,
             }
         }
     }
@@ -972,12 +977,31 @@ impl LayoutEngine {
 
         let height_before_constraints = content_height_opt.unwrap_or(children_height);
 
-        // Apply min/max
-        let final_width =
-            self.apply_size_constraints(width_before_constraints, &node.style.size, ctx, true);
+        // Apply min/max (resolve padding/border early for box-sizing adjustment)
+        let flex_padding = self.resolve_padding(&node.style.spacing, ctx);
+        let flex_border = self.resolve_border(&node.style.spacing, ctx);
+        let flex_pb_w =
+            flex_padding.left + flex_padding.right + flex_border.left + flex_border.right;
+        let flex_pb_h =
+            flex_padding.top + flex_padding.bottom + flex_border.top + flex_border.bottom;
 
-        let final_height =
-            self.apply_size_constraints(height_before_constraints, &node.style.size, ctx, false);
+        let final_width = self.apply_size_constraints(
+            width_before_constraints,
+            &node.style.size,
+            ctx,
+            true,
+            Some(&node.style.box_sizing),
+            flex_pb_w,
+        );
+
+        let final_height = self.apply_size_constraints(
+            height_before_constraints,
+            &node.style.size,
+            ctx,
+            false,
+            Some(&node.style.box_sizing),
+            flex_pb_h,
+        );
 
         // Detect whether constraints changed size
         let relayout_needed = (Some(final_width) != content_width_opt
@@ -1055,6 +1079,7 @@ impl LayoutEngine {
                 line_ctx.end_pos.1,
             ),
             current_x: line_ctx.current_x + node.layout_box.width_box(),
+            margin_end: 0.0,
         }
     }
 
@@ -1083,7 +1108,7 @@ impl LayoutEngine {
             .max(0.0);
 
         // --------- Convert to FlexItem ----------
-        let flex_items = collect_layout_items(&node.children);
+        let flex_items: Vec<_> = LayoutItems::new(&node.children).collect();
         let item_len = flex_items.len();
 
         let mut states = vec![FlexItemState::default(); item_len];
@@ -1373,10 +1398,12 @@ impl LayoutEngine {
             Axis::Horizontal => LineContext {
                 end_pos: (child_main_pos, child_cross_pos),
                 current_x: child_main_pos,
+                margin_end: 0.0,
             },
             Axis::Vertical => LineContext {
                 end_pos: (child_cross_pos, child_main_pos),
                 current_x: child_cross_pos,
+                margin_end: 0.0,
             },
         };
 
@@ -1418,7 +1445,7 @@ impl LayoutEngine {
             .unwrap_or(0.0)
             .max(0.0);
 
-        let items = collect_layout_items(&node.children);
+        let items: Vec<_> = LayoutItems::new(&node.children).collect();
 
         let children_main_total = self.flex_children_main_total(node, axis, ctx, &items);
 
@@ -1921,6 +1948,7 @@ impl LayoutEngine {
             LineContext {
                 end_pos: (cursor_x, cursor_y),
                 current_x,
+                margin_end: 0.0,
             },
         )
     }
@@ -1960,7 +1988,16 @@ impl LayoutEngine {
                         border_edge,
                     )
                 }))
-            .map(|width| self.apply_size_constraints(width, size_style, ctx, true));
+            .map(|width| {
+                self.apply_size_constraints(
+                    width,
+                    size_style,
+                    ctx,
+                    true,
+                    Some(box_sizing),
+                    padding.left + padding.right + border.left + border.right,
+                )
+            });
 
         // --- height ---
         // Parent-assigned (flex) size takes priority over explicit size
@@ -1980,7 +2017,16 @@ impl LayoutEngine {
                         border_edge,
                     )
                 }))
-            .map(|height| self.apply_size_constraints(height, size_style, ctx, false));
+            .map(|height| {
+                self.apply_size_constraints(
+                    height,
+                    size_style,
+                    ctx,
+                    false,
+                    Some(box_sizing),
+                    padding.top + padding.bottom + border.top + border.bottom,
+                )
+            });
 
         ((content_width, content_height), border, padding)
     }
@@ -1992,6 +2038,8 @@ impl LayoutEngine {
         size_style: &crate::SizeStyle,
         ctx: &LayoutContext,
         is_width: bool,
+        box_sizing: Option<&BoxSizing>,
+        padding_border_edge: f32,
     ) -> f32 {
         let containing_size = if is_width {
             ctx.containing_block_width
@@ -2006,6 +2054,14 @@ impl LayoutEngine {
             self.viewport_height,
             is_width,
         );
+
+        let (min_constraint, max_constraint) = match box_sizing {
+            Some(BoxSizing::BorderBox) => (
+                min_constraint.map(|m| (m - padding_border_edge).max(0.0)),
+                max_constraint.map(|m| (m - padding_border_edge).max(0.0)),
+            ),
+            _ => (min_constraint, max_constraint),
+        };
 
         clamp(value, min_constraint, max_constraint)
     }
@@ -2190,28 +2246,43 @@ fn clamp_flex_main_size(
     }
 }
 
-fn collect_layout_items(children: &[LayoutChild]) -> Vec<LayoutItem> {
-    let mut items = Vec::new();
-    let mut iter = children.iter().enumerate().peekable();
+struct LayoutItems<'a> {
+    children: &'a [LayoutChild],
+    index: usize,
+}
 
-    while let Some((i, child)) = iter.next() {
-        match child {
-            LayoutChild::Node(_) => items.push(LayoutItem::Node(i)),
+impl<'a> LayoutItems<'a> {
+    fn new(children: &'a [LayoutChild]) -> Self {
+        Self { children, index: 0 }
+    }
+}
+
+impl<'a> Iterator for LayoutItems<'a> {
+    type Item = LayoutItem;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let i = self.index;
+        if i >= self.children.len() {
+            return None;
+        }
+        match &self.children[i] {
+            LayoutChild::Node(_) => {
+                self.index = i + 1;
+                Some(LayoutItem::Node(i))
+            }
             LayoutChild::Fragment(_) => {
                 let start = i;
                 let mut end = i + 1;
-
-                while let Some((next_i, LayoutChild::Fragment(_))) = iter.peek() {
-                    end = *next_i + 1;
-                    iter.next();
+                while end < self.children.len()
+                    && matches!(self.children[end], LayoutChild::Fragment(_))
+                {
+                    end += 1;
                 }
-
-                items.push(LayoutItem::Fragments(start..end));
+                self.index = end;
+                Some(LayoutItem::Fragments(start..end))
             }
         }
     }
-
-    items
 }
 
 fn resolved_fragment_line_height(
