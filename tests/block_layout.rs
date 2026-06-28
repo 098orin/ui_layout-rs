@@ -840,6 +840,65 @@ fn block_empty_node() {
 }
 
 #[test]
+fn block_sibling_with_margin_after_marginless_sibling() {
+    let child1 = LayoutNode::new(Style {
+        size: SizeStyle {
+            height: LengthOrAuto::Length(Length::Px(10.0)),
+            ..Default::default()
+        },
+        spacing: Spacing {
+            margin_bottom: LengthOrAuto::Length(Length::Px(10.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let child2 = LayoutNode::new(Style {
+        size: SizeStyle {
+            height: LengthOrAuto::Length(Length::Px(10.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let child3 = LayoutNode::new(Style {
+        size: SizeStyle {
+            height: LengthOrAuto::Length(Length::Px(10.0)),
+            ..Default::default()
+        },
+        spacing: Spacing {
+            margin_top: LengthOrAuto::Length(Length::Px(20.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Auto,
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        [child1, child2, child3],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    let c1 = block_box(node(&root, 0));
+    let c2 = block_box(node(&root, 1));
+    let c3 = block_box(node(&root, 2));
+
+    assert_eq!(c1.border_box.y, 0.0);
+    // child2: margin collapsed between child1(10) and child2(0) => 10
+    assert_eq!(c2.border_box.y, 20.0);
+    // child3: margin collapsed between child2(0) and child3(20) => 20, NOT with parent
+    assert_eq!(c3.border_box.y, 50.0);
+}
+
+#[test]
 fn block_display_none() {
     let mut root = LayoutNode::new(Style {
         display: Display {
