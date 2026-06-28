@@ -243,6 +243,8 @@ pub enum FlexDirection {
     Row,
     #[default]
     Column,
+    RowReverse,
+    ColumnReverse,
 }
 
 #[derive(Debug, Clone, PartialEq)]
