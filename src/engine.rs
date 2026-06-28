@@ -1869,9 +1869,19 @@ impl LayoutEngine {
                     let _ =
                         self.layout_node(child, &ctx_for_child, EMPTY_LINE_CONTEXT, intrinsic_pass);
 
+                    let margin = self
+                        .resolve_margin(&child.style.spacing, base_ctx_for_children)
+                        .unwrap_or_default();
+                    let (main_margin_start, main_margin_end) = axis.edge_main(&margin);
+                    let cross_margin = match axis {
+                        Axis::Horizontal => margin.top + margin.bottom,
+                        Axis::Vertical => margin.left + margin.right,
+                    };
+
                     let tuple = (child.layout_box.width_box(), child.layout_box.height_box());
-                    total_border_main += axis.tuple_main(tuple);
-                    max_cross = max_cross.max(axis.tuple_cross(tuple));
+                    total_border_main +=
+                        axis.tuple_main(tuple) + main_margin_start + main_margin_end;
+                    max_cross = max_cross.max(axis.tuple_cross(tuple) + cross_margin);
                 }
                 LayoutItem::Fragments(range) => {
                     let line_height = resolved_fragment_line_height(
