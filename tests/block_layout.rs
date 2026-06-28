@@ -332,7 +332,8 @@ fn margins_affect_positioning() {
     let c = node(&root.children[0].node().unwrap(), 0);
     let b = block_box(c);
     assert_eq!(b.border_box.x, 20.0);
-    assert_eq!(b.border_box.y, 10.0);
+    // margin-top collapses with parent (no border/padding) => child at y=0
+    assert_eq!(b.border_box.y, 0.0);
 }
 
 // --- Margin collapsing ---
@@ -439,6 +440,349 @@ fn three_siblings_with_margin_collapse() {
     assert_eq!(block_box(node(&root, 1)).border_box.y, 30.0);
     assert_eq!(block_box(node(&root, 2)).border_box.y, 75.0);
     assert_eq!(block_box(&root).content_box.height, 85.0);
+}
+
+// --- Parent-child margin collapsing ---
+
+#[test]
+fn parent_child_top_margin_collapse() {
+    // Parent has no border/padding, child has margin-top
+    // Child should be at y=0 and parent's effective margin absorbs child's margin
+    let child = LayoutNode::new(Style {
+        size: SizeStyle {
+            height: LengthOrAuto::Length(Length::Px(50.0)),
+            ..Default::default()
+        },
+        spacing: Spacing {
+            margin_top: LengthOrAuto::Length(Length::Px(30.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let mut parent = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Auto,
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        [child],
+    );
+
+    LayoutEngine::layout(&mut parent, 800.0, 600.0);
+
+    // Child should be at y=0 (margin-top collapsed)
+    assert_eq!(block_box(node(&parent, 0)).border_box.y, 0.0);
+    // Parent height should exclude the child's collapsed margin-top
+    assert_eq!(block_box(&parent).content_box.height, 50.0);
+}
+
+#[test]
+fn parent_child_top_margin_collapse_blocked_by_border() {
+    // Parent has border-top, so child's margin-top should NOT collapse
+    let child = LayoutNode::new(Style {
+        size: SizeStyle {
+            height: LengthOrAuto::Length(Length::Px(50.0)),
+            ..Default::default()
+        },
+        spacing: Spacing {
+            margin_top: LengthOrAuto::Length(Length::Px(30.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let mut parent = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Auto,
+                ..Default::default()
+            },
+            spacing: Spacing {
+                border_top: Length::Px(1.0),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        [child],
+    );
+
+    LayoutEngine::layout(&mut parent, 800.0, 600.0);
+
+    // Child should be shifted by its margin-top (no collapse)
+    assert_eq!(block_box(node(&parent, 0)).border_box.y, 30.0);
+    // Parent height should include child's margin-top
+    assert_eq!(block_box(&parent).content_box.height, 80.0);
+}
+
+#[test]
+fn parent_child_top_margin_collapse_blocked_by_padding() {
+    // Parent has padding-top, so child's margin-top should NOT collapse
+    let child = LayoutNode::new(Style {
+        size: SizeStyle {
+            height: LengthOrAuto::Length(Length::Px(50.0)),
+            ..Default::default()
+        },
+        spacing: Spacing {
+            margin_top: LengthOrAuto::Length(Length::Px(30.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let mut parent = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Auto,
+                ..Default::default()
+            },
+            spacing: Spacing {
+                padding_top: Length::Px(1.0),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        [child],
+    );
+
+    LayoutEngine::layout(&mut parent, 800.0, 600.0);
+
+    // Child should be shifted by its margin-top (no collapse)
+    assert_eq!(block_box(node(&parent, 0)).border_box.y, 30.0);
+}
+
+#[test]
+fn parent_child_bottom_margin_collapse() {
+    // Parent has no border/padding, child has margin-bottom
+    // Child's margin-bottom should extrude below parent
+    let child = LayoutNode::new(Style {
+        size: SizeStyle {
+            height: LengthOrAuto::Length(Length::Px(50.0)),
+            ..Default::default()
+        },
+        spacing: Spacing {
+            margin_bottom: LengthOrAuto::Length(Length::Px(20.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let mut parent = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Auto,
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        [child],
+    );
+
+    LayoutEngine::layout(&mut parent, 800.0, 600.0);
+
+    // Parent height should NOT include child's margin-bottom
+    assert_eq!(block_box(&parent).content_box.height, 50.0);
+}
+
+#[test]
+fn parent_child_bottom_margin_collapse_blocked_by_border() {
+    // Parent has border-bottom, child's margin-bottom should be included in height
+    let child = LayoutNode::new(Style {
+        size: SizeStyle {
+            height: LengthOrAuto::Length(Length::Px(50.0)),
+            ..Default::default()
+        },
+        spacing: Spacing {
+            margin_bottom: LengthOrAuto::Length(Length::Px(20.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let mut parent = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Auto,
+                ..Default::default()
+            },
+            spacing: Spacing {
+                border_bottom: Length::Px(1.0),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        [child],
+    );
+
+    LayoutEngine::layout(&mut parent, 800.0, 600.0);
+
+    // Parent height SHOULD include child's margin-bottom (border blocks collapse)
+    assert_eq!(block_box(&parent).content_box.height, 70.0);
+}
+
+#[test]
+fn nested_margin_collapse_top() {
+    // Grandparent -> parent -> child, all without border/padding.
+    // Child's margin-top should propagate through parent to grandparent.
+    let child = LayoutNode::new(Style {
+        size: SizeStyle {
+            height: LengthOrAuto::Length(Length::Px(30.0)),
+            ..Default::default()
+        },
+        spacing: Spacing {
+            margin_top: LengthOrAuto::Length(Length::Px(40.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let parent = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(100.0)),
+                height: LengthOrAuto::Auto,
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        [child],
+    );
+
+    let mut grandparent = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Auto,
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        [parent],
+    );
+
+    LayoutEngine::layout(&mut grandparent, 800.0, 600.0);
+
+    // All margins collapsed: child at y=0 inside parent, parent at y=0 inside grandparent
+    let parent_node = node(&grandparent, 0);
+    let child_node = node(parent_node, 0);
+
+    assert_eq!(block_box(child_node).border_box.y, 0.0);
+    assert_eq!(block_box(parent_node).border_box.y, 0.0);
+    // Grandparent content height = child height (margins extruded above)
+    assert_eq!(block_box(&grandparent).content_box.height, 30.0);
+}
+
+#[test]
+fn parent_child_collapse_with_sibling_margins() {
+    // First child's margin-top collapses with parent; sibling collapsing still works
+    let child1 = LayoutNode::new(Style {
+        size: SizeStyle {
+            height: LengthOrAuto::Length(Length::Px(20.0)),
+            ..Default::default()
+        },
+        spacing: Spacing {
+            margin_top: LengthOrAuto::Length(Length::Px(30.0)),
+            margin_bottom: LengthOrAuto::Length(Length::Px(10.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let child2 = LayoutNode::new(Style {
+        size: SizeStyle {
+            height: LengthOrAuto::Length(Length::Px(30.0)),
+            ..Default::default()
+        },
+        spacing: Spacing {
+            margin_bottom: LengthOrAuto::Length(Length::Px(15.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let mut parent = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Auto,
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        [child1, child2],
+    );
+
+    LayoutEngine::layout(&mut parent, 800.0, 600.0);
+
+    // child1: margin-top (30) collapsed with parent => at y=0
+    assert_eq!(block_box(node(&parent, 0)).border_box.y, 0.0);
+    // child2: sibling margin collapsed (max(child1.mb=10, child2.mt=0) = 10)
+    assert_eq!(block_box(node(&parent, 1)).border_box.y, 30.0);
+    // Parent height: child2 bottom (60) + child2 margin-bottom (15) but bottom collapse
+    // => 60 (child2 bottom) because margin-bottom extruded
+    assert_eq!(block_box(&parent).content_box.height, 60.0);
+}
+
+#[test]
+fn parent_own_margin_collapses_with_child_margin() {
+    // Parent has its own margin-top. Child's margin-top should collapse with parent's.
+    let child = LayoutNode::new(Style {
+        size: SizeStyle {
+            height: LengthOrAuto::Length(Length::Px(50.0)),
+            ..Default::default()
+        },
+        spacing: Spacing {
+            margin_top: LengthOrAuto::Length(Length::Px(40.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let parent = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(100.0)),
+                height: LengthOrAuto::Auto,
+                ..Default::default()
+            },
+            spacing: Spacing {
+                margin_top: LengthOrAuto::Length(Length::Px(20.0)),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        [child],
+    );
+
+    // Give root a border so it blocks margin collapsing upward
+    let mut root = LayoutNode::with_children(
+        Style {
+            spacing: Spacing {
+                border_top: Length::Px(1.0),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        [parent],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    // Parent's effective margin-top = max(20, 40) = 40
+    // Parent should be positioned at y=40 (collapsed margin)
+    let parent_node = node(&root, 0);
+    assert_eq!(block_box(parent_node).border_box.y, 40.0);
+    // Child at y=0 inside parent (margin collapsed)
+    assert_eq!(block_box(node(parent_node, 0)).border_box.y, 0.0);
+    // Parent content height = 50 (child height only)
+    assert_eq!(block_box(parent_node).content_box.height, 50.0);
 }
 
 // --- BoxModel direct accessors ---

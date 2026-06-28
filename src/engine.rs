@@ -190,6 +190,7 @@ impl FlowCursor {
         LineContext {
             end_pos: (self.x, self.y),
             current_x: self.current_x,
+            margin_start: 0.0,
             margin_end: 0.0,
         }
     }
@@ -216,6 +217,7 @@ impl FlowCursor {
 
 struct FlowAccum {
     prev_child_margin: f32,
+    first_child_margin: f32,
     pending_advance: f32,
     children_width: f32,
     children_height: f32,
@@ -406,6 +408,8 @@ pub(crate) struct LineContext {
     /// Current x offset in the flat inline coordinate space.
     pub current_x: f32,
 
+    /// Collapsed top margin of the first child for parent-child margin collapsing.
+    pub margin_start: f32,
     /// Collapsed bottom margin of the last child for parent-child margin collapsing.
     pub margin_end: f32,
 }
@@ -413,6 +417,7 @@ pub(crate) struct LineContext {
 pub(crate) const EMPTY_LINE_CONTEXT: LineContext = LineContext {
     end_pos: (0.0, 0.0),
     current_x: 0.0,
+    margin_start: 0.0,
     margin_end: 0.0,
 };
 
@@ -636,6 +641,7 @@ impl LayoutEngine {
             },
             accum: FlowAccum {
                 prev_child_margin: 0.0,
+                first_child_margin: 0.0,
                 pending_advance: 0.0,
                 children_width: 0.0,
                 children_height: 0.0,
@@ -801,11 +807,22 @@ impl LayoutEngine {
         child_node.layout_box.shift(ml, 0.0);
 
         if child_is_block {
-            let margin_top = state.accum.prev_child_margin.max(top.unwrap_or_default());
-            child_node.layout_box.shift(0.0, margin_top);
-            state.cursor.shift_y(margin_top);
-            state.accum.prev_child_margin =
-                bottom.unwrap_or_default().max(updated_line_ctx.margin_end);
+            let top_collapses = state.accum.prev_child_margin == 0.0
+                && state.border.top == 0.0
+                && state.padding.top == 0.0;
+
+            let effective_top = top.unwrap_or_default().max(updated_line_ctx.margin_start);
+            let effective_bottom = bottom.unwrap_or_default().max(updated_line_ctx.margin_end);
+
+            if top_collapses {
+                state.accum.first_child_margin = effective_top;
+            } else {
+                let margin_top = state.accum.prev_child_margin.max(effective_top);
+                child_node.layout_box.shift(0.0, margin_top);
+                state.cursor.shift_y(margin_top);
+            }
+
+            state.accum.prev_child_margin = effective_bottom;
         }
 
         if child_node.style.display.outer == OuterDisplay::Inline {
@@ -876,6 +893,7 @@ impl LayoutEngine {
                     children_height,
                     max_inline_line_height,
                     prev_child_margin,
+                    first_child_margin,
                     mut line_span_buf,
                     ..
                 },
@@ -922,17 +940,31 @@ impl LayoutEngine {
             LineContext {
                 end_pos: (cursor_x, cursor_y),
                 current_x: parent_current_x + current_x,
+                margin_start: 0.0,
                 margin_end: 0.0,
             }
         } else {
             let content_width = content_width_opt.unwrap_or(children_width);
-            let content_height = content_height_opt.unwrap_or(children_height);
+
+            let top_collapses = border.top == 0.0 && padding.top == 0.0;
+            let bottom_collapses = border.bottom == 0.0 && padding.bottom == 0.0;
+
+            let content_height = content_height_opt.unwrap_or(if bottom_collapses {
+                children_height - prev_child_margin
+            } else {
+                children_height
+            });
+            let children_h = if bottom_collapses {
+                (children_height - prev_child_margin).max(0.0)
+            } else {
+                children_height
+            };
 
             let box_model = create_box_model(
                 content_width,
                 content_height,
                 children_width,
-                children_height,
+                children_h,
                 padding,
                 border,
             );
@@ -943,7 +975,16 @@ impl LayoutEngine {
             LineContext {
                 end_pos: (0.0, end_y + block_height),
                 current_x: parent_current_x + current_x,
-                margin_end: prev_child_margin,
+                margin_start: if top_collapses {
+                    first_child_margin
+                } else {
+                    0.0
+                },
+                margin_end: if bottom_collapses {
+                    prev_child_margin
+                } else {
+                    0.0
+                },
             }
         }
     }
@@ -1087,6 +1128,7 @@ impl LayoutEngine {
                 line_ctx.end_pos.1,
             ),
             current_x: line_ctx.current_x + node.layout_box.width_box(),
+            margin_start: 0.0,
             margin_end: 0.0,
         }
     }
@@ -1423,11 +1465,13 @@ impl LayoutEngine {
             Axis::Horizontal => LineContext {
                 end_pos: (child_main_pos, child_cross_pos),
                 current_x: child_main_pos,
+                margin_start: 0.0,
                 margin_end: 0.0,
             },
             Axis::Vertical => LineContext {
                 end_pos: (child_cross_pos, child_main_pos),
                 current_x: child_cross_pos,
+                margin_start: 0.0,
                 margin_end: 0.0,
             },
         };
@@ -1989,6 +2033,7 @@ impl LayoutEngine {
             LineContext {
                 end_pos: (cursor_x, cursor_y),
                 current_x,
+                margin_start: 0.0,
                 margin_end: 0.0,
             },
         )

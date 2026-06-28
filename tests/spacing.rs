@@ -125,11 +125,12 @@ fn block_margin_collapse_three_siblings_with_uneven_margins() {
 
     // Margins collapse: between child1(30) and child2(10) => 30
     // Between child2(25) and child3(5) => 25
-    // Last child's bottom margin (20) should be included in parent height
+    // Parent has no border/padding => last child's bottom margin (20) extrudes
+    // Parent's content height excludes the extruded margin
     assert_eq!(block_box(node(&root, 0)).border_box.y, 0.0);
     assert_eq!(block_box(node(&root, 1)).border_box.y, 40.0);
     assert_eq!(block_box(node(&root, 2)).border_box.y, 85.0);
-    assert_eq!(block_box(&root).content_box.height, 120.0);
+    assert_eq!(block_box(&root).content_box.height, 100.0);
 }
 
 #[test]
@@ -160,7 +161,8 @@ fn block_auto_height_respects_child_margin_bottom() {
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
-    assert_eq!(block_box(&root).content_box.height, 80.0);
+    // Parent has no border/padding => child's margin_bottom extrudes below
+    assert_eq!(block_box(&root).content_box.height, 50.0);
     assert_eq!(block_box(node(&root, 0)).border_box.y, 0.0);
 }
 
@@ -192,8 +194,10 @@ fn block_auto_height_respects_child_margin_top() {
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
-    assert_eq!(block_box(&root).content_box.height, 70.0);
-    assert_eq!(block_box(node(&root, 0)).border_box.y, 20.0);
+    // Parent has no border/padding => child's margin_top collapses with parent
+    // Child is at y=0 and parent height excludes extruded margin
+    assert_eq!(block_box(&root).content_box.height, 50.0);
+    assert_eq!(block_box(node(&root, 0)).border_box.y, 0.0);
 }
 
 // --- Flex spacing ---
