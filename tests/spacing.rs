@@ -1025,3 +1025,130 @@ fn multiple_flex_children_with_various_margins() {
     assert_eq!(block_box(node(&root, 1)).border_box.x, 45.0);
     assert_eq!(block_box(node(&root, 2)).border_box.x, 108.0);
 }
+
+#[test]
+fn flex_column_auto_height_includes_child_margins() {
+    let child1 = LayoutNode::new(Style {
+        size: SizeStyle {
+            height: LengthOrAuto::Length(Length::Px(20.0)),
+            ..Default::default()
+        },
+        spacing: Spacing {
+            margin_top: LengthOrAuto::Length(Length::Px(10.0)),
+            margin_bottom: LengthOrAuto::Length(Length::Px(10.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let child2 = LayoutNode::new(Style {
+        size: SizeStyle {
+            height: LengthOrAuto::Length(Length::Px(30.0)),
+            ..Default::default()
+        },
+        spacing: Spacing {
+            margin_top: LengthOrAuto::Length(Length::Px(10.0)),
+            margin_bottom: LengthOrAuto::Length(Length::Px(10.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let child3 = LayoutNode::new(Style {
+        size: SizeStyle {
+            height: LengthOrAuto::Length(Length::Px(40.0)),
+            ..Default::default()
+        },
+        spacing: Spacing {
+            margin_top: LengthOrAuto::Length(Length::Px(10.0)),
+            margin_bottom: LengthOrAuto::Length(Length::Px(10.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            display: Display {
+                outer: OuterDisplay::Block,
+                inner: InnerDisplay::Flex,
+            },
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                ..Default::default()
+            },
+            flex_direction: FlexDirection::Column,
+            ..Default::default()
+        },
+        [child1, child2, child3],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    let container_height = block_box(&root).content_box.height;
+    let expected = (10.0 + 20.0 + 10.0) + (10.0 + 30.0 + 10.0) + (10.0 + 40.0 + 10.0);
+    assert!(
+        (container_height - expected).abs() < 0.01,
+        "expected height {}, got {}",
+        expected,
+        container_height
+    );
+}
+
+#[test]
+fn flex_row_auto_height_includes_child_cross_margins() {
+    let child1 = LayoutNode::new(Style {
+        size: SizeStyle {
+            width: LengthOrAuto::Length(Length::Px(20.0)),
+            height: LengthOrAuto::Length(Length::Px(30.0)),
+            ..Default::default()
+        },
+        spacing: Spacing {
+            margin_top: LengthOrAuto::Length(Length::Px(5.0)),
+            margin_bottom: LengthOrAuto::Length(Length::Px(5.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let child2 = LayoutNode::new(Style {
+        size: SizeStyle {
+            width: LengthOrAuto::Length(Length::Px(30.0)),
+            height: LengthOrAuto::Length(Length::Px(20.0)),
+            ..Default::default()
+        },
+        spacing: Spacing {
+            margin_top: LengthOrAuto::Length(Length::Px(5.0)),
+            margin_bottom: LengthOrAuto::Length(Length::Px(15.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            display: Display {
+                outer: OuterDisplay::Block,
+                inner: InnerDisplay::Flex,
+            },
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                ..Default::default()
+            },
+            flex_direction: FlexDirection::Row,
+            ..Default::default()
+        },
+        [child1, child2],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    let container_height = block_box(&root).content_box.height;
+    let expected = f32::max(5.0 + 30.0 + 5.0, 5.0 + 20.0 + 15.0);
+    assert!(
+        (container_height - expected).abs() < 0.01,
+        "expected height {}, got {}",
+        expected,
+        container_height
+    );
+}
