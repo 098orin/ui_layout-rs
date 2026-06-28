@@ -222,6 +222,7 @@ struct FlowAccum {
     children_width: f32,
     children_height: f32,
     max_inline_line_height: f32,
+    first_block_child_processed: bool,
     line_span_buf: Vec<LineSpan>,
 }
 
@@ -646,6 +647,7 @@ impl LayoutEngine {
                 children_width: 0.0,
                 children_height: 0.0,
                 max_inline_line_height: line_height,
+                first_block_child_processed: false,
                 line_span_buf: Vec::new(),
             },
             padding,
@@ -807,7 +809,7 @@ impl LayoutEngine {
         child_node.layout_box.shift(ml, 0.0);
 
         if child_is_block {
-            let top_collapses = state.accum.prev_child_margin == 0.0
+            let top_collapses = !state.accum.first_block_child_processed
                 && state.border.top == 0.0
                 && state.padding.top == 0.0;
 
@@ -823,6 +825,7 @@ impl LayoutEngine {
             }
 
             state.accum.prev_child_margin = effective_bottom;
+            state.accum.first_block_child_processed = true;
         }
 
         if child_node.style.display.outer == OuterDisplay::Inline {
