@@ -70,6 +70,8 @@ impl fmt::Display for FlexDirection {
         match self {
             FlexDirection::Row => write!(f, "row"),
             FlexDirection::Column => write!(f, "column"),
+            FlexDirection::RowReverse => write!(f, "row-reverse"),
+            FlexDirection::ColumnReverse => write!(f, "column-reverse"),
         }
     }
 }
