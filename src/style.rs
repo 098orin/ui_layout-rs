@@ -240,8 +240,8 @@ impl Display {
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum FlexDirection {
-    Row,
     #[default]
+    Row,
     Column,
     RowReverse,
     ColumnReverse,

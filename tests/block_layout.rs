@@ -862,6 +862,7 @@ fn block_with_flex_child_followed_by_block_with_margin() {
             height: LengthOrAuto::Length(Length::Px(30.0)),
             ..Default::default()
         },
+        flex_direction: FlexDirection::Row,
         ..Default::default()
     });
 

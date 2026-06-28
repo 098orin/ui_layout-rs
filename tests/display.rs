@@ -45,10 +45,9 @@ fn display_node_with_style_properties() {
     let mut node2 = LayoutNode::new(Style::default());
     node2.style.size.width = LengthOrAuto::Length(Length::Px(100.0));
     node2.style.size.height = LengthOrAuto::Length(Length::Px(200.0));
-    node2.style.flex_direction = FlexDirection::Row;
     assert_eq!(
         format!("{}", node2),
-        "LayoutNode [width: 100px, height: 200px, flex-direction: row]\n"
+        "LayoutNode [width: 100px, height: 200px]\n"
     );
 }
 
@@ -77,10 +76,13 @@ fn display_style_formatting() {
 
     let styled = Style {
         display: Display::parse("flex").unwrap(),
-        flex_direction: FlexDirection::Row,
+        flex_direction: FlexDirection::Column,
         ..Style::default()
     };
-    assert_eq!(format!("{}", styled), "display: flex, flex-direction: row");
+    assert_eq!(
+        format!("{}", styled),
+        "display: flex, flex-direction: column"
+    );
 }
 
 #[test]
@@ -167,10 +169,7 @@ fn display_alternate_with_style_and_box() {
         },
     });
     let s = format!("{:#}", node);
-    assert_eq!(
-        s,
-        "LayoutNode [display: flex, flex-direction: row] block(800x600 @0,0)\n"
-    );
+    assert_eq!(s, "LayoutNode [display: flex] block(800x600 @0,0)\n");
 }
 
 #[test]
@@ -395,8 +394,8 @@ fn layout_child_fragment_mut_modifies_fragment() {
 // --- FlexDirection defaults ---
 
 #[test]
-fn flex_direction_default_is_column() {
-    assert_eq!(FlexDirection::default(), FlexDirection::Column);
+fn flex_direction_default_is_row() {
+    assert_eq!(FlexDirection::default(), FlexDirection::Row);
 }
 
 // --- ContentBox variant display ---
