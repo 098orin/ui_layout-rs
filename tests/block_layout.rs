@@ -840,6 +840,71 @@ fn block_empty_node() {
 }
 
 #[test]
+fn block_with_flex_child_followed_by_block_with_margin() {
+    let child1 = LayoutNode::new(Style {
+        size: SizeStyle {
+            height: LengthOrAuto::Length(Length::Px(20.0)),
+            ..Default::default()
+        },
+        spacing: Spacing {
+            margin_bottom: LengthOrAuto::Length(Length::Px(10.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let child2 = LayoutNode::new(Style {
+        display: Display {
+            outer: OuterDisplay::Block,
+            inner: InnerDisplay::Flex,
+        },
+        size: SizeStyle {
+            height: LengthOrAuto::Length(Length::Px(30.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let child3 = LayoutNode::new(Style {
+        size: SizeStyle {
+            height: LengthOrAuto::Length(Length::Px(40.0)),
+            ..Default::default()
+        },
+        spacing: Spacing {
+            margin_top: LengthOrAuto::Length(Length::Px(15.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Auto,
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        [child1, child2, child3],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    let c1 = block_box(node(&root, 0));
+    let c2 = block_box(node(&root, 1));
+    let c3 = block_box(node(&root, 2));
+
+    assert_eq!(c1.border_box.y, 0.0);
+    // child2: collapsed margin max(10, 0) = 10, so y = child1_bottom + 10 = 20 + 10 = 30
+    assert_eq!(c2.border_box.y, 30.0);
+    // child3: flex bottom = 30 + 30 = 60, collapsed margin max(0, 15) = 15, so y = 60 + 15 = 75
+    assert_eq!(c3.border_box.y, 75.0);
+    // Parent height: child3 bottom = 75 + 40 = 115
+    assert_eq!(block_box(&root).content_box.height, 115.0);
+}
+
+#[test]
 fn block_sibling_with_margin_after_marginless_sibling() {
     let child1 = LayoutNode::new(Style {
         size: SizeStyle {
