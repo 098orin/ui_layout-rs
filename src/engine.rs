@@ -240,6 +240,7 @@ struct FlexPlacementCtx {
     auto_unit: f32,
     gap_between: f32,
     gap: f32,
+    reversed: bool,
 }
 
 /// The difference between containing_block_* and available_* is:
@@ -294,9 +295,16 @@ enum Axis {
 impl Axis {
     fn from_flex_direction(value: &FlexDirection) -> Axis {
         match value {
-            FlexDirection::Row => Axis::Horizontal,
-            FlexDirection::Column => Axis::Vertical,
+            FlexDirection::Row | FlexDirection::RowReverse => Axis::Horizontal,
+            FlexDirection::Column | FlexDirection::ColumnReverse => Axis::Vertical,
         }
+    }
+
+    fn is_reversed(value: &FlexDirection) -> bool {
+        matches!(
+            value,
+            FlexDirection::RowReverse | FlexDirection::ColumnReverse
+        )
     }
 
     fn edge_main(&self, edge: &Edge) -> (f32, f32) {
@@ -1275,7 +1283,17 @@ impl LayoutEngine {
             margin_end_resolved
         };
 
-        placement.cursor_main += margin_start;
+        let child_main_size = axis.tuple_main((
+            child_node.layout_box.width_box(),
+            child_node.layout_box.height_box(),
+        ));
+
+        if placement.reversed {
+            placement.cursor_main -= margin_end;
+            placement.cursor_main -= child_main_size;
+        } else {
+            placement.cursor_main += margin_start;
+        }
 
         let child_main_pos = match axis {
             Axis::Horizontal => placement.content_box.x + placement.cursor_main,
@@ -1332,13 +1350,12 @@ impl LayoutEngine {
         let relative_y = child_origin.1 - placement.content_box.y;
         child_node.layout_box.shift(relative_x, relative_y);
 
-        let child_main_size = axis.tuple_main((
-            child_node.layout_box.width_box(),
-            child_node.layout_box.height_box(),
-        ));
-
-        placement.cursor_main +=
-            child_main_size + margin_end + placement.gap + placement.gap_between;
+        if placement.reversed {
+            placement.cursor_main -= margin_start + placement.gap + placement.gap_between;
+        } else {
+            placement.cursor_main +=
+                child_main_size + margin_end + placement.gap + placement.gap_between;
+        }
     }
 
     fn position_flex_fragments(
@@ -1380,9 +1397,17 @@ impl LayoutEngine {
             Axis::Vertical => fragment_width,
         };
 
-        let child_main_pos = match axis {
-            Axis::Horizontal => placement.content_box.x + placement.cursor_main,
-            Axis::Vertical => placement.content_box.y + placement.cursor_main,
+        let child_main_pos = if placement.reversed {
+            placement.cursor_main -= item_main_size;
+            match axis {
+                Axis::Horizontal => placement.content_box.x + placement.cursor_main,
+                Axis::Vertical => placement.content_box.y + placement.cursor_main,
+            }
+        } else {
+            match axis {
+                Axis::Horizontal => placement.content_box.x + placement.cursor_main,
+                Axis::Vertical => placement.content_box.y + placement.cursor_main,
+            }
         };
 
         let available_cross = axis.rect_cross(&placement.content_box);
@@ -1421,7 +1446,11 @@ impl LayoutEngine {
             outbox_width,
         );
 
-        placement.cursor_main += item_main_size + placement.gap + placement.gap_between;
+        if placement.reversed {
+            placement.cursor_main -= placement.gap + placement.gap_between;
+        } else {
+            placement.cursor_main += item_main_size + placement.gap + placement.gap_between;
+        }
     }
 
     /// Set child positions.
@@ -1477,12 +1506,24 @@ impl LayoutEngine {
             resolve_justify_content(node.style.justify_content, remaining_space, items.len())
         };
 
+        let reversed = Axis::is_reversed(&node.style.flex_direction);
+        let use_reversed_alg =
+            reversed && !matches!(node.style.justify_content, JustifyContent::End);
+        let cursor_main = if use_reversed_alg {
+            axis.rect_main(&content_box) - start_offset
+        } else if reversed {
+            0.0
+        } else {
+            start_offset
+        };
+
         let mut placement = FlexPlacementCtx {
             content_box,
-            cursor_main: start_offset,
+            cursor_main,
             auto_unit,
             gap_between,
             gap,
+            reversed: use_reversed_alg,
         };
 
         for item in items {
