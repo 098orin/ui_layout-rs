@@ -1126,10 +1126,13 @@ impl LayoutEngine {
         }
 
         LineContext {
-            end_pos: (
-                line_ctx.end_pos.0 + node.layout_box.width_box(),
-                line_ctx.end_pos.1,
-            ),
+            end_pos: match node.style.display.outer {
+                OuterDisplay::Block => (0.0, line_ctx.end_pos.1 + node.layout_box.height_box()),
+                _ => (
+                    line_ctx.end_pos.0 + node.layout_box.width_box(),
+                    line_ctx.end_pos.1,
+                ),
+            },
             current_x: line_ctx.current_x + node.layout_box.width_box(),
             margin_start: 0.0,
             margin_end: 0.0,
