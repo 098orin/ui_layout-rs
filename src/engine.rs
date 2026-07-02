@@ -68,44 +68,6 @@ impl LayoutMetrics {
     }
 }
 
-#[cfg(not(feature = "layout-bench"))]
-pub struct LayoutMetrics;
-
-#[cfg(not(feature = "layout-bench"))]
-impl LayoutMetrics {
-    pub const fn new() -> Self {
-        LayoutMetrics
-    }
-
-    #[inline(always)]
-    pub fn reset(&self) {}
-
-    #[inline(always)]
-    pub fn count_layout_call(&self) {}
-
-    #[inline(always)]
-    pub fn count_cache_match(&self) {}
-
-    #[inline(always)]
-    pub fn count_cache_miss_match(&self) {}
-
-    #[inline(always)]
-    pub fn layout_call_count(&self) -> usize {
-        0
-    }
-
-    #[inline(always)]
-    pub fn cache_miss_match_count(&self) -> usize {
-        0
-    }
-}
-
-impl Default for LayoutMetrics {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 //=====================
 // Main code
 //=====================
@@ -398,6 +360,7 @@ impl Axis {
 pub struct LayoutEngine {
     pub(crate) viewport_width: f32,
     pub(crate) viewport_height: f32,
+    #[cfg(feature = "layout-bench")]
     layout_metrics: LayoutMetrics,
 }
 
@@ -438,6 +401,7 @@ impl LayoutEngine {
         let engine = LayoutEngine {
             viewport_width: width,
             viewport_height: height,
+            #[cfg(feature = "layout-bench")]
             layout_metrics: LayoutMetrics::new(),
         };
 
@@ -473,15 +437,18 @@ impl LayoutEngine {
         if intrinsic_pass {
             let (key, (layout_box, line_ctx)) = &node.layout_box_cache;
             if *key == crate::cache::make_layout_key(ctx, self) {
+                #[cfg(feature = "layout-bench")]
                 self.layout_metrics.count_cache_match();
 
                 node.layout_box = layout_box.clone();
                 return *line_ctx;
             } else {
+                #[cfg(feature = "layout-bench")]
                 self.layout_metrics.count_cache_miss_match();
             }
         }
 
+        #[cfg(feature = "layout-bench")]
         self.layout_metrics.count_layout_call();
 
         let out = self.layout_by_display(node, ctx, line_ctx, intrinsic_pass);
