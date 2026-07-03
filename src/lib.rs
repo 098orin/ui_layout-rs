@@ -58,13 +58,13 @@
 //! Inline layouts additionally provide [`LineSpan`] information for
 //! observing how a box is split across lines.
 //!
-//! ## Fragments
+//! ## Children
 //!
-//! Layout trees may contain both complete nodes and inline fragments.
-//! Children are represented by [`LayoutChild`]:
+//! Layout trees contain children represented by [`LayoutChild`]:
 //!
 //! - `LayoutChild::Node` — a normal layout node
-//! - `LayoutChild::Fragment` — a fragment participating in inline layout
+//! - `LayoutChild::Fragment` — an inline-level fragment
+//! - `LayoutChild::Object` — a custom [`FlowLayouter`] object
 //!
 //! [`ItemFragment`] represents the smallest independently positioned
 //! piece of inline content.
@@ -77,6 +77,14 @@
 //! During layout, fragments are wrapped in [`FragmentNode`] and assigned
 //! placement information, allowing inline content to be split and
 //! positioned across multiple lines.
+//!
+//! ## Custom Objects
+//!
+//! The [`FlowLayouter`] trait allows custom types to participate directly
+//! in layout.  Objects report their intrinsic size via
+//! [`FlowLayouter::measure`] and perform inline layout via
+//! [`FlowLayouter::layout`].  They can be used as children in both flow
+//! and flex containers.
 
 mod cache;
 mod display;

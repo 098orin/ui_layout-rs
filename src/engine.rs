@@ -213,23 +213,24 @@ struct FlexPlacementCtx {
     reversed: bool,
 }
 
-/// The difference between containing_block_* and available_* is:
+/// Layout context passed to [`FlowLayouter::measure`].
 ///
-/// - containing_block_*:
-///   The base size used for resolving percentages and intrinsic sizing.
-///   Independent of layout results.
-///
-/// - available_*:
-///   The actual free space available for layout after considering
-///   constraints such as sibling layout, margins, and line breaking.
-///
-/// - `parent_assigned_border_*`:
-///   Border-box sizes assigned by parent (for stretch).
+/// Provides size information for the current layout pass, including
+/// containing-block dimensions (for percentage resolution) and
+/// parent-assigned sizes (for flex stretch).
 pub struct LayoutContext {
+    /// Containing block width for resolving percentages and intrinsic sizing.
+    /// Independent of layout results.
     pub containing_block_width: Option<f32>,
+    /// Containing block height for resolving percentages and intrinsic sizing.
+    /// Independent of layout results.
     pub containing_block_height: Option<f32>,
+    /// The actual free space available for layout after considering
+    /// constraints such as sibling layout, margins, and line breaking.
     pub available_width: Option<f32>,
+    /// Border-box width assigned by the parent (e.g. via flex stretch).
     pub parent_assigned_border_width: Option<f32>,
+    /// Border-box height assigned by the parent (e.g. via flex stretch).
     pub parent_assigned_border_height: Option<f32>,
 }
 
