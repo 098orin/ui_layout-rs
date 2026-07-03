@@ -360,6 +360,11 @@ fn write_child(
     match child {
         LayoutChild::Node(n) => write_node(f, n, prefix, is_last),
         LayoutChild::Fragment(frag) => write_fragment(f, frag, prefix, is_last),
+        LayoutChild::Object(o) => {
+            let branch = if is_last { "└── " } else { "├── " };
+
+            writeln!(f, "{}{}{}", prefix, branch, o.debug_name(),)
+        }
     }
 }
 

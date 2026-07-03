@@ -102,6 +102,7 @@ impl EdgeOption {
 pub enum LayoutItem {
     Node(usize),
     Fragments(std::ops::Range<usize>),
+    Object(usize),
 }
 
 #[derive(Clone)]
@@ -148,9 +149,13 @@ struct FlowCursor {
 }
 
 impl FlowCursor {
+    fn pos(&self) -> (f32, f32) {
+        (self.x, self.y)
+    }
+
     fn line_ctx(&self) -> LineContext {
         LineContext {
-            end_pos: (self.x, self.y),
+            end_pos: self.pos(),
             current_x: self.current_x,
             margin_start: 0.0,
             margin_end: 0.0,
@@ -220,13 +225,12 @@ struct FlexPlacementCtx {
 ///
 /// - `parent_assigned_border_*`:
 ///   Border-box sizes assigned by parent (for stretch).
-pub(crate) struct LayoutContext {
-    pub(crate) containing_block_width: Option<f32>,
-    pub(crate) containing_block_height: Option<f32>,
-    pub(crate) available_width: Option<f32>,
-    pub(crate) available_height: Option<f32>,
-    pub(crate) parent_assigned_border_width: Option<f32>,
-    pub(crate) parent_assigned_border_height: Option<f32>,
+pub struct LayoutContext {
+    pub containing_block_width: Option<f32>,
+    pub containing_block_height: Option<f32>,
+    pub available_width: Option<f32>,
+    pub parent_assigned_border_width: Option<f32>,
+    pub parent_assigned_border_height: Option<f32>,
 }
 
 impl LayoutContext {
@@ -247,12 +251,12 @@ impl LayoutContext {
     }
 }
 
+// Provides helper methods to abstract width/height selection, reducing code duplication
+// for row and column layout support.
+
 /// Axis orientation
-///
-/// Provides helper methods to abstract width/height selection, reducing code duplication
-/// for row and column layout support.
 #[derive(Debug, Clone, Copy)]
-enum Axis {
+pub enum Axis {
     Horizontal,
     Vertical,
 }
@@ -393,7 +397,6 @@ impl LayoutEngine {
             containing_block_width: Some(width),
             containing_block_height: Some(height),
             available_width: Some(width),
-            available_height: Some(height),
             parent_assigned_border_width: None,
             parent_assigned_border_height: None,
         };
@@ -585,7 +588,6 @@ impl LayoutEngine {
             containing_block_width: content_width_opt,
             containing_block_height: content_height_opt,
             available_width: content_width_opt.or(ctx.available_width),
-            available_height: None,
             parent_assigned_border_width: None,
             parent_assigned_border_height: None,
         };
@@ -638,6 +640,9 @@ impl LayoutEngine {
                 ),
                 LayoutItem::Node(i) => {
                     self.process_flow_node_item(node, i, ctx, &base_ctx_for_child, &mut state)
+                }
+                LayoutItem::Object(i) => {
+                    self.process_flow_object_item(node, i, outbox_width, line_height, &mut state);
                 }
             }
         }
@@ -842,6 +847,69 @@ impl LayoutEngine {
         }
     }
 
+    fn process_flow_object_item(
+        &self,
+        node: &mut LayoutNode,
+        i: usize,
+        outbox_width: f32,
+        line_height: f32,
+        state: &mut FlowState,
+    ) {
+        use crate::FlowLayoutContext;
+
+        let object = match &mut node.children[i] {
+            LayoutChild::Object(o) => o,
+            _ => unreachable!(),
+        };
+
+        let flow_ctx = FlowLayoutContext {
+            start_pos: state.cursor.pos(),
+            available_inline_size: outbox_width - state.cursor.current_x,
+            line_height,
+        };
+
+        let line_spans = object.layout(&flow_ctx);
+
+        let had_line_spans = !line_spans.is_empty();
+
+        if had_line_spans {
+            let max_span_width = line_spans
+                .iter()
+                .map(LineSpan::width)
+                .filter(|w| !w.is_nan())
+                .max_by(f32::total_cmp)
+                .unwrap_or(0.0);
+
+            state.accum.children_width = state.accum.children_width.max(max_span_width);
+
+            if let Some(last_span) = line_spans.last() {
+                state.accum.children_height = state
+                    .accum
+                    .children_height
+                    .max(last_span.line_pos.1 + line_height);
+            }
+        }
+
+        if let Some(last_span) = line_spans.last() {
+            state.cursor.set_pos(
+                last_span.line_pos.0 + last_span.width(),
+                last_span.line_pos.1,
+            );
+
+            state.cursor.line_index = last_span.line_index;
+        }
+
+        for span in line_spans {
+            push_or_merge_line_span(&mut state.accum.line_span_buf, span);
+        }
+
+        state.accum.max_inline_line_height = state.accum.max_inline_line_height.max(line_height);
+
+        if had_line_spans {
+            state.accum.pending_advance = state.accum.max_inline_line_height;
+        }
+    }
+
     fn finalize_flow_box(
         &self,
         node: &mut LayoutNode,
@@ -977,7 +1045,6 @@ impl LayoutEngine {
                     containing_block_width: content_width_opt,
                     containing_block_height: content_height_opt,
                     available_width: None,
-                    available_height: None,
                     parent_assigned_border_width: None,
                     parent_assigned_border_height: None,
                 };
@@ -1041,7 +1108,6 @@ impl LayoutEngine {
                 containing_block_width: Some(final_width),
                 containing_block_height: Some(final_height),
                 available_width: None,
-                available_height: None,
                 parent_assigned_border_width: None,
                 parent_assigned_border_height: None,
             };
@@ -1056,7 +1122,6 @@ impl LayoutEngine {
                 containing_block_width: content_width_opt,
                 containing_block_height: content_height_opt,
                 available_width: None,
-                available_height: None,
                 parent_assigned_border_width: None,
                 parent_assigned_border_height: None,
             };
@@ -1229,6 +1294,12 @@ impl LayoutEngine {
                         line_height * line_count as f32
                     }
                 },
+                LayoutItem::Object(index) => {
+                    let object = node.children[*index].object().unwrap();
+                    let measured = object.measure(ctx);
+                    let tuple = (measured.width, measured.height);
+                    axis.tuple_main(tuple)
+                }
             })
             .sum()
     }
@@ -1470,6 +1541,36 @@ impl LayoutEngine {
         }
     }
 
+    fn position_flex_object(
+        &self,
+        node: &mut LayoutNode,
+        axis: Axis,
+        ctx: &LayoutContext,
+        index: usize,
+        placement: &mut FlexPlacementCtx,
+    ) {
+        let object = node.children[index].object().unwrap();
+        let measured = object.measure(ctx);
+        let tuple = (measured.width, measured.height);
+        let item_main_size = axis.tuple_main(tuple);
+        let item_cross_size = axis.tuple_cross(tuple);
+
+        let available_cross = axis.rect_cross(&placement.content_box);
+        let cross_offset =
+            resolve_align_position(node.style.align_items, item_cross_size, available_cross);
+
+        let _child_cross_pos = match axis {
+            Axis::Horizontal => placement.content_box.y + cross_offset,
+            Axis::Vertical => placement.content_box.x + cross_offset,
+        };
+
+        if placement.reversed {
+            placement.cursor_main -= placement.gap + placement.gap_between;
+        } else {
+            placement.cursor_main += item_main_size + placement.gap + placement.gap_between;
+        }
+    }
+
     /// Set child positions.
     fn flow_flex_children(&self, node: &mut LayoutNode, axis: Axis, ctx: &LayoutContext) {
         if node.children.is_empty() {
@@ -1550,6 +1651,9 @@ impl LayoutEngine {
                 }
                 LayoutItem::Fragments(range) => {
                     self.position_flex_fragments(node, axis, range, &mut placement)
+                }
+                LayoutItem::Object(index) => {
+                    self.position_flex_object(node, axis, ctx, index, &mut placement)
                 }
             }
         }
@@ -1675,6 +1779,12 @@ impl LayoutEngine {
                         Axis::Horizontal => fragment_width,
                         Axis::Vertical => fragment_height,
                     };
+                }
+                LayoutItem::Object(index) => {
+                    let object = node.children.get_mut(*index).unwrap().object().unwrap();
+                    let measured = object.measure(base_ctx_for_children);
+                    let tuple = (measured.width, measured.height);
+                    state.main_size = axis.tuple_main(tuple);
                 }
             }
         }
@@ -1867,6 +1977,13 @@ impl LayoutEngine {
 
                     total_border_main += axis.tuple_main((fragment_width, fragment_height));
                     max_cross = max_cross.max(axis.tuple_cross((fragment_width, fragment_height)));
+                }
+                LayoutItem::Object(index) => {
+                    let object = node.children.get_mut(*index).unwrap().object().unwrap();
+                    let measured = object.measure(base_ctx_for_children);
+                    let tuple = (measured.width, measured.height);
+                    total_border_main += axis.tuple_main(tuple);
+                    max_cross = max_cross.max(axis.tuple_cross(tuple));
                 }
             }
         }
@@ -2349,6 +2466,10 @@ impl<'a> Iterator for LayoutItems<'a> {
                 }
                 self.index = end;
                 Some(LayoutItem::Fragments(start..end))
+            }
+            LayoutChild::Object(_) => {
+                self.index = i + 1;
+                Some(LayoutItem::Object(i))
             }
         }
     }

@@ -81,6 +81,7 @@
 mod cache;
 mod display;
 mod engine;
+mod flow_layouter;
 mod fragment;
 mod geometry;
 mod layout_child;
@@ -88,6 +89,7 @@ mod layout_node;
 mod style;
 
 pub use engine::*;
+pub use flow_layouter::*;
 pub use fragment::*;
 pub use geometry::*;
 pub use layout_child::*;

@@ -1,4 +1,4 @@
-use crate::{FragmentNode, ItemFragment, LayoutNode};
+use crate::{FlowLayouter, FragmentNode, ItemFragment, LayoutNode};
 
 /// A unified layout item used during layout processing.
 ///
@@ -13,6 +13,7 @@ use crate::{FragmentNode, ItemFragment, LayoutNode};
 pub enum LayoutChild {
     Node(Box<LayoutNode>),
     Fragment(FragmentNode),
+    Object(Box<dyn FlowLayouter>),
 }
 
 impl LayoutChild {
@@ -40,6 +41,13 @@ impl LayoutChild {
     pub fn fragment_mut(&mut self) -> Option<&mut FragmentNode> {
         match self {
             LayoutChild::Fragment(f) => Some(f),
+            _ => None,
+        }
+    }
+
+    pub fn object(&self) -> Option<&dyn FlowLayouter> {
+        match self {
+            LayoutChild::Object(o) => Some(&**o),
             _ => None,
         }
     }
