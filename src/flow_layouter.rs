@@ -1,5 +1,5 @@
 use crate::{LayoutContext, LineSpan};
-use std::fmt::Debug;
+use std::fmt::{self, Debug};
 
 /// The measured size of a [`FlowLayouter`] object.
 ///
@@ -120,12 +120,12 @@ pub trait FlowLayouter: Debug {
     /// dimensions independent of any particular layout context.
     fn measure(&self, ctx: &LayoutContext) -> MeasureResult;
 
-    /// Returns a human-readable name for debugging and tree
+    /// Writes a human-readable name for debugging and tree
     /// rendering.
     ///
-    /// The default implementation returns the fully-qualified
+    /// The default implementation writes the fully-qualified
     /// type name via [`std::any::type_name`].
-    fn debug_name(&self) -> &'static str {
-        std::any::type_name::<Self>()
+    fn write_debug(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", std::any::type_name::<Self>())
     }
 }

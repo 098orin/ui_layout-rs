@@ -587,22 +587,6 @@ fn flex_column_reverse_with_object() {
 }
 
 // ========================
-// Object debug_name
-// ========================
-
-#[test]
-fn flow_object_debug_name() {
-    let obj = FixedObject {
-        width: 10.0,
-        height: 10.0,
-    };
-
-    let name = obj.debug_name();
-    assert!(!name.is_empty());
-    assert!(name.contains("FixedObject"));
-}
-
-// ========================
 // Object measure API
 // ========================
 

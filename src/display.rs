@@ -363,7 +363,8 @@ fn write_child(
         LayoutChild::Object(o) => {
             let branch = if is_last { "└── " } else { "├── " };
 
-            writeln!(f, "{}{}{}", prefix, branch, o.debug_name(),)
+            writeln!(f, "{}{}", prefix, branch)?;
+            o.write_debug(f)
         }
     }
 }
