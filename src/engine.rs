@@ -222,14 +222,18 @@ pub struct LayoutContext {
     /// Containing block width for resolving percentages and intrinsic sizing.
     /// Independent of layout results.
     pub containing_block_width: Option<f32>,
+
     /// Containing block height for resolving percentages and intrinsic sizing.
     /// Independent of layout results.
     pub containing_block_height: Option<f32>,
+
     /// The actual free space available for layout after considering
     /// constraints such as sibling layout, margins, and line breaking.
     pub available_width: Option<f32>,
+
     /// Border-box width assigned by the parent (e.g. via flex stretch).
     pub parent_assigned_border_width: Option<f32>,
+
     /// Border-box height assigned by the parent (e.g. via flex stretch).
     pub parent_assigned_border_height: Option<f32>,
 }
