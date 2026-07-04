@@ -787,3 +787,408 @@ fn flow_single_object_children_box_tracks_object_size() {
     assert!(b.children_box.width <= b.content_box.width);
     assert!(b.children_box.height >= 20.0);
 }
+
+// ========================
+// Object with container padding / border
+// ========================
+
+#[test]
+fn flow_object_in_content_box_container_with_padding() {
+    let obj = FixedObject {
+        width: 200.0,
+        height: 20.0,
+    };
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Auto,
+                ..Default::default()
+            },
+            spacing: Spacing {
+                padding_left: Length::Px(10.0),
+                padding_right: Length::Px(10.0),
+                ..Default::default()
+            },
+            line_height: Length::Px(20.0),
+            ..Default::default()
+        },
+        [LayoutChild::Object(Box::new(obj))],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    let b = block_box(&root);
+    assert_eq!(b.content_box.width, 200.0);
+    assert!(approx_eq(b.border_box.width, 220.0));
+    assert!(approx_eq(b.content_box.x, 10.0));
+    assert!(b.content_box.height >= 20.0);
+}
+
+#[test]
+fn flow_object_in_border_box_container_with_padding_reduces_available_width() {
+    let obj = FixedObject {
+        width: 190.0,
+        height: 20.0,
+    };
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Auto,
+                ..Default::default()
+            },
+            spacing: Spacing {
+                padding_left: Length::Px(20.0),
+                padding_right: Length::Px(20.0),
+                ..Default::default()
+            },
+            box_sizing: BoxSizing::BorderBox,
+            line_height: Length::Px(20.0),
+            ..Default::default()
+        },
+        [LayoutChild::Object(Box::new(obj))],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    let b = block_box(&root);
+    assert_eq!(b.content_box.width, 160.0);
+    assert_eq!(b.border_box.width, 200.0);
+    assert!(
+        b.content_box.height >= 40.0,
+        "190px object should wrap in 160px content area, got height={}",
+        b.content_box.height
+    );
+}
+
+#[test]
+fn flow_object_wraps_when_padding_reduces_available_space() {
+    let obj = FixedObject {
+        width: 180.0,
+        height: 20.0,
+    };
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Auto,
+                ..Default::default()
+            },
+            spacing: Spacing {
+                padding_left: Length::Px(15.0),
+                padding_right: Length::Px(15.0),
+                ..Default::default()
+            },
+            box_sizing: BoxSizing::BorderBox,
+            line_height: Length::Px(20.0),
+            ..Default::default()
+        },
+        [LayoutChild::Object(Box::new(obj))],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    let b = block_box(&root);
+    assert_eq!(b.content_box.width, 170.0);
+    assert!(
+        b.content_box.height >= 40.0,
+        "180px object should wrap in 170px content area, got height={}",
+        b.content_box.height
+    );
+}
+
+#[test]
+fn flow_object_in_container_with_border() {
+    let obj = FixedObject {
+        width: 80.0,
+        height: 20.0,
+    };
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Auto,
+                ..Default::default()
+            },
+            spacing: Spacing {
+                border_left: Length::Px(5.0),
+                border_right: Length::Px(5.0),
+                border_top: Length::Px(5.0),
+                border_bottom: Length::Px(5.0),
+                ..Default::default()
+            },
+            line_height: Length::Px(20.0),
+            ..Default::default()
+        },
+        [LayoutChild::Object(Box::new(obj))],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    let b = block_box(&root);
+    assert_eq!(b.content_box.width, 200.0);
+    assert_eq!(b.border_box.width, 210.0);
+    assert!(approx_eq(b.content_box.x, 5.0));
+    assert!(b.content_box.height >= 20.0);
+}
+
+#[test]
+fn flow_object_in_border_box_container_with_padding_and_border() {
+    let obj = FixedObject {
+        width: 170.0,
+        height: 20.0,
+    };
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Auto,
+                ..Default::default()
+            },
+            spacing: Spacing {
+                padding_left: Length::Px(10.0),
+                padding_right: Length::Px(10.0),
+                border_left: Length::Px(5.0),
+                border_right: Length::Px(5.0),
+                ..Default::default()
+            },
+            box_sizing: BoxSizing::BorderBox,
+            line_height: Length::Px(20.0),
+            ..Default::default()
+        },
+        [LayoutChild::Object(Box::new(obj))],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    let b = block_box(&root);
+    assert_eq!(b.content_box.width, 170.0);
+    assert_eq!(b.border_box.width, 200.0);
+    assert!(approx_eq(b.content_box.x, 15.0));
+    assert!(approx_eq(b.padding_box.x, 5.0));
+}
+
+#[test]
+fn flow_object_with_padding_and_fragments_all_fit() {
+    let obj = FixedObject {
+        width: 40.0,
+        height: 15.0,
+    };
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Auto,
+                ..Default::default()
+            },
+            spacing: Spacing {
+                padding_left: Length::Px(10.0),
+                padding_right: Length::Px(10.0),
+                ..Default::default()
+            },
+            line_height: Length::Px(20.0),
+            ..Default::default()
+        },
+        [
+            LayoutChild::from(fragment(30.0, 10.0)),
+            LayoutChild::Object(Box::new(obj)),
+            LayoutChild::from(fragment(50.0, 10.0)),
+        ],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    let b = block_box(&root);
+    assert!(approx_eq(b.content_box.x, 10.0));
+    assert!(b.content_box.height >= 20.0);
+    assert!(b.content_box.height < 40.0);
+}
+
+#[test]
+fn flow_object_auto_height_container_with_vertical_padding() {
+    let obj = FixedObject {
+        width: 80.0,
+        height: 20.0,
+    };
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Auto,
+                ..Default::default()
+            },
+            spacing: Spacing {
+                padding_top: Length::Px(15.0),
+                padding_bottom: Length::Px(15.0),
+                ..Default::default()
+            },
+            line_height: Length::Px(20.0),
+            ..Default::default()
+        },
+        [LayoutChild::Object(Box::new(obj))],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    let b = block_box(&root);
+    assert!(approx_eq(b.content_box.y, 15.0));
+    assert!(
+        b.border_box.height >= 50.0,
+        "border-box height should include padding (15+20+15=50), got {}",
+        b.border_box.height
+    );
+}
+
+#[test]
+fn flow_object_with_content_box_padding_does_not_cause_wrap() {
+    let obj = FixedObject {
+        width: 200.0,
+        height: 20.0,
+    };
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Auto,
+                ..Default::default()
+            },
+            spacing: Spacing {
+                padding_left: Length::Px(10.0),
+                padding_right: Length::Px(10.0),
+                ..Default::default()
+            },
+            line_height: Length::Px(20.0),
+            ..Default::default()
+        },
+        [LayoutChild::Object(Box::new(obj))],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    let b = block_box(&root);
+    assert!(
+        b.content_box.height >= 20.0 && b.content_box.height < 40.0,
+        "200px object should fit in 200px content area despite padding, height={}",
+        b.content_box.height
+    );
+}
+
+#[test]
+fn flow_object_children_box_tracks_padded_container() {
+    let obj = FixedObject {
+        width: 55.0,
+        height: 18.0,
+    };
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Auto,
+                ..Default::default()
+            },
+            spacing: Spacing {
+                padding_left: Length::Px(20.0),
+                padding_right: Length::Px(20.0),
+                ..Default::default()
+            },
+            line_height: Length::Px(20.0),
+            ..Default::default()
+        },
+        [LayoutChild::Object(Box::new(obj))],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    let b = block_box(&root);
+    assert!(approx_eq(b.children_box.x, 20.0));
+    assert!(b.children_box.width >= 55.0);
+    assert!(b.children_box.width <= b.content_box.width);
+}
+
+#[test]
+fn flex_container_with_padding_and_object() {
+    let obj = FixedObject {
+        width: 60.0,
+        height: 30.0,
+    };
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            display: Display {
+                outer: OuterDisplay::Block,
+                inner: InnerDisplay::Flex,
+            },
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Length(Length::Px(50.0)),
+                ..Default::default()
+            },
+            spacing: Spacing {
+                padding_left: Length::Px(10.0),
+                padding_right: Length::Px(10.0),
+                padding_top: Length::Px(5.0),
+                padding_bottom: Length::Px(5.0),
+                ..Default::default()
+            },
+            flex_direction: FlexDirection::Row,
+            ..Default::default()
+        },
+        [LayoutChild::Object(Box::new(obj))],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    let b = block_box(&root);
+    assert!(approx_eq(b.content_box.x, 10.0));
+    assert!(approx_eq(b.content_box.y, 5.0));
+    assert_eq!(b.content_box.width, 200.0);
+    assert_eq!(b.border_box.width, 220.0);
+}
+
+#[test]
+fn flex_container_border_box_with_padding_and_object() {
+    let obj = FixedObject {
+        width: 60.0,
+        height: 30.0,
+    };
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            display: Display {
+                outer: OuterDisplay::Block,
+                inner: InnerDisplay::Flex,
+            },
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Length(Length::Px(50.0)),
+                ..Default::default()
+            },
+            spacing: Spacing {
+                padding_left: Length::Px(20.0),
+                padding_right: Length::Px(20.0),
+                ..Default::default()
+            },
+            box_sizing: BoxSizing::BorderBox,
+            flex_direction: FlexDirection::Row,
+            ..Default::default()
+        },
+        [LayoutChild::Object(Box::new(obj))],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    let b = block_box(&root);
+    assert_eq!(b.content_box.width, 160.0);
+    assert_eq!(b.border_box.width, 200.0);
+    assert!(approx_eq(b.content_box.x, 20.0));
+}
