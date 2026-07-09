@@ -65,6 +65,7 @@
 //! - `LayoutChild::Node` — a normal layout node
 //! - `LayoutChild::Fragment` — an inline-level fragment
 //! - `LayoutChild::Object` — a custom [`FlowLayouter`] object
+//! - `LayoutChild::Custom` — a custom [`CustomLayout`] object
 //!
 //! [`ItemFragment`] represents the smallest independently positioned
 //! piece of inline content.
@@ -87,6 +88,7 @@
 //! and flex containers.
 
 mod cache;
+mod custom_layout;
 mod display;
 mod engine;
 mod flow_layouter;
@@ -96,6 +98,7 @@ mod layout_child;
 mod layout_node;
 mod style;
 
+pub use custom_layout::*;
 pub use engine::*;
 pub use flow_layouter::*;
 pub use fragment::*;

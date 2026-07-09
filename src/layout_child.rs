@@ -1,4 +1,4 @@
-use crate::{FlowLayouter, FragmentNode, ItemFragment, LayoutNode};
+use crate::{CustomLayout, FlowLayouter, FragmentNode, ItemFragment, LayoutNode};
 
 /// A unified layout item used during layout processing.
 ///
@@ -7,6 +7,7 @@ use crate::{FlowLayouter, FragmentNode, ItemFragment, LayoutNode};
 /// - [`Node`](LayoutChild::Node) — a nested layout node (block, inline, flex, etc.)
 /// - [`Fragment`](LayoutChild::Fragment) — an inline-level content fragment
 /// - [`Object`](LayoutChild::Object) — a custom [`FlowLayouter`] object
+/// - [`Custom`](LayoutChild::Custom) — a custom [`CustomLayout`] object
 ///
 /// This abstraction allows the layout engine to treat structural elements,
 /// inline fragments, and custom objects uniformly while preserving their order.
@@ -27,6 +28,12 @@ pub enum LayoutChild {
     /// Objects are self-layouting: they implement [`FlowLayouter::layout`]
     /// for inline flow and [`FlowLayouter::measure`] for flex sizing.
     Object(Box<dyn FlowLayouter>),
+    /// A custom object that implements [`CustomLayout`].
+    ///
+    /// Custom nodes are self-layouting: they implement
+    /// [`CustomLayout::layout`] for block-level layout and
+    /// [`CustomLayout::measure`] for flex sizing.
+    Custom(Box<dyn CustomLayout>),
 }
 
 impl LayoutChild {
@@ -71,6 +78,15 @@ impl LayoutChild {
     pub fn object(&self) -> Option<&dyn FlowLayouter> {
         match self {
             LayoutChild::Object(o) => Some(&**o),
+            _ => None,
+        }
+    }
+
+    /// Returns a reference to the underlying [`CustomLayout`] object
+    /// if this child is a [`Custom`](LayoutChild::Custom).
+    pub fn custom(&self) -> Option<&dyn CustomLayout> {
+        match self {
+            LayoutChild::Custom(c) => Some(&**c),
             _ => None,
         }
     }

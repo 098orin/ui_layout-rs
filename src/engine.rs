@@ -103,6 +103,7 @@ pub enum LayoutItem {
     Node(usize),
     Fragments(std::ops::Range<usize>),
     Object(usize),
+    Custom(usize),
 }
 
 #[derive(Clone)]
@@ -649,6 +650,9 @@ impl LayoutEngine {
                 LayoutItem::Object(i) => {
                     self.process_flow_object_item(node, i, outbox_width, line_height, &mut state);
                 }
+                LayoutItem::Custom(i) => {
+                    self.process_flow_custom_item(node, i, &base_ctx_for_child, &mut state);
+                }
             }
         }
 
@@ -913,6 +917,44 @@ impl LayoutEngine {
         if had_line_spans {
             state.accum.pending_advance = state.accum.max_inline_line_height;
         }
+    }
+
+    fn process_flow_custom_item(
+        &self,
+        node: &mut LayoutNode,
+        i: usize,
+        base_ctx: &LayoutContext,
+        state: &mut FlowState,
+    ) {
+        let custom = match &node.children[i] {
+            LayoutChild::Custom(c) => &**c,
+            _ => unreachable!(),
+        };
+
+        let measured = custom.measure(base_ctx);
+        let line_ctx = state.cursor.line_ctx();
+
+        let y = line_ctx.end_pos.1 + state.accum.pending_advance;
+
+        let ctx = base_ctx;
+
+        let rect = custom.layout(&ctx);
+
+        let w = if rect.width.is_finite() {
+            rect.width
+        } else {
+            measured.width
+        };
+        let h = if rect.height.is_finite() {
+            rect.height
+        } else {
+            measured.height
+        };
+
+        state.cursor.set_pos(0.0, y + h);
+        state.accum.children_width = state.accum.children_width.max(w);
+        state.accum.children_height = state.accum.children_height.max(y + h);
+        state.accum.pending_advance = 0.0;
     }
 
     fn finalize_flow_box(
@@ -1305,6 +1347,12 @@ impl LayoutEngine {
                     let tuple = (measured.width, measured.height);
                     axis.tuple_main(tuple)
                 }
+                LayoutItem::Custom(index) => {
+                    let custom = node.children[*index].custom().unwrap();
+                    let measured = custom.measure(ctx);
+                    let tuple = (measured.width, measured.height);
+                    axis.tuple_main(tuple)
+                }
             })
             .sum()
     }
@@ -1576,6 +1624,31 @@ impl LayoutEngine {
         }
     }
 
+    fn position_flex_custom(
+        &self,
+        node: &mut LayoutNode,
+        axis: Axis,
+        ctx: &LayoutContext,
+        index: usize,
+        placement: &mut FlexPlacementCtx,
+    ) {
+        let custom = node.children[index].custom().unwrap();
+        let measured = custom.measure(ctx);
+        let tuple = (measured.width, measured.height);
+        let item_main_size = axis.tuple_main(tuple);
+        let item_cross_size = axis.tuple_cross(tuple);
+
+        let available_cross = axis.rect_cross(&placement.content_box);
+        let _cross_offset =
+            resolve_align_position(node.style.align_items, item_cross_size, available_cross);
+
+        if placement.reversed {
+            placement.cursor_main -= placement.gap + placement.gap_between;
+        } else {
+            placement.cursor_main += item_main_size + placement.gap + placement.gap_between;
+        }
+    }
+
     /// Set child positions.
     fn flow_flex_children(&self, node: &mut LayoutNode, axis: Axis, ctx: &LayoutContext) {
         if node.children.is_empty() {
@@ -1659,6 +1732,9 @@ impl LayoutEngine {
                 }
                 LayoutItem::Object(index) => {
                     self.position_flex_object(node, axis, ctx, index, &mut placement)
+                }
+                LayoutItem::Custom(index) => {
+                    self.position_flex_custom(node, axis, ctx, index, &mut placement)
                 }
             }
         }
@@ -1788,6 +1864,12 @@ impl LayoutEngine {
                 LayoutItem::Object(index) => {
                     let object = node.children.get_mut(*index).unwrap().object().unwrap();
                     let measured = object.measure(base_ctx_for_children);
+                    let tuple = (measured.width, measured.height);
+                    state.main_size = axis.tuple_main(tuple);
+                }
+                LayoutItem::Custom(index) => {
+                    let custom = node.children.get(*index).unwrap().custom().unwrap();
+                    let measured = custom.measure(base_ctx_for_children);
                     let tuple = (measured.width, measured.height);
                     state.main_size = axis.tuple_main(tuple);
                 }
@@ -1986,6 +2068,13 @@ impl LayoutEngine {
                 LayoutItem::Object(index) => {
                     let object = node.children.get_mut(*index).unwrap().object().unwrap();
                     let measured = object.measure(base_ctx_for_children);
+                    let tuple = (measured.width, measured.height);
+                    total_border_main += axis.tuple_main(tuple);
+                    max_cross = max_cross.max(axis.tuple_cross(tuple));
+                }
+                LayoutItem::Custom(index) => {
+                    let custom = node.children.get(*index).unwrap().custom().unwrap();
+                    let measured = custom.measure(base_ctx_for_children);
                     let tuple = (measured.width, measured.height);
                     total_border_main += axis.tuple_main(tuple);
                     max_cross = max_cross.max(axis.tuple_cross(tuple));
@@ -2475,6 +2564,10 @@ impl<'a> Iterator for LayoutItems<'a> {
             LayoutChild::Object(_) => {
                 self.index = i + 1;
                 Some(LayoutItem::Object(i))
+            }
+            LayoutChild::Custom(_) => {
+                self.index = i + 1;
+                Some(LayoutItem::Custom(i))
             }
         }
     }
