@@ -926,8 +926,8 @@ impl LayoutEngine {
         base_ctx: &LayoutContext,
         state: &mut FlowState,
     ) {
-        let custom = match &node.children[i] {
-            LayoutChild::Custom(c) => &**c,
+        let custom = match &mut node.children[i] {
+            LayoutChild::Custom(c) => c.as_mut(),
             _ => unreachable!(),
         };
 

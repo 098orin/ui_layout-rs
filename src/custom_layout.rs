@@ -31,7 +31,7 @@ pub trait CustomLayout: fmt::Debug {
     /// `ctx` provides the containing block dimensions and the available
     /// inline/extent space.  Returns the final [`Rect`] of this node
     /// in the parent's content-box coordinate space.
-    fn layout(&self, ctx: &LayoutContext) -> Rect;
+    fn layout(&mut self, ctx: &LayoutContext) -> Rect;
 
     /// Returns the intrinsic size of this object.
     ///
