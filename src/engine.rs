@@ -433,6 +433,32 @@ impl LayoutEngine {
         );
     }
 
+    /// Runs full layout on a root node. Intended to be called from within
+    /// a [`CustomLayout`] implementation.
+    ///
+    /// Unlike the static [`LayoutEngine::layout`] method, this instance method
+    /// reuses the engine's viewport configuration and accepts the parent's
+    /// [`LayoutContext`] directly — typically the one passed to
+    /// [`CustomLayout::layout`]. This allows a custom container type to
+    /// delegate child layout to the engine:
+    ///
+    /// 1. Construct a temporary [`LayoutNode`] with the container's children.
+    /// 2. Call `layout_root` to run the full layout algorithm.
+    /// 3. Take the computed [`Rect`] and children back.
+    ///
+    /// Returns the computed [`Rect`] of the root node (its border-box size
+    /// and position in the parent's coordinate space).
+    pub fn layout_root(&self, root: &mut LayoutNode, ctx: &LayoutContext) -> Rect {
+        let _ = self.layout_node(root, ctx, EMPTY_LINE_CONTEXT, false);
+
+        Rect {
+            x: 0.0,
+            y: 0.0,
+            width: root.layout_box.width_box(),
+            height: root.layout_box.height_box(),
+        }
+    }
+
     /// Internal method for layout a node.
     /// Layouts a single node and its descendants.
     #[must_use]
@@ -938,7 +964,7 @@ impl LayoutEngine {
 
         let ctx = base_ctx;
 
-        let rect = custom.layout(&ctx);
+        let rect = custom.layout(self, &ctx);
 
         let w = if rect.width.is_finite() {
             rect.width

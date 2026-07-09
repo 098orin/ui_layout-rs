@@ -1,4 +1,4 @@
-use crate::{LayoutContext, MeasureResult, Rect};
+use crate::{LayoutContext, LayoutEngine, MeasureResult, Rect};
 use std::fmt;
 
 /// A self-layouting object that participates in block-level layout.
@@ -31,7 +31,7 @@ pub trait CustomLayout: fmt::Debug {
     /// `ctx` provides the containing block dimensions and the available
     /// inline/extent space.  Returns the final [`Rect`] of this node
     /// in the parent's content-box coordinate space.
-    fn layout(&mut self, ctx: &LayoutContext) -> Rect;
+    fn layout(&mut self, engine: &LayoutEngine, ctx: &LayoutContext) -> Rect;
 
     /// Returns the intrinsic size of this object.
     ///
