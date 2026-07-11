@@ -1,4 +1,4 @@
-use crate::{FlowLayouter, FragmentNode, ItemFragment, LayoutNode};
+use crate::{BlockLayouter, FlowLayouter, FragmentNode, ItemFragment, LayoutNode};
 
 /// A unified layout item used during layout processing.
 ///
@@ -7,6 +7,7 @@ use crate::{FlowLayouter, FragmentNode, ItemFragment, LayoutNode};
 /// - [`Node`](LayoutChild::Node) — a nested layout node (block, inline, flex, etc.)
 /// - [`Fragment`](LayoutChild::Fragment) — an inline-level content fragment
 /// - [`Object`](LayoutChild::Object) — a custom [`FlowLayouter`] object
+/// - [`Custom`](LayoutChild::Custom) — a custom [`BlockLayouter`] object
 ///
 /// This abstraction allows the layout engine to treat structural elements,
 /// inline fragments, and custom objects uniformly while preserving their order.
@@ -27,6 +28,17 @@ pub enum LayoutChild {
     /// Objects are self-layouting: they implement [`FlowLayouter::layout`]
     /// for inline flow and [`FlowLayouter::measure`] for flex sizing.
     Object(Box<dyn FlowLayouter>),
+    /// A custom block-level component that implements [`BlockLayouter`].
+    ///
+    /// The component returns its border-box [`Rect`](crate::Rect) via
+    /// [`BlockLayouter::layout`].  Layout results are stored in
+    /// the associated [`LayoutNode`].
+    Custom {
+        /// The block-level layouter that computes the component's rect.
+        layouter: Box<dyn BlockLayouter>,
+        /// Layout node for storing computed layout results.
+        node: Box<LayoutNode>,
+    },
 }
 
 impl LayoutChild {
@@ -74,6 +86,26 @@ impl LayoutChild {
             _ => None,
         }
     }
+
+    /// Returns references to the [`BlockLayouter`] and its
+    /// associated [`LayoutNode`] if this child is a
+    /// [`Custom`](LayoutChild::Custom).
+    pub fn custom(&self) -> Option<(&dyn BlockLayouter, &LayoutNode)> {
+        match self {
+            LayoutChild::Custom { layouter, node } => Some((&**layouter, node)),
+            _ => None,
+        }
+    }
+
+    /// Returns mutable references to the [`BlockLayouter`] and its
+    /// associated [`LayoutNode`] if this child is a
+    /// [`Custom`](LayoutChild::Custom).
+    pub fn custom_mut(&mut self) -> Option<(&mut Box<dyn BlockLayouter>, &mut LayoutNode)> {
+        match self {
+            LayoutChild::Custom { layouter, node } => Some((layouter, node)),
+            _ => None,
+        }
+    }
 }
 
 impl From<LayoutNode> for LayoutChild {
@@ -91,5 +123,14 @@ impl From<FragmentNode> for LayoutChild {
 impl From<ItemFragment> for LayoutChild {
     fn from(value: ItemFragment) -> Self {
         LayoutChild::Fragment(FragmentNode::new(value))
+    }
+}
+
+impl From<Box<dyn BlockLayouter>> for LayoutChild {
+    fn from(layouter: Box<dyn BlockLayouter>) -> Self {
+        LayoutChild::Custom {
+            layouter,
+            node: Box::new(LayoutNode::new(crate::Style::default())),
+        }
     }
 }

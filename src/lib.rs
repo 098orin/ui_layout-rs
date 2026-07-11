@@ -65,6 +65,7 @@
 //! - `LayoutChild::Node` — a normal layout node
 //! - `LayoutChild::Fragment` — an inline-level fragment
 //! - `LayoutChild::Object` — a custom [`FlowLayouter`] object
+//! - `LayoutChild::Custom` — a custom [`BlockLayouter`] object
 //!
 //! [`ItemFragment`] represents the smallest independently positioned
 //! piece of inline content.
@@ -81,11 +82,15 @@
 //! ## Custom Objects
 //!
 //! The [`FlowLayouter`] trait allows custom types to participate directly
-//! in layout.  Objects report their intrinsic size via
-//! [`FlowLayouter::measure`] and perform inline layout via
-//! [`FlowLayouter::layout`].  They can be used as children in both flow
-//! and flex containers.
+//! in layout as inline-level objects.  Objects report their intrinsic size
+//! via [`FlowLayouter::measure`] and perform inline layout via
+//! [`FlowLayouter::layout`].
+//!
+//! The [`BlockLayouter`] trait allows custom types to participate
+//! as block-level components.  Components return their border-box
+//! [`Rect`](crate::Rect) via [`BlockLayouter::layout`].
 
+mod block_layouter;
 mod cache;
 mod display;
 mod engine;
@@ -96,6 +101,7 @@ mod layout_child;
 mod layout_node;
 mod style;
 
+pub use block_layouter::*;
 pub use engine::*;
 pub use flow_layouter::*;
 pub use fragment::*;

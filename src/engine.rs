@@ -103,6 +103,7 @@ pub enum LayoutItem {
     Node(usize),
     Fragments(std::ops::Range<usize>),
     Object(usize),
+    Custom(usize),
 }
 
 #[derive(Clone)]
@@ -649,6 +650,9 @@ impl LayoutEngine {
                 LayoutItem::Object(i) => {
                     self.process_flow_object_item(node, i, outbox_width, line_height, &mut state);
                 }
+                LayoutItem::Custom(i) => {
+                    self.process_flow_custom_item(node, i, ctx, &base_ctx_for_child, &mut state);
+                }
             }
         }
 
@@ -913,6 +917,97 @@ impl LayoutEngine {
         if had_line_spans {
             state.accum.pending_advance = state.accum.max_inline_line_height;
         }
+    }
+
+    fn process_flow_custom_item(
+        &self,
+        node: &mut LayoutNode,
+        i: usize,
+        ctx: &LayoutContext,
+        base_ctx_for_child: &LayoutContext,
+        state: &mut FlowState,
+    ) {
+        let content_width_opt = state
+            .content_width_opt
+            .or(ctx.available_width);
+
+        let ctx_for_child = LayoutContext {
+            available_width: content_width_opt,
+            ..*base_ctx_for_child
+        };
+
+        let rect = {
+            let layouter = match &node.children[i] {
+                LayoutChild::Custom { layouter, .. } => layouter.as_ref(),
+                _ => unreachable!(),
+            };
+            layouter.layout(&ctx_for_child)
+        };
+
+        let child_node = match &mut node.children[i] {
+            LayoutChild::Custom { node, .. } => node.as_mut(),
+            _ => unreachable!(),
+        };
+
+        let child_margin = self.resolve_margin(&child_node.style.spacing, ctx);
+        let child_padding = self.resolve_padding(&child_node.style.spacing, ctx);
+        let child_border = self.resolve_border(&child_node.style.spacing, ctx);
+
+        let outer_w = rect.width + child_border.left + child_border.right
+            + child_padding.left
+            + child_padding.right;
+        let outer_h = rect.height + child_border.top + child_border.bottom
+            + child_padding.top
+            + child_padding.bottom;
+
+        child_node.layout_box = LayoutBox::BlockBox(create_box_model(
+            outer_w,
+            outer_h,
+            rect.width + child_padding.left + child_padding.right,
+            rect.height + child_padding.top + child_padding.bottom,
+            child_padding,
+            child_border,
+        ));
+
+        let line_ctx_for_child = state.cursor.line_ctx();
+        let child_position_y = line_ctx_for_child.end_pos.1 + state.accum.pending_advance;
+
+        let top_margin = child_margin.top.unwrap_or(0.0);
+        let bottom_margin = child_margin.bottom.unwrap_or(0.0);
+
+        let top_collapses = !state.accum.first_block_child_processed
+            && state.border.top == 0.0
+            && state.padding.top == 0.0;
+
+        if top_collapses {
+            state.accum.first_child_margin = top_margin;
+        } else {
+            let margin_top = state.accum.prev_child_margin.max(top_margin);
+            child_node.layout_box.shift(0.0, margin_top);
+            state.cursor.shift_y(margin_top);
+        }
+
+        state.accum.prev_child_margin = bottom_margin;
+        state.accum.first_block_child_processed = true;
+
+        child_node
+            .layout_box
+            .shift(0.0, child_position_y);
+
+        state
+            .cursor
+            .set_pos(0.0, child_position_y + child_node.layout_box.height());
+
+        state.accum.children_width = state
+            .accum
+            .children_width
+            .max(child_node.layout_box.width());
+        state.accum.children_height = state
+            .accum
+            .children_height
+            .max(child_position_y + child_node.layout_box.height());
+
+        state.accum.pending_advance = 0.0;
     }
 
     fn finalize_flow_box(
@@ -1305,6 +1400,14 @@ impl LayoutEngine {
                     let tuple = (measured.width, measured.height);
                     axis.tuple_main(tuple)
                 }
+                LayoutItem::Custom(index) => {
+                    if let LayoutChild::Custom { layouter, .. } = &node.children[*index] {
+                        let rect = layouter.layout(ctx);
+                        axis.tuple_main((rect.width, rect.height))
+                    } else {
+                        0.0
+                    }
+                }
             })
             .sum()
     }
@@ -1576,6 +1679,67 @@ impl LayoutEngine {
         }
     }
 
+    fn position_flex_custom(
+        &self,
+        node: &mut LayoutNode,
+        axis: Axis,
+        ctx: &LayoutContext,
+        index: usize,
+        placement: &mut FlexPlacementCtx,
+    ) {
+        let rect = if let LayoutChild::Custom { layouter, .. } = &node.children[index] {
+            layouter.layout(ctx)
+        } else {
+            return;
+        };
+
+        let child_node = match &mut node.children[index] {
+            LayoutChild::Custom { node, .. } => node.as_mut(),
+            _ => unreachable!(),
+        };
+
+        let tuple = (rect.width, rect.height);
+        let item_main_size = axis.tuple_main(tuple);
+        let item_cross_size = axis.tuple_cross(tuple);
+
+        let available_cross = axis.rect_cross(&placement.content_box);
+        let cross_offset =
+            resolve_align_position(node.style.align_items, item_cross_size, available_cross);
+
+        let (main_offset, cross_offset_pos) = match axis {
+            Axis::Horizontal => (rect.x, placement.content_box.y + cross_offset),
+            Axis::Vertical => (rect.y, placement.content_box.x + cross_offset),
+        };
+
+        let cursor = if placement.reversed {
+            placement.cursor_main - placement.gap - placement.gap_between
+        } else {
+            placement.cursor_main
+        };
+
+        child_node.layout_box = LayoutBox::BlockBox(BoxModel {
+            border_box: rect,
+            padding_box: rect,
+            content_box: rect,
+            children_box: rect,
+        });
+
+        match axis {
+            Axis::Horizontal => {
+                child_node.layout_box.shift(cursor + main_offset, cross_offset_pos);
+            }
+            Axis::Vertical => {
+                child_node.layout_box.shift(cross_offset_pos, cursor + main_offset);
+            }
+        }
+
+        if placement.reversed {
+            placement.cursor_main -= item_main_size + placement.gap + placement.gap_between;
+        } else {
+            placement.cursor_main += item_main_size + placement.gap + placement.gap_between;
+        }
+    }
+
     /// Set child positions.
     fn flow_flex_children(&self, node: &mut LayoutNode, axis: Axis, ctx: &LayoutContext) {
         if node.children.is_empty() {
@@ -1659,6 +1823,9 @@ impl LayoutEngine {
                 }
                 LayoutItem::Object(index) => {
                     self.position_flex_object(node, axis, ctx, index, &mut placement)
+                }
+                LayoutItem::Custom(index) => {
+                    self.position_flex_custom(node, axis, ctx, index, &mut placement)
                 }
             }
         }
@@ -1790,6 +1957,13 @@ impl LayoutEngine {
                     let measured = object.measure(base_ctx_for_children);
                     let tuple = (measured.width, measured.height);
                     state.main_size = axis.tuple_main(tuple);
+                }
+                LayoutItem::Custom(index) => {
+                    if let LayoutChild::Custom { layouter, .. } = &node.children[*index] {
+                        let rect = layouter.layout(base_ctx_for_children);
+                        let tuple = (rect.width, rect.height);
+                        state.main_size = axis.tuple_main(tuple);
+                    }
                 }
             }
         }
@@ -1989,6 +2163,14 @@ impl LayoutEngine {
                     let tuple = (measured.width, measured.height);
                     total_border_main += axis.tuple_main(tuple);
                     max_cross = max_cross.max(axis.tuple_cross(tuple));
+                }
+                LayoutItem::Custom(index) => {
+                    if let LayoutChild::Custom { layouter, .. } = &node.children[*index] {
+                        let rect = layouter.layout(base_ctx_for_children);
+                        let tuple = (rect.width, rect.height);
+                        total_border_main += axis.tuple_main(tuple);
+                        max_cross = max_cross.max(axis.tuple_cross(tuple));
+                    }
                 }
             }
         }
@@ -2475,6 +2657,10 @@ impl<'a> Iterator for LayoutItems<'a> {
             LayoutChild::Object(_) => {
                 self.index = i + 1;
                 Some(LayoutItem::Object(i))
+            }
+            LayoutChild::Custom { .. } => {
+                self.index = i + 1;
+                Some(LayoutItem::Custom(i))
             }
         }
     }
