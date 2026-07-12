@@ -368,15 +368,12 @@ fn write_child(
             o.write_debug(f)?;
             writeln!(f)
         }
-        LayoutChild::Custom { layouter, node: child_node } => {
+        LayoutChild::Custom(layouter) => {
             let branch = if is_last { "└── " } else { "├── " };
 
             write!(f, "{}{}", prefix, branch)?;
 
             layouter.write_debug(f)?;
-            if f.alternate() {
-                write!(f, " {}", child_node.layout_box)?;
-            }
             writeln!(f)
         }
     }

@@ -31,7 +31,7 @@ use std::fmt::{self, Debug};
 /// }
 ///
 /// impl BlockLayouter for MyPanel {
-///     fn layout(&self, _ctx: &LayoutContext) -> Rect {
+///     fn layout(&mut self, _ctx: &LayoutContext) -> Rect {
 ///         Rect { x: 0.0, y: 0.0, width: self.width, height: self.height }
 ///     }
 /// }
@@ -39,7 +39,7 @@ use std::fmt::{self, Debug};
 /// let panel: Box<dyn BlockLayouter> = Box::new(MyPanel { width: 200.0, height: 100.0 });
 /// let root = LayoutNode::with_children(
 ///     Style::default(),
-///     [LayoutChild::from(panel)],
+///     [LayoutChild::Custom(panel)],
 /// );
 /// ```
 pub trait BlockLayouter: Debug {
@@ -48,7 +48,7 @@ pub trait BlockLayouter: Debug {
     /// The returned [`Rect`] describes the component's position and
     /// size including border, padding, and content area.  The engine
     /// writes this result into the parent's layout output.
-    fn layout(&self, ctx: &LayoutContext) -> Rect;
+    fn layout(&mut self, ctx: &LayoutContext) -> Rect;
 
     /// Writes a human-readable name for debugging and tree rendering.
     ///

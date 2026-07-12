@@ -31,14 +31,8 @@ pub enum LayoutChild {
     /// A custom block-level component that implements [`BlockLayouter`].
     ///
     /// The component returns its border-box [`Rect`](crate::Rect) via
-    /// [`BlockLayouter::layout`].  Layout results are stored in
-    /// the associated [`LayoutNode`].
-    Custom {
-        /// The block-level layouter that computes the component's rect.
-        layouter: Box<dyn BlockLayouter>,
-        /// Layout node for storing computed layout results.
-        node: Box<LayoutNode>,
-    },
+    /// [`BlockLayouter::layout`].
+    Custom(Box<dyn BlockLayouter>),
 }
 
 impl LayoutChild {
@@ -87,22 +81,18 @@ impl LayoutChild {
         }
     }
 
-    /// Returns references to the [`BlockLayouter`] and its
-    /// associated [`LayoutNode`] if this child is a
+    /// Returns references to the [`BlockLayouter`] if this child is a
     /// [`Custom`](LayoutChild::Custom).
-    pub fn custom(&self) -> Option<(&dyn BlockLayouter, &LayoutNode)> {
+    pub fn custom(&self) -> Option<&Box<dyn BlockLayouter>> {
         match self {
-            LayoutChild::Custom { layouter, node } => Some((&**layouter, node)),
+            LayoutChild::Custom(c) => Some(c),
             _ => None,
         }
     }
 
-    /// Returns mutable references to the [`BlockLayouter`] and its
-    /// associated [`LayoutNode`] if this child is a
-    /// [`Custom`](LayoutChild::Custom).
-    pub fn custom_mut(&mut self) -> Option<(&mut Box<dyn BlockLayouter>, &mut LayoutNode)> {
+    pub fn custom_mut(&mut self) -> Option<&mut Box<dyn BlockLayouter>> {
         match self {
-            LayoutChild::Custom { layouter, node } => Some((layouter, node)),
+            LayoutChild::Custom(c) => Some(c),
             _ => None,
         }
     }
@@ -123,14 +113,5 @@ impl From<FragmentNode> for LayoutChild {
 impl From<ItemFragment> for LayoutChild {
     fn from(value: ItemFragment) -> Self {
         LayoutChild::Fragment(FragmentNode::new(value))
-    }
-}
-
-impl From<Box<dyn BlockLayouter>> for LayoutChild {
-    fn from(layouter: Box<dyn BlockLayouter>) -> Self {
-        LayoutChild::Custom {
-            layouter,
-            node: Box::new(LayoutNode::new(crate::Style::default())),
-        }
     }
 }
