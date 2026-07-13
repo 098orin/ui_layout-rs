@@ -1,3 +1,4 @@
+#![cfg(feature = "unstable")]
 mod common;
 use common::*;
 use ui_layout::*;

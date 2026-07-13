@@ -11,3 +11,4 @@ categories = ["gui"]
 
 [features]
 layout-bench = []
+unstable = []

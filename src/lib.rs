@@ -90,6 +90,7 @@
 //! as block-level components.  Components return their border-box
 //! [`Rect`](crate::Rect) via [`BlockLayouter::layout`].
 
+#[cfg(feature = "unstable")]
 mod block_layouter;
 mod cache;
 mod display;
@@ -101,6 +102,7 @@ mod layout_child;
 mod layout_node;
 mod style;
 
+#[cfg(feature = "unstable")]
 pub use block_layouter::*;
 pub use engine::*;
 pub use flow_layouter::*;

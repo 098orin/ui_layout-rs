@@ -103,6 +103,7 @@ pub enum LayoutItem {
     Node(usize),
     Fragments(std::ops::Range<usize>),
     Object(usize),
+    #[cfg(feature = "unstable")]
     Custom(usize),
 }
 
@@ -650,6 +651,7 @@ impl LayoutEngine {
                 LayoutItem::Object(i) => {
                     self.process_flow_object_item(node, i, outbox_width, line_height, &mut state);
                 }
+                #[cfg(feature = "unstable")]
                 LayoutItem::Custom(i) => {
                     self.process_flow_custom_item(node, i, ctx, &base_ctx_for_child, &mut state);
                 }
@@ -919,6 +921,7 @@ impl LayoutEngine {
         }
     }
 
+    #[cfg(feature = "unstable")]
     fn process_flow_custom_item(
         &self,
         node: &mut LayoutNode,
@@ -1347,6 +1350,7 @@ impl LayoutEngine {
                     let tuple = (measured.width, measured.height);
                     axis.tuple_main(tuple)
                 }
+                #[cfg(feature = "unstable")]
                 LayoutItem::Custom(index) => {
                     if let LayoutChild::Custom(layouter) = &mut node.children[*index] {
                         let rect = layouter.as_mut().layout(ctx);
@@ -1626,6 +1630,7 @@ impl LayoutEngine {
         }
     }
 
+    #[cfg(feature = "unstable")]
     fn position_flex_custom(
         &self,
         node: &mut LayoutNode,
@@ -1739,6 +1744,7 @@ impl LayoutEngine {
                 LayoutItem::Object(index) => {
                     self.position_flex_object(node, axis, ctx, index, &mut placement)
                 }
+                #[cfg(feature = "unstable")]
                 LayoutItem::Custom(index) => {
                     self.position_flex_custom(node, axis, ctx, index, &mut placement)
                 }
@@ -1873,6 +1879,7 @@ impl LayoutEngine {
                     let tuple = (measured.width, measured.height);
                     state.main_size = axis.tuple_main(tuple);
                 }
+                #[cfg(feature = "unstable")]
                 LayoutItem::Custom(index) => {
                     if let LayoutChild::Custom(layouter) = &mut node.children[*index] {
                         let rect = layouter.as_mut().layout(base_ctx_for_children);
@@ -2079,6 +2086,7 @@ impl LayoutEngine {
                     total_border_main += axis.tuple_main(tuple);
                     max_cross = max_cross.max(axis.tuple_cross(tuple));
                 }
+                #[cfg(feature = "unstable")]
                 LayoutItem::Custom(index) => {
                     let layouter = node.children.get_mut(*index).unwrap().custom_mut().unwrap();
                     let rect = layouter.layout(base_ctx_for_children);
@@ -2572,6 +2580,7 @@ impl<'a> Iterator for LayoutItems<'a> {
                 self.index = i + 1;
                 Some(LayoutItem::Object(i))
             }
+            #[cfg(feature = "unstable")]
             LayoutChild::Custom(_) => {
                 self.index = i + 1;
                 Some(LayoutItem::Custom(i))

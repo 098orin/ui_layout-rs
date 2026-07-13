@@ -1,4 +1,6 @@
-use crate::{BlockLayouter, FlowLayouter, FragmentNode, ItemFragment, LayoutNode};
+use crate::{FlowLayouter, FragmentNode, ItemFragment, LayoutNode};
+#[cfg(feature = "unstable")]
+use crate::BlockLayouter;
 
 /// A unified layout item used during layout processing.
 ///
@@ -32,6 +34,7 @@ pub enum LayoutChild {
     ///
     /// The component returns its border-box [`Rect`](crate::Rect) via
     /// [`BlockLayouter::layout`].
+    #[cfg(feature = "unstable")]
     Custom(Box<dyn BlockLayouter>),
 }
 
@@ -81,6 +84,7 @@ impl LayoutChild {
         }
     }
 
+    #[cfg(feature = "unstable")]
     /// Returns references to the [`BlockLayouter`] if this child is a
     /// [`Custom`](LayoutChild::Custom).
     pub fn custom(&self) -> Option<&Box<dyn BlockLayouter>> {
@@ -90,6 +94,7 @@ impl LayoutChild {
         }
     }
 
+    #[cfg(feature = "unstable")]
     pub fn custom_mut(&mut self) -> Option<&mut Box<dyn BlockLayouter>> {
         match self {
             LayoutChild::Custom(c) => Some(c),

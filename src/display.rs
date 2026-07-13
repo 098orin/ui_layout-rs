@@ -368,6 +368,7 @@ fn write_child(
             o.write_debug(f)?;
             writeln!(f)
         }
+        #[cfg(feature = "unstable")]
         LayoutChild::Custom(layouter) => {
             let branch = if is_last { "└── " } else { "├── " };
 
