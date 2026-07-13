@@ -292,11 +292,11 @@ fn line_box(base: &BoxModel, span: &LineSpan, len: usize, edges: InlineBoxEdges)
     b.border_box.x = span.line_pos.0;
     b.border_box.y = span.line_pos.1;
     b.content_box.width = new_content_width;
-    b.content_box.x = left_border + left_padding;
-    b.content_box.y = edges.top_border + edges.top_padding;
+    b.content_box.x = span.line_pos.0 + left_border + left_padding;
+    b.content_box.y = span.line_pos.1 + edges.top_border + edges.top_padding;
 
-    b.padding_box.x = left_border;
-    b.padding_box.y = edges.top_border;
+    b.padding_box.x = span.line_pos.0 + left_border;
+    b.padding_box.y = span.line_pos.1 + edges.top_border;
     b.padding_box.width = new_content_width + left_padding + right_padding;
     b.padding_box.height = b.content_box.height + edges.top_padding + edges.bottom_padding;
     b.border_box.width = b.padding_box.width + left_border + right_border;
