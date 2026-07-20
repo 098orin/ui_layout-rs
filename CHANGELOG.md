@@ -7,7 +7,7 @@ and this project loosely follows Semantic Versioning.
 
 ---
 
-## Unreleased
+## [0.11.0] - 2026-07-20
 
 ### Breaking Changes
 * `Display` enum replaced with `Display` struct `{ outer: OuterDisplay, inner: InnerDisplay }`, following the CSS Display Level 3 specification.
