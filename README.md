@@ -15,6 +15,7 @@ custom GUI frameworks, editors, and experimental UI engines.
 ## Features
 
 ### Flexbox Support
+
 - Flex layout (Row / Column direction)
 - `flex_grow` with proportional space distribution
 - `flex_shrink` with proportional space reduction when overflowing
@@ -93,7 +94,6 @@ match &root.layout_box {
 For more examples and to understand the behavior of gaps, alignment, and sizing,
 see the unit tests in the [`tests/`](tests/) directory. They provide practical usage patterns and expected layouts.
 
-
 ## Specification Compliance
 
 This implementation follows CSS3 specifications with current focus on:
@@ -103,26 +103,25 @@ This implementation follows CSS3 specifications with current focus on:
 - ✅ **CSS Display Module Level 3**: Block, Inline, Flex, and None display values
 - ✅ **CSS Values and Units Module Level 3**: px, %, vw, vh, auto, and calc() support
 
-
 ## Status
 
 See [CHANGELOG.md](CHANGELOG.md) for a detailed list of changes.
 
-* Version: **0.11.0(Unreleased)**
-* API is evolving but now includes full Flexbox-like alignment and gaps
-* **Phase 1 improvements**: Enhanced margin collapsing, comprehensive specification references
+- Version: **0.11.0**
+- API is evolving but now includes full Flexbox-like alignment and gaps
+- **Phase 1 improvements**: Enhanced margin collapsing, comprehensive specification references
 
 Future versions may add:
 
-* `grid`
-* Flex wrap support (`flex-wrap: wrap | nowrap | wrap-reverse`)
-* Flex direction reverse (`flex-direction: row-reverse | column-reverse`)
-* Additional flex sizing rules (fr units, etc.)
-* Absolute / fixed positioning
-* Display: inline-block explicit support
-* Complete parent-child margin collapsing
-* Content-based minimum sizing for flex items
-* Correct flex-basis priority over width/height in flex item sizing
+- `grid`
+- Flex wrap support (`flex-wrap: wrap | nowrap | wrap-reverse`)
+- Flex direction reverse (`flex-direction: row-reverse | column-reverse`)
+- Additional flex sizing rules (fr units, etc.)
+- Absolute / fixed positioning
+- Display: inline-block explicit support
+- Complete parent-child margin collapsing
+- Content-based minimum sizing for flex items
+- Correct flex-basis priority over width/height in flex item sizing
 
 ## License
 
