@@ -10,20 +10,61 @@ and this project loosely follows Semantic Versioning.
 ## Unreleased
 
 ### Breaking Changes
-* `LayoutNode{ children, .. }` changed from `Vec<LayoutNode>` to `Vec<LayoutChild>`
-* `LayoutBoxes` renamed/simplified to `LayoutBox`
-  * `None`
-  * `BlockBox(BoxModel)`
-  * `InlineBox(InlineBox)`
-* Removed `LayoutNode::set_fragments(...)`
-* Some size/spacing properties types migrated from  `Length`  to `LengthOrAuto`
-* `Display` changed into `{ outer, inner }` structure
+* `Display` enum replaced with `Display` struct `{ outer: OuterDisplay, inner: InnerDisplay }`, following the CSS Display Level 3 specification.
+  * New enums: `OuterDisplay` (`Block`, `Inline`, `None`), `InnerDisplay` (`Flow`, `Flex`).
+  * `Display::Flex { flex_direction }` variant removed; `flex_direction` is now a separate field on `Style`.
+* `LayoutBoxes` renamed to `LayoutBox` with new variants: `None`, `BlockBox(BoxModel)`, `InlineBox(InlineBox)`.
+  * Removed variants: `Single`, `Multiple`.
+* `LayoutNode.children` changed from `Vec<LayoutNode>` to `Vec<LayoutChild>`.
+* `LayoutNode::set_fragments(...)` removed.
+* `FragmentPlacement` renamed to `Placement` (adds `#[derive(Default)]`).
+* `Length::Auto` variant removed. Auto sizing is now represented by the new `LengthOrAuto` enum.
+  * `LengthOrAuto::Length(Length)` | `LengthOrAuto::Auto` (default).
+* Size/spacing property types migrated from `Length` to `LengthOrAuto`:
+  * `SizeStyle` fields: `width`, `height`, `min_width`, `max_width`, `min_height`, `max_height`.
+  * `Spacing` fields: `margin_top`, `margin_bottom`, `margin_left`, `margin_right`.
+  * `ItemStyle.flex_basis`, `Style.column_gap`, `Style.row_gap`.
+* `FlexDirection` default changed from `Column` to `Row` (matches CSS spec).
+* `LayoutNode::with_children(...)` signature changed to accept any `IntoIterator<Item = T> where T: Into<LayoutChild>`.
+* `IntoIterator for &LayoutBox` now yields `BoxModel` by value (previously yielded `&BoxModel`).
+* `IntoIterator for &mut LayoutBoxes` removed.
+* `FlowLayouter::debug_name(...)` replaced by `write_debug(...)`.
 
-### Added 
-* Added `LayoutBox` iteration support and helper methods (`width`, `height`, `len`, etc.)
-* Added `LayoutNode::with_children(...)`
-* Added `LayoutChild` , an enum: `Node(Box<LayoutNode>) | Fragment(FragmentNode)`
-* Added `FragmentNode`
+### Added
+* **Flex reverse**: `FlexDirection::RowReverse` and `ColumnReverse` variants, with full flex reverse layout support.
+* **Margin collapse**: Vertical margins between block-level siblings now collapse per CSS rules.
+* **`LayoutChild`** enum with variants: `Node`, `Fragment`, `Object(Box<dyn FlowLayouter>)`, `Custom(Box<dyn BlockLayouter>)` (unstable).
+* **`FlowLayouter`** trait for custom inline flow layout delegation (`layout`, `measure`, `write_debug` methods).
+* **`BlockLayouter`** trait (`feature = "unstable"`) for custom block layout delegation.
+* **`LayoutEngine::layout_root(...)`** method for custom layout delegation.
+* **`FragmentNode`** struct wrapping `ItemFragment` with `Placement`.
+* **`LayoutBox` iteration** support via named types `LayoutBoxIter` / `LayoutBoxIntoIter` with `ExactSizeIterator`, `DoubleEndedIterator`, `FusedIterator`.
+* **`LayoutBox::width_box()`**, **`height_box()`** methods for inline box dimensions.
+* **`InlineBox`** struct (`box_model: BoxModel`, `line_spans: Vec<LineSpan>`).
+* **`LineSpan`** struct with `x_range`, `line_pos`, `line_index`, and `width()` method.
+* **`EdgeOption`** struct (`left`, `top`, `right`, `bottom` as `Option<f32>`).
+* **`MeasureResult`** struct (`width`, `height`).
+* **`FlowLayoutContext`** struct for flow layout delegation.
+* **`LayoutItem`** enum: `Node`, `Fragments`, `Object`, `Custom` (unstable).
+* **`Axis`** enum: `Horizontal`, `Vertical`.
+* **`Style.line_height`** field added.
+* **`fmt::Display`** implementations for: `Length`, `LengthOrAuto`, `OuterDisplay`, `InnerDisplay`, `Display`, `FlexDirection`, `BoxSizing`, `JustifyContent`, `AlignItems`, `ItemStyle`, `SizeStyle`, `Spacing`, `Style`, `Placement`.
+* **`Display::from_css_name()`**, **`Display::from_css()`**, **`Display::parse()`** methods and `FromStr` impl.
+* **`LayoutMetrics`** struct (behind `feature = "layout-bench"`) for layout call/cache instrumentation.
+* **`feature = "unstable"`** flag gating `BlockLayouter` trait and `LayoutChild::Custom`.
+
+### Fixed
+* `FlexDirection` default corrected from `Column` to `Row`.
+* Flex container auto-sizing now correctly includes child margins.
+* `FlowLayouter` objects now handle line breaks during inline flow layout (`LayoutChild::Object`).
+* `LayoutBoxIter` returns correct per-line `BoxModel` dimensions (padding/border stripping for non-first/non-last lines).
+* `Default` for `Spacing` now correctly initializes margins to `LengthOrAuto::Length(Px(0.0))` instead of `LengthOrAuto::Auto`.
+
+### Internal
+* Module reorganization: `src/node.rs` removed; replaced by `src/layout_node.rs` and `src/layout_child.rs`.
+* New modules: `src/display.rs`, `src/flow_layouter.rs`, `src/block_layouter.rs`.
+* `LayoutEngine` changed from unit struct to struct holding viewport state.
+* Extensive internal refactoring of flow, flex, inline, and block layout engines.
 
 ---
 
