@@ -1,6 +1,6 @@
-use crate::{FlowLayouter, FragmentNode, ItemFragment, LayoutNode};
 #[cfg(feature = "unstable")]
 use crate::BlockLayouter;
+use crate::{FlowLayouter, FragmentNode, ItemFragment, LayoutNode};
 
 /// A unified layout item used during layout processing.
 ///
