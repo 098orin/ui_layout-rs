@@ -4,7 +4,6 @@ use crate::{EMPTY_LINE_CONTEXT, LayoutBox, LayoutChild, LineContext, Style};
 type LayoutCache = (u32, (LayoutBox, LineContext));
 
 /// A node in the layout tree.
-#[non_exhaustive]
 #[derive(Debug)]
 pub struct LayoutNode {
     pub style: Style,
