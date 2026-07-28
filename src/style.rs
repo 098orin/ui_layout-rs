@@ -17,6 +17,7 @@ pub enum OuterDisplay {
 pub enum InnerDisplay {
     #[default]
     Flow,
+    FlowRoot,
     Flex,
 }
 
@@ -34,6 +35,8 @@ pub enum InnerDisplay {
 /// - `inline`       => (Inline, Flow)
 /// - `flex`         => (Block, Flex)
 /// - `inline-flex`  => (Inline, Flex)
+/// - `flow-root`    => (Block, FlowRoot)
+/// - `inline-block` => (Inline, FlowRoot)
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Display {
     pub outer: OuterDisplay,
@@ -48,6 +51,8 @@ impl Display {
     /// - `inline`
     /// - `flex`
     /// - `inline-flex`
+    /// - `flow-root`
+    /// - `inline-block`
     /// - `none`
     ///
     /// Returns `None` if the keyword is not recognized.
@@ -77,6 +82,14 @@ impl Display {
                 outer: OuterDisplay::Inline,
                 inner: InnerDisplay::Flex,
             }),
+            "flow-root" => Some(Self {
+                outer: OuterDisplay::Block,
+                inner: InnerDisplay::FlowRoot,
+            }),
+            "inline-block" => Some(Self {
+                outer: OuterDisplay::Inline,
+                inner: InnerDisplay::FlowRoot,
+            }),
             _ => None,
         }
     }
@@ -86,6 +99,8 @@ impl Display {
     /// This supports the modern syntax like:
     /// - `display: block flow`
     /// - `display: inline flex`
+    /// - `display: block flow-root`
+    /// - `display: inline flow-root`
     ///
     /// Returns a tuple:
     /// `(outer, inner)`
@@ -101,6 +116,14 @@ impl Display {
     /// let (outer, inner) = Display::from_css("inline flex");
     /// assert_eq!(outer, Some(OuterDisplay::Inline));
     /// assert_eq!(inner, Some(InnerDisplay::Flex));
+    ///
+    /// let (outer, inner) = Display::from_css("block flow-root");
+    /// assert_eq!(outer, Some(OuterDisplay::Block));
+    /// assert_eq!(inner, Some(InnerDisplay::FlowRoot));
+    ///
+    /// let (outer, inner) = Display::from_css("inline flow-root");
+    /// assert_eq!(outer, Some(OuterDisplay::Inline));
+    /// assert_eq!(inner, Some(InnerDisplay::FlowRoot));
     /// ```
     ///
     /// Unknown tokens are ignored.
@@ -119,6 +142,7 @@ impl Display {
                 "none" => outer = Some(OuterDisplay::None),
 
                 "flow" => inner = Some(InnerDisplay::Flow),
+                "flow-root" => inner = Some(InnerDisplay::FlowRoot),
                 "flex" => inner = Some(InnerDisplay::Flex),
 
                 _ => {}
@@ -166,6 +190,19 @@ impl Display {
     /// assert_eq!(d.inner, InnerDisplay::Flex);
     /// ```
     ///
+    /// Flow-root values:
+    ///
+    /// ```
+    /// # use ui_layout::*;
+    /// let d = Display::parse("flow-root").unwrap();
+    /// assert_eq!(d.outer, OuterDisplay::Block);
+    /// assert_eq!(d.inner, InnerDisplay::FlowRoot);
+    ///
+    /// let d = Display::parse("inline-block").unwrap();
+    /// assert_eq!(d.outer, OuterDisplay::Inline);
+    /// assert_eq!(d.inner, InnerDisplay::FlowRoot);
+    /// ```
+    ///
     /// Multi-keyword syntax:
     ///
     /// ```
@@ -177,6 +214,14 @@ impl Display {
     /// let d = Display::parse("block flow").unwrap();
     /// assert_eq!(d.outer, OuterDisplay::Block);
     /// assert_eq!(d.inner, InnerDisplay::Flow);
+    ///
+    /// let d = Display::parse("block flow-root").unwrap();
+    /// assert_eq!(d.outer, OuterDisplay::Block);
+    /// assert_eq!(d.inner, InnerDisplay::FlowRoot);
+    ///
+    /// let d = Display::parse("inline flow-root").unwrap();
+    /// assert_eq!(d.outer, OuterDisplay::Inline);
+    /// assert_eq!(d.inner, InnerDisplay::FlowRoot);
     /// ```
     ///
     /// Missing parts are filled with defaults:

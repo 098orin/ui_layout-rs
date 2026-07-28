@@ -33,6 +33,21 @@ pub fn new_child(height: f32) -> LayoutNode {
     })
 }
 
+pub fn block_child(height: f32, mt: f32, mb: f32) -> LayoutNode {
+    LayoutNode::new(Style {
+        size: SizeStyle {
+            height: LengthOrAuto::Length(Length::Px(height)),
+            ..Default::default()
+        },
+        spacing: Spacing {
+            margin_top: LengthOrAuto::Length(Length::Px(mt)),
+            margin_bottom: LengthOrAuto::Length(Length::Px(mb)),
+            ..Default::default()
+        },
+        ..Default::default()
+    })
+}
+
 pub fn flex_container(width: f32, height: f32, direction: FlexDirection) -> Style {
     Style {
         display: Display {

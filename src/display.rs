@@ -47,6 +47,7 @@ impl fmt::Display for InnerDisplay {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             InnerDisplay::Flow => write!(f, "flow"),
+            InnerDisplay::FlowRoot => write!(f, "flow-root"),
             InnerDisplay::Flex => write!(f, "flex"),
         }
     }
@@ -58,6 +59,8 @@ impl fmt::Display for Display {
             (OuterDisplay::Block, InnerDisplay::Flow) => write!(f, "block"),
             (OuterDisplay::Inline, InnerDisplay::Flow) => write!(f, "inline"),
             (OuterDisplay::None, InnerDisplay::Flow) => write!(f, "none"),
+            (OuterDisplay::Block, InnerDisplay::FlowRoot) => write!(f, "flow-root"),
+            (OuterDisplay::Inline, InnerDisplay::FlowRoot) => write!(f, "inline-block"),
             (OuterDisplay::Block, InnerDisplay::Flex) => write!(f, "flex"),
             (OuterDisplay::Inline, InnerDisplay::Flex) => write!(f, "inline-flex"),
             (outer, inner) => write!(f, "{} {}", outer, inner),

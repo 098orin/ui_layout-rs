@@ -204,6 +204,7 @@ struct FlowState {
     parent_current_x: f32,
     content_width_opt: Option<f32>,
     intrinsic_pass: bool,
+    collapse_margins: bool,
 }
 
 struct FlexPlacementCtx {
@@ -561,7 +562,9 @@ impl LayoutEngine {
         intrinsic_pass: bool,
     ) -> LineContext {
         match node.style.display.inner {
-            InnerDisplay::Flow => self.layout_flow(node, ctx, line_ctx, size_opt, intrinsic_pass),
+            InnerDisplay::Flow | InnerDisplay::FlowRoot => {
+                self.layout_flow(node, ctx, line_ctx, size_opt, intrinsic_pass)
+            }
             InnerDisplay::Flex => self.layout_flex(node, ctx, line_ctx, size_opt, intrinsic_pass),
         }
     }
@@ -632,6 +635,7 @@ impl LayoutEngine {
             parent_current_x,
             content_width_opt,
             intrinsic_pass,
+            collapse_margins: node.style.display.inner == InnerDisplay::Flow,
         };
 
         let items: Vec<_> = LayoutItems::new(&node.children).collect();
@@ -792,17 +796,24 @@ impl LayoutEngine {
         child_node.layout_box.shift(ml, 0.0);
 
         if child_is_block {
-            let top_collapses = !state.accum.first_block_child_processed
+            let top_collapses = state.collapse_margins
+                && !state.accum.first_block_child_processed
                 && state.border.top == 0.0
                 && state.padding.top == 0.0;
 
             let effective_top = top.unwrap_or_default().max(updated_line_ctx.margin_start);
             let effective_bottom = bottom.unwrap_or_default().max(updated_line_ctx.margin_end);
 
-            if top_collapses {
-                state.accum.first_child_margin = effective_top;
+            if state.collapse_margins {
+                if top_collapses {
+                    state.accum.first_child_margin = effective_top;
+                } else {
+                    let margin_top = state.accum.prev_child_margin.max(effective_top);
+                    child_node.layout_box.shift(0.0, margin_top);
+                    state.cursor.shift_y(margin_top);
+                }
             } else {
-                let margin_top = state.accum.prev_child_margin.max(effective_top);
+                let margin_top = state.accum.prev_child_margin + effective_top;
                 child_node.layout_box.shift(0.0, margin_top);
                 state.cursor.shift_y(margin_top);
             }
@@ -989,6 +1000,7 @@ impl LayoutEngine {
             border,
             end_y,
             parent_current_x,
+            collapse_margins,
             ..
         } = state;
 
@@ -1034,8 +1046,9 @@ impl LayoutEngine {
         } else {
             let content_width = content_width_opt.unwrap_or(children_width);
 
-            let top_collapses = border.top == 0.0 && padding.top == 0.0;
-            let bottom_collapses = border.bottom == 0.0 && padding.bottom == 0.0;
+            let top_collapses = collapse_margins && border.top == 0.0 && padding.top == 0.0;
+            let bottom_collapses =
+                collapse_margins && border.bottom == 0.0 && padding.bottom == 0.0;
 
             let content_height = content_height_opt.unwrap_or(if bottom_collapses {
                 children_height - prev_child_margin
