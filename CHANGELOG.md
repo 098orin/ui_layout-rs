@@ -7,6 +7,19 @@ and this project loosely follows Semantic Versioning.
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- Spacing display output now emits compact CSS-like notation:
+  - All same: margin: 10px
+  - TB / LR pair: margin: 10px 20px
+  - T / LR / B: margin: 10px 20px 30px
+  - All different: margin: 10px 40px 20px 30px (top right bottom left)
+  - Single side: margin-top: 10px (individual entry kept when shorter)
+
+---
+
 ## [0.11.0] - 2026-07-20
 
 ### Breaking Changes
