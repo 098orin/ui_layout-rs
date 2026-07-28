@@ -194,7 +194,7 @@ impl LayoutBox {
                 .map(|s| s.width())
                 .filter(|v| !v.is_nan())
                 .max_by(f32::total_cmp)
-                .unwrap_or(0.0),
+                .unwrap_or_else(|| l.box_model.width()),
         }
     }
 

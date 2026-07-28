@@ -2,6 +2,44 @@ mod common;
 use common::*;
 use ui_layout::*;
 
+#[test]
+fn inline_margins_advance_the_following_inline_sibling() {
+    let first = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline").unwrap(),
+            spacing: Spacing {
+                margin_left: Length::Px(5.0).into(),
+                margin_right: Length::Px(7.0).into(),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        [fragment(30.0, 10.0)],
+    );
+    let second = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline").unwrap(),
+            ..Default::default()
+        },
+        [fragment(20.0, 10.0)],
+    );
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: Length::Px(200.0).into(),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        [first, second],
+    );
+
+    LayoutEngine::layout(&mut root, 200.0, 100.0);
+
+    assert_eq!(inline_box_model(node(&root, 0)).border_box.x, 5.0);
+    assert_eq!(inline_box_model(node(&root, 1)).border_box.x, 42.0);
+}
+
 // --- ItemFragment API ---
 
 #[test]

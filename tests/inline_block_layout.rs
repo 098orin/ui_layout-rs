@@ -214,6 +214,41 @@ fn respects_explicit_width() {
     assert_eq!(ib.content_box.width, 100.0);
 }
 
+#[test]
+fn empty_inline_blocks_keep_explicit_size_and_advance_inline_flow() {
+    let inline_block = |width, height| {
+        LayoutNode::new(Style {
+            display: Display::parse("inline-block").unwrap(),
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(width)),
+                height: LengthOrAuto::Length(Length::Px(height)),
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+    };
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(300.0)),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        [inline_block(80.0, 24.0), inline_block(60.0, 32.0)],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    let first: Vec<_> = node(&root, 0).layout_box.iter().collect();
+    let second: Vec<_> = node(&root, 1).layout_box.iter().collect();
+    assert_eq!(first[0].border_box.size(), (80.0, 24.0));
+    assert_eq!(second[0].border_box.size(), (60.0, 32.0));
+    assert_eq!(first[0].border_box.x, 0.0);
+    assert_eq!(second[0].border_box.x, 80.0);
+}
+
 // --- Padding and border ---
 
 #[test]
@@ -293,7 +328,7 @@ fn multiple_inline_blocks_flow_inline() {
     assert_eq!(boxes1.len(), 1);
     assert_eq!(boxes2.len(), 1);
     assert_eq!(boxes1[0].border_box.x, 0.0);
-    assert_eq!(boxes2[0].border_box.x, 0.0);
+    assert_eq!(boxes2[0].border_box.x, boxes1[0].border_box.width);
     assert_eq!(boxes2[0].border_box.y, 0.0);
 }
 

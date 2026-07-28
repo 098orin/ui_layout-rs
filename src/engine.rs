@@ -662,7 +662,7 @@ impl LayoutEngine {
             }
         }
 
-        self.finalize_flow_box(node, content_width_opt, content_height_opt, state)
+        self.finalize_flow_box(node, ctx, content_width_opt, content_height_opt, state)
     }
 
     fn process_flow_fragment_item(
@@ -785,7 +785,7 @@ impl LayoutEngine {
             bottom,
         } = child_margin;
 
-        let (ml, _mr) = resolve_flow_margin_auto(
+        let (ml, mr) = resolve_flow_margin_auto(
             ml_opt,
             mr_opt,
             state.content_width_opt,
@@ -820,6 +820,10 @@ impl LayoutEngine {
 
             state.accum.prev_child_margin = effective_bottom;
             state.accum.first_block_child_processed = true;
+        } else {
+            // Inline-level margins consume inline space on both sides.
+            state.cursor.x += ml + mr;
+            state.cursor.current_x += ml + mr;
         }
 
         if child_node.style.display.outer == OuterDisplay::Inline {
@@ -974,6 +978,7 @@ impl LayoutEngine {
     fn finalize_flow_box(
         &self,
         node: &mut LayoutNode,
+        ctx: &LayoutContext,
         content_width_opt: Option<f32>,
         content_height_opt: Option<f32>,
         state: FlowState,
@@ -1004,6 +1009,9 @@ impl LayoutEngine {
             ..
         } = state;
 
+        let pb_w = padding.left + padding.right + border.left + border.right;
+        let pb_h = padding.top + padding.bottom + border.top + border.bottom;
+
         if node.style.display.outer == OuterDisplay::Inline {
             let has_only_blocks = line_span_buf.is_empty();
             let content_w = if has_only_blocks {
@@ -1017,6 +1025,32 @@ impl LayoutEngine {
                 max_inline_line_height
             };
 
+            // An inline-block is an atomic inline-level flow root. Unlike a
+            // normal inline box, its explicit and constrained dimensions are
+            // part of its own box, even when it has no children.
+            let (content_w, content_h) = if node.style.display.inner == InnerDisplay::FlowRoot {
+                (
+                    self.apply_size_constraints(
+                        content_width_opt.unwrap_or(content_w),
+                        &node.style.size,
+                        ctx,
+                        true,
+                        Some(&node.style.box_sizing),
+                        pb_w,
+                    ),
+                    self.apply_size_constraints(
+                        content_height_opt.unwrap_or(content_h),
+                        &node.style.size,
+                        ctx,
+                        false,
+                        Some(&node.style.box_sizing),
+                        pb_h,
+                    ),
+                )
+            } else {
+                (content_w, content_h)
+            };
+
             let mut box_model = create_box_model(
                 content_w,
                 content_h,
@@ -1026,7 +1060,9 @@ impl LayoutEngine {
                 border,
             );
 
-            box_model.shift(-(border.left + padding.left), -(border.top + padding.top));
+            if node.style.display.inner != InnerDisplay::FlowRoot {
+                box_model.shift(-(border.left + padding.left), -(border.top + padding.top));
+            }
 
             for (i, span) in line_span_buf.iter_mut().enumerate() {
                 span.line_index = i;
@@ -1037,9 +1073,16 @@ impl LayoutEngine {
                 line_spans: line_span_buf,
             });
 
+            let (end_pos, current_x) = if node.style.display.inner == InnerDisplay::FlowRoot {
+                let width = node.layout_box.width();
+                ((cursor_x + width, cursor_y), parent_current_x + width)
+            } else {
+                ((cursor_x, cursor_y), parent_current_x + current_x)
+            };
+
             LineContext {
-                end_pos: (cursor_x, cursor_y),
-                current_x: parent_current_x + current_x,
+                end_pos,
+                current_x,
                 margin_start: 0.0,
                 margin_end: 0.0,
             }
@@ -1060,6 +1103,23 @@ impl LayoutEngine {
             } else {
                 children_height
             };
+
+            let content_width = self.apply_size_constraints(
+                content_width,
+                &node.style.size,
+                ctx,
+                true,
+                Some(&node.style.box_sizing),
+                pb_w,
+            );
+            let content_height = self.apply_size_constraints(
+                content_height,
+                &node.style.size,
+                ctx,
+                false,
+                Some(&node.style.box_sizing),
+                pb_h,
+            );
 
             let box_model = create_box_model(
                 content_width,

@@ -1196,6 +1196,43 @@ fn flex_column_row_gap() {
 // --- Min/max height constraints ---
 
 #[test]
+fn auto_sized_flex_row_uses_flow_child_min_height() {
+    let child = LayoutNode::new(Style {
+        item_style: ItemStyle {
+            flex_grow: 1.0,
+            flex_basis: LengthOrAuto::Length(Length::Px(80.0)),
+            ..Default::default()
+        },
+        size: SizeStyle {
+            min_height: LengthOrAuto::Length(Length::Px(70.0)),
+            ..Default::default()
+        },
+        spacing: Spacing {
+            padding_top: Length::Px(8.0),
+            padding_bottom: Length::Px(8.0),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            display: Display {
+                outer: OuterDisplay::Block,
+                inner: InnerDisplay::Flex,
+            },
+            ..Default::default()
+        },
+        [child],
+    );
+
+    LayoutEngine::layout(&mut root, 300.0, 200.0);
+
+    assert_eq!(block_box(node(&root, 0)).content_box.height, 70.0);
+    assert_eq!(block_box(&root).content_box.height, 86.0);
+}
+
+#[test]
 fn flex_min_height_constraint() {
     let child = LayoutNode::new(Style {
         item_style: ItemStyle {
