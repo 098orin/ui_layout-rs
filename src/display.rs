@@ -257,27 +257,60 @@ fn collect_style_entries(style: &Style) -> Vec<String> {
 
 /// Collects entries for a spacing group (margin, border, padding).
 ///
-/// If all four sides share the same non-default value, emits a single
-/// shorthand entry (e.g. `margin: 10px`). Otherwise emits individual
-/// side entries for those that differ from the default.
+/// Uses CSS shorthand notation when possible:
+/// - All same:       `margin: 10px`
+/// - TB / LR pair:   `margin: 10px 20px`
+/// - T / LR / B:     `margin: 10px 20px 30px`
+/// - All different:   `margin: 10px 20px 30px 40px`  (top right bottom left)
+///
+/// When only a single side is set, emits the individual side entry
+/// (e.g. `margin-top: 10px`) since that is shorter than the shorthand.
 fn collect_spacing_group<T: PartialEq + fmt::Display>(
     entries: &mut Vec<String>,
     group_name: &str,
     sides: &[(&T, &str); 4],
     default: &T,
 ) {
-    let all_same = sides[0].0 == sides[1].0 && sides[0].0 == sides[2].0 && sides[0].0 == sides[3].0;
+    let top = sides[0].0;
+    let bottom = sides[1].0;
+    let left = sides[2].0;
+    let right = sides[3].0;
 
-    if all_same {
-        if *sides[0].0 != *default {
-            entries.push(format!("{}: {}", group_name, sides[0].0));
-        }
-    } else {
+    let non_default_count = [*top != *default, *bottom != *default, *left != *default, *right != *default]
+        .iter()
+        .filter(|&&b| b)
+        .count();
+
+    if non_default_count == 0 {
+        return;
+    }
+
+    if non_default_count == 1 {
         for (value, name) in sides {
             if **value != *default {
                 entries.push(format!("{}: {}", name, value));
             }
         }
+        return;
+    }
+
+    if *top == *bottom && *left == *right {
+        if *top == *left {
+            // All same: margin: 10px
+            entries.push(format!("{}: {}", group_name, top));
+        } else {
+            // TB / LR: margin: 10px 20px
+            entries.push(format!("{}: {} {}", group_name, top, left));
+        }
+    } else if *left == *right {
+        // T / LR / B: margin: 10px 20px 30px
+        entries.push(format!("{}: {} {} {}", group_name, top, left, bottom));
+    } else {
+        // All different: top right bottom left
+        entries.push(format!(
+            "{}: {} {} {} {}",
+            group_name, top, right, bottom, left
+        ));
     }
 }
 
