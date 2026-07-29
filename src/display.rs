@@ -276,10 +276,15 @@ fn collect_spacing_group<T: PartialEq + fmt::Display>(
     let left = sides[2].0;
     let right = sides[3].0;
 
-    let non_default_count = [*top != *default, *bottom != *default, *left != *default, *right != *default]
-        .iter()
-        .filter(|&&b| b)
-        .count();
+    let non_default_count = [
+        *top != *default,
+        *bottom != *default,
+        *left != *default,
+        *right != *default,
+    ]
+    .iter()
+    .filter(|&&b| b)
+    .count();
 
     if non_default_count == 0 {
         return;
