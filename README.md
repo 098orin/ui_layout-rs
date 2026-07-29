@@ -25,10 +25,11 @@ custom GUI frameworks, editors, and experimental UI engines.
 - Row and column gaps (`row_gap` / `column_gap`)
 - Margin collapsing for block-level elements
 
-### Block & Inline Layout
+### Block, Inline & Flow Root
 
 - Block layout with full CSS Box Model support (margin, padding, border, `box-sizing`)
 - Inline layout with multi-line wrapping
+- `display: flow-root` and `display: inline-block` — establishes a new Block Formatting Context (margin collapsing isolation)
 - `BoxSizing`: ContentBox and BorderBox
 
 ### Extensibility
@@ -118,14 +119,14 @@ This implementation follows CSS3 specifications with current focus on:
 
 - ✅ **CSS Box Model Module Level 3**: Margin collapsing, padding, border, box-sizing support
 - ✅ **CSS Flexible Box Layout Module Level 1**: Core flexbox algorithm including flex-grow, flex-shrink, flex-basis (flex-wrap not yet implemented)
-- ✅ **CSS Display Module Level 3**: Block, Inline, Flex, and None display values
+- ✅ **CSS Display Module Level 3**: Block, Inline, Flex, FlowRoot, InlineBlock, and None display values
 - ✅ **CSS Values and Units Module Level 3**: px, %, vw, vh, auto, and calc() support
 
 ## Status
 
 See [CHANGELOG.md](CHANGELOG.md) for a detailed list of changes.
 
-- Version: **0.11.0**
+- Version: **0.12.1**
 - API is evolving but now includes full Flexbox-like alignment, gaps, inline layout, and extensibility via traits
 
 Future versions may add:
@@ -134,9 +135,6 @@ Future versions may add:
 - Flex wrap support (`flex-wrap: wrap | nowrap | wrap-reverse`)
 - Additional flex sizing rules (fr units, etc.)
 - Absolute / fixed positioning
-- Display: inline-block explicit support
-- Complete parent-child margin collapsing
-- Content-based minimum sizing for flex items
 - Correct flex-basis priority over width/height in flex item sizing
 
 ## License
