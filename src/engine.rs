@@ -204,6 +204,12 @@ struct FlowState {
     parent_current_x: f32,
     content_width_opt: Option<f32>,
     intrinsic_pass: bool,
+    /// Whether sibling and parent-child margins should collapse.
+    ///
+    /// - `true`:  `InnerDisplay::Flow` — vertical margins collapse (CSS normal flow)
+    /// - `false`: `InnerDisplay::FlowRoot` — margins are additive (new BFC)
+    ///
+    /// See: <https://www.w3.org/TR/CSS2/box.html#collapsing-margins>
     collapse_margins: bool,
 }
 
@@ -635,6 +641,9 @@ impl LayoutEngine {
             parent_current_x,
             content_width_opt,
             intrinsic_pass,
+            // Only InnerDisplay::Flow collapses margins.
+            // FlowRoot (flow-root / inline-block) establishes a new
+            // Block Formatting Context, which isolates margin collapsing.
             collapse_margins: node.style.display.inner == InnerDisplay::Flow,
         };
 
@@ -806,13 +815,17 @@ impl LayoutEngine {
 
             if state.collapse_margins {
                 if top_collapses {
+                    // First block child with no border/padding above:
+                    // store margin for potential collapse with parent.
                     state.accum.first_child_margin = effective_top;
                 } else {
+                    // Subsequent child: collapse with previous sibling's bottom margin.
                     let margin_top = state.accum.prev_child_margin.max(effective_top);
                     child_node.layout_box.shift(0.0, margin_top);
                     state.cursor.shift_y(margin_top);
                 }
             } else {
+                // FlowRoot: margins are additive, never collapse.
                 let margin_top = state.accum.prev_child_margin + effective_top;
                 child_node.layout_box.shift(0.0, margin_top);
                 state.cursor.shift_y(margin_top);
@@ -1026,8 +1039,9 @@ impl LayoutEngine {
             };
 
             // An inline-block is an atomic inline-level flow root. Unlike a
-            // normal inline box, its explicit and constrained dimensions are
-            // part of its own box, even when it has no children.
+            // normal inline box (which shrink-wraps), its explicit dimensions
+            // (width/height, min/max constraints) are always applied — even
+            // when the box has no children.
             let (content_w, content_h) = if node.style.display.inner == InnerDisplay::FlowRoot {
                 (
                     self.apply_size_constraints(
@@ -1060,6 +1074,10 @@ impl LayoutEngine {
                 border,
             );
 
+            // For inline boxes, shift the box model so that the content
+            // origin is at (0, 0). Inline-block (FlowRoot) is an atomic box
+            // and keeps its border/padding origin unshifted — its content
+            // area remains inset relative to the border box, as browsers do.
             if node.style.display.inner != InnerDisplay::FlowRoot {
                 box_model.shift(-(border.left + padding.left), -(border.top + padding.top));
             }
@@ -1073,6 +1091,9 @@ impl LayoutEngine {
                 line_spans: line_span_buf,
             });
 
+            // Inline-block advances the inline cursor by its full width (it is
+            // an atomic inline-level box).  Normal inline boxes only advance
+            // by the placed current_x (the line-end position within the line).
             let (end_pos, current_x) = if node.style.display.inner == InnerDisplay::FlowRoot {
                 let width = node.layout_box.width();
                 ((cursor_x + width, cursor_y), parent_current_x + width)
@@ -1089,6 +1110,8 @@ impl LayoutEngine {
         } else {
             let content_width = content_width_opt.unwrap_or(children_width);
 
+            // Margin collapsing only applies to InnerDisplay::Flow.
+            // For FlowRoot the flags stay false so children_height is used as-is.
             let top_collapses = collapse_margins && border.top == 0.0 && padding.top == 0.0;
             let bottom_collapses =
                 collapse_margins && border.bottom == 0.0 && padding.bottom == 0.0;
@@ -1136,6 +1159,8 @@ impl LayoutEngine {
             LineContext {
                 end_pos: (0.0, end_y + block_height),
                 current_x: parent_current_x + current_x,
+                // Propagate collapsed margins upward for the parent chain.
+                // FlowRoot always yields 0.0 here, stopping the chain.
                 margin_start: if top_collapses {
                     first_child_margin
                 } else {
