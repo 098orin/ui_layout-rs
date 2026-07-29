@@ -11,12 +11,27 @@ and this project loosely follows Semantic Versioning.
 
 ### Added
 
+- **`display: flow-root` and `display: inline-block`**: New `InnerDisplay::FlowRoot` variant that establishes a Block Formatting Context.
+  - `display: flow-root` → `(Block, FlowRoot)` — block-level, isolates margin collapsing.
+  - `display: inline-block` → `(Inline, FlowRoot)` — inline-level, atomic inline box with explicit sizing.
+  - CSS parsing (`from_css_name`, `from_css`, `parse`) and `fmt::Display` formatting for both keywords.
+  - `FlowRoot` reuses the same `layout_flow` path as `Flow`; margin collapsing is gated by a `collapse_margins` flag.
 - Spacing display output now emits compact CSS-like notation:
   - All same: margin: 10px
   - TB / LR pair: margin: 10px 20px
   - T / LR / B: margin: 10px 20px 30px
   - All different: margin: 10px 40px 20px 30px (top right bottom left)
   - Single side: margin-top: 10px (individual entry kept when shorter)
+
+### Fixed
+
+- **Inline-block sizing**: Size constraints (width, height, min/max) are now correctly applied to inline-block boxes.
+- **Inline-block cursor advancement**: Inline-block boxes now advance the inline cursor by their full box width.
+- **Inline-block box model**: Inline-block boxes keep their border/padding origin unshifted, matching atomic inline-level box semantics.
+
+### Internal
+
+- Improved code documentation across the flow layout engine (`FlowState::collapse_margins`, margin collapsing branches, inline-block finalization logic).
 
 ---
 
