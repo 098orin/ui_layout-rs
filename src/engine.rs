@@ -200,6 +200,7 @@ struct FlowState {
     accum: FlowAccum,
     padding: Edge,
     border: Edge,
+    start_x: f32,
     end_y: f32,
     parent_current_x: f32,
     content_width_opt: Option<f32>,
@@ -637,6 +638,7 @@ impl LayoutEngine {
             },
             padding,
             border,
+            start_x: line_ctx.end_pos.0,
             end_y,
             parent_current_x,
             content_width_opt,
@@ -1016,6 +1018,7 @@ impl LayoutEngine {
                 },
             padding,
             border,
+            start_x,
             end_y,
             parent_current_x,
             collapse_margins,
@@ -1027,11 +1030,7 @@ impl LayoutEngine {
 
         if node.style.display.outer == OuterDisplay::Inline {
             let has_only_blocks = line_span_buf.is_empty();
-            let content_w = if has_only_blocks {
-                children_width.max(current_x)
-            } else {
-                current_x
-            };
+            let content_w = children_width.max(current_x);
             let content_h = if has_only_blocks {
                 children_height.max(max_inline_line_height)
             } else {
@@ -1096,7 +1095,7 @@ impl LayoutEngine {
             // by the placed current_x (the line-end position within the line).
             let (end_pos, current_x) = if node.style.display.inner == InnerDisplay::FlowRoot {
                 let width = node.layout_box.width();
-                ((cursor_x + width, cursor_y), parent_current_x + width)
+                ((start_x + width, cursor_y), parent_current_x + width)
             } else {
                 ((cursor_x, cursor_y), parent_current_x + current_x)
             };
