@@ -7,6 +7,15 @@ and this project loosely follows Semantic Versioning.
 
 ---
 
+## [0.12.1]
+
+### Fixed
+- inline-block x-coordinate
+  - Add start_x to FlowState for correct inline-block end_pos
+  - Use children_width.max(current_x) for content width calculation
+
+---
+
 ## [0.12.0]
 
 ### Added
