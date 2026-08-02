@@ -93,6 +93,7 @@
 #[cfg(feature = "unstable")]
 mod block_layouter;
 mod cache;
+mod custom_object;
 mod display;
 mod engine;
 mod flow_layouter;
@@ -104,6 +105,7 @@ mod style;
 
 #[cfg(feature = "unstable")]
 pub use block_layouter::*;
+pub use custom_object::*;
 pub use engine::*;
 pub use flow_layouter::*;
 pub use fragment::*;

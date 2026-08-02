@@ -2939,3 +2939,143 @@ fn compute_inline_extent(
         child_bottom
     }
 }
+
+/// Resolves the content-box size for a custom/replaced element.
+///
+/// Takes the resolved CSS width/height (None = auto), the element's intrinsic size,
+/// and the aspect ratio constraint, and returns the final content-box size.
+///
+/// Handles:
+/// - Box-sizing: for BorderBox, the CSS size already includes padding/border
+/// - Min/max constraints (absolute lengths only; percentages are skipped without containing block)
+/// - Aspect ratio: when only one axis is specified, derive the other
+///
+/// Note: This is a helper for engines that manage custom node layout.
+/// The engine is responsible for providing the viewport dimensions and intrinsic size.
+pub fn resolve_custom_box_size(
+    style: &Style,
+    intrinsic_width: f32,
+    intrinsic_height: f32,
+    aspect_ratio: Option<f32>,
+    containing_block_width: Option<f32>,
+    containing_block_height: Option<f32>,
+    viewport_width: f32,
+    viewport_height: f32,
+) -> (f32, f32) {
+    // Resolve CSS width/height
+    let resolved_width = style.size.width.resolve_with(
+        containing_block_width,
+        viewport_width,
+        viewport_height,
+    );
+    let resolved_height = style.size.height.resolve_with(
+        containing_block_height,
+        viewport_width,
+        viewport_height,
+    );
+
+    // Convert to content-box based on box-sizing
+    let pb_h = style.spacing.padding_left.resolve_with(
+        containing_block_width,
+        viewport_width,
+        viewport_height,
+    ).unwrap_or(0.0)
+    + style.spacing.padding_right.resolve_with(
+        containing_block_width,
+        viewport_width,
+        viewport_height,
+    ).unwrap_or(0.0)
+    + style.spacing.border_left.resolve_with(
+        containing_block_width,
+        viewport_width,
+        viewport_height,
+    ).unwrap_or(0.0)
+    + style.spacing.border_right.resolve_with(
+        containing_block_width,
+        viewport_width,
+        viewport_height,
+    ).unwrap_or(0.0);
+
+    let pb_v = style.spacing.padding_top.resolve_with(
+        containing_block_height,
+        viewport_width,
+        viewport_height,
+    ).unwrap_or(0.0)
+    + style.spacing.padding_bottom.resolve_with(
+        containing_block_height,
+        viewport_width,
+        viewport_height,
+    ).unwrap_or(0.0)
+    + style.spacing.border_top.resolve_with(
+        containing_block_height,
+        viewport_width,
+        viewport_height,
+    ).unwrap_or(0.0)
+    + style.spacing.border_bottom.resolve_with(
+        containing_block_height,
+        viewport_width,
+        viewport_height,
+    ).unwrap_or(0.0);
+
+    let content_width = resolved_width.map(|w| match style.box_sizing {
+        BoxSizing::ContentBox => w,
+        BoxSizing::BorderBox => (w - pb_h).max(0.0),
+    });
+    let content_height = resolved_height.map(|h| match style.box_sizing {
+        BoxSizing::ContentBox => h,
+        BoxSizing::BorderBox => (h - pb_v).max(0.0),
+    });
+
+    // Apply aspect ratio
+    let (content_width, content_height) = if let Some(_ratio) = aspect_ratio {
+        match (content_width, content_height) {
+            (Some(w), None) if intrinsic_height > 0.0 => {
+                (Some(w), Some(intrinsic_height * w / intrinsic_width))
+            }
+            (None, Some(h)) if intrinsic_width > 0.0 => {
+                (Some(intrinsic_width * h / intrinsic_height), Some(h))
+            }
+            _ => (content_width, content_height),
+        }
+    } else {
+        (content_width, content_height)
+    };
+
+    // Fall back to intrinsic size
+    let (mut width, mut height) = (
+        content_width.unwrap_or(intrinsic_width),
+        content_height.unwrap_or(intrinsic_height),
+    );
+
+    // Apply min/max constraints
+    if let Some(min_w) = style.size.min_width.resolve_with(
+        containing_block_width,
+        viewport_width,
+        viewport_height,
+    ) {
+        width = width.max(min_w);
+    }
+    if let Some(max_w) = style.size.max_width.resolve_with(
+        containing_block_width,
+        viewport_width,
+        viewport_height,
+    ) {
+        width = width.min(max_w);
+    }
+    if let Some(min_h) = style.size.min_height.resolve_with(
+        containing_block_height,
+        viewport_width,
+        viewport_height,
+    ) {
+        height = height.max(min_h);
+    }
+    if let Some(max_h) = style.size.max_height.resolve_with(
+        containing_block_height,
+        viewport_width,
+        viewport_height,
+    ) {
+        height = height.min(max_h);
+    }
+
+    (width, height)
+}
