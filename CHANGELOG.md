@@ -7,6 +7,51 @@ and this project loosely follows Semantic Versioning.
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **`CustomLayouter::layout()`**: replaces the separate `layout_flow` /
+  `layout_block` methods with a single unified entry point that returns a
+  [`LayoutBox`] (`BlockBox` for block-level objects, `InlineBox` for inline
+  objects, `None` for nothing).
+- **`CustomLayouter::formatting_context()`**: custom objects now declare how they
+  participate in their parent's formatting context.
+  - `OuterDisplay::Block` → the object is laid out as a block (forces a new line
+    and stacks vertically).
+  - `OuterDisplay::Inline` → the object is laid out inline (shares the current
+    line).
+  - `OuterDisplay::None` → the object is skipped (display: none).
+- **Graceful `LayoutBox` mismatches**: the returned [`LayoutBox`] variant need
+  not match the declared `formatting_context`.
+  - An inline-level object returning `BlockBox` is placed atomically on the
+    current line like a fragment (the box is never split; it wraps whole to the
+    next line when it does not fit), with its `box_model` shifted to the placed
+    position.
+  - A block-level object returning `InlineBox` is wrapped in an anonymous block
+    box: its `box_model` is placed on its own line and its `spans` are preserved
+    in the result.
+- **Block-level custom objects in flow**: the engine now dispatches block layout
+  for custom children reporting `OuterDisplay::Block`, placing them like
+  block-level boxes (line break, vertical stacking, extent tracking).
+- **`LayoutChild::custom_result()`**: layout results are stored on the custom
+  child as a [`CustomObjectResult`] (`spans` for inline objects, `box_model` for
+  block/flex placement), observable via `LayoutChild::Custom` without
+  downcasting.
+- **Flex custom result**: `position_flex_custom` now records the final
+  border-box rect of custom flex items instead of discarding it.
+
+### Changed
+
+- `LayoutChild::Custom` now wraps a `CustomChild { layouter, result }` instead of
+  a bare `Box<dyn CustomLayouter>`. Construction via `LayoutChild::from(obj)`
+  (or `CustomChild::new(obj)`) is unchanged ergonomically.
+- The inline-flow context (`start_pos`, `available_inline_size`, `line_height`)
+  moved into [`LayoutContext`]; the separate `FlowLayoutContext` type was
+  removed.
+
+---
+
 ## [0.12.1]
 
 ### Fixed

@@ -151,6 +151,18 @@ impl Rect {
     }
 }
 
+/// Builds a borderless, paddingless box model where every box equals `rect`.
+impl From<Rect> for BoxModel {
+    fn from(rect: Rect) -> Self {
+        Self {
+            border_box: rect,
+            padding_box: rect,
+            content_box: rect,
+            children_box: rect,
+        }
+    }
+}
+
 impl BoxModel {
     /// Translates the entire box by the given offset.
     pub(crate) fn shift(&mut self, dx: f32, dy: f32) {

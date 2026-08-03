@@ -9,8 +9,12 @@ struct MockBlock {
     height: f32,
 }
 
-impl BlockLayouter for MockBlock {
-    fn layout(&mut self, ctx: &LayoutContext) -> Rect {
+impl CustomLayouter for MockBlock {
+    fn formatting_context(&self) -> OuterDisplay {
+        OuterDisplay::Block
+    }
+
+    fn layout(&mut self, ctx: &LayoutContext) -> LayoutBox {
         let w = ctx
             .available_width
             .unwrap_or(ctx.containing_block_width.unwrap_or(self.width))
@@ -19,15 +23,22 @@ impl BlockLayouter for MockBlock {
             .containing_block_height
             .map(|ch| ch.min(self.height))
             .unwrap_or(self.height);
-        rect(0.0, 0.0, w, h)
+        LayoutBox::BlockBox(BoxModel::from(rect(0.0, 0.0, w, h)))
+    }
+
+    fn measure(&self, _ctx: &LayoutContext) -> MeasureResult {
+        MeasureResult {
+            width: self.width,
+            height: self.height,
+        }
     }
 }
 
 fn block_child(w: f32, h: f32) -> LayoutChild {
-    LayoutChild::Custom(Box::new(MockBlock {
+    LayoutChild::from(MockBlock {
         width: w,
         height: h,
-    }))
+    })
 }
 
 // ========================
@@ -398,10 +409,10 @@ fn block_with_margin() {
             },
             ..Default::default()
         },
-        [LayoutChild::Custom(Box::new(MockBlock {
+        [LayoutChild::from(MockBlock {
             width: 100.0,
             height: 40.0,
-        }))],
+        })],
     );
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
@@ -425,10 +436,10 @@ fn block_with_padding() {
             },
             ..Default::default()
         },
-        [LayoutChild::Custom(Box::new(MockBlock {
+        [LayoutChild::from(MockBlock {
             width: 100.0,
             height: 40.0,
-        }))],
+        })],
     );
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
@@ -452,10 +463,10 @@ fn block_with_border() {
             },
             ..Default::default()
         },
-        [LayoutChild::Custom(Box::new(MockBlock {
+        [LayoutChild::from(MockBlock {
             width: 100.0,
             height: 40.0,
-        }))],
+        })],
     );
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
@@ -480,14 +491,14 @@ fn block_in_flow_with_margin_collapse() {
             ..Default::default()
         },
         [
-            LayoutChild::Custom(Box::new(MockBlock {
+            LayoutChild::from(MockBlock {
                 width: 100.0,
                 height: 30.0,
-            })),
-            LayoutChild::Custom(Box::new(MockBlock {
+            }),
+            LayoutChild::from(MockBlock {
                 width: 100.0,
                 height: 30.0,
-            })),
+            }),
         ],
     );
 
