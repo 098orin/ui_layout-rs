@@ -64,8 +64,7 @@
 //!
 //! - `LayoutChild::Node` — a normal layout node
 //! - `LayoutChild::Fragment` — an inline-level fragment
-//! - `LayoutChild::Object` — a custom [`FlowLayouter`] object
-//! - `LayoutChild::Custom` — a custom [`BlockLayouter`] object
+//! - `LayoutChild::Custom` — a custom [`CustomLayouter`] object
 //!
 //! [`ItemFragment`] represents the smallest independently positioned
 //! piece of inline content.
@@ -81,33 +80,40 @@
 //!
 //! ## Custom Objects
 //!
-//! The [`FlowLayouter`] trait allows custom types to participate directly
-//! in layout as inline-level objects.  Objects report their intrinsic size
-//! via [`FlowLayouter::measure`] and perform inline layout via
-//! [`FlowLayouter::layout`].
+//! The [`CustomLayouter`] trait allows custom types to participate directly
+//! in layout. Custom objects implement a single
+//! [`layout`](CustomLayouter::layout) method returning a [`LayoutBox`] —
+//! [`LayoutBox::InlineBox`] for inline content, [`LayoutBox::BlockBox`] for
+//! block-level boxes — and declare how they participate through
+//! [`formatting_context`](CustomLayouter::formatting_context):
 //!
-//! The [`BlockLayouter`] trait allows custom types to participate
-//! as block-level components.  Components return their border-box
-//! [`Rect`](crate::Rect) via [`BlockLayouter::layout`].
+//! - `OuterDisplay::Block` → the engine lays the object out as a block
+//! - `OuterDisplay::Inline` → the engine lays the object out inline
+//! - `OuterDisplay::None` → the object is skipped
+//!
+//! The returned [`LayoutBox`] need not match the declared context. An inline
+//! object returning `BlockBox` is placed atomically on the current line like a
+//! fragment; a block object returning `InlineBox` is wrapped in an anonymous
+//! block box.
+//!
+//! Layout results are stored on the child in a [`CustomObjectResult`],
+//! accessible through [`LayoutChild::custom_result`] after layout.
 
-#[cfg(feature = "unstable")]
-mod block_layouter;
 mod cache;
+mod custom_layouter;
 mod custom_object;
 mod display;
 mod engine;
-mod flow_layouter;
 mod fragment;
 mod geometry;
 mod layout_child;
 mod layout_node;
 mod style;
 
-#[cfg(feature = "unstable")]
-pub use block_layouter::*;
+pub use cache::*;
+pub use custom_layouter::*;
 pub use custom_object::*;
 pub use engine::*;
-pub use flow_layouter::*;
 pub use fragment::*;
 pub use geometry::*;
 pub use layout_child::*;

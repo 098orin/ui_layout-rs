@@ -1,7 +1,7 @@
 use crate::{
-    AlignItems, BoxModel, BoxSizing, FlexDirection, FragmentNode, InlineBox, InnerDisplay,
-    ItemFragment, JustifyContent, LayoutBox, LayoutChild, LayoutNode, LengthOrAuto, LineSpan,
-    OuterDisplay, Placement, Rect, Spacing, Style,
+    AlignItems, BoxModel, BoxSizing, CustomObjectResult, FlexDirection, FragmentNode, InlineBox,
+    InnerDisplay, ItemFragment, JustifyContent, LayoutBox, LayoutChild, LayoutNode, LengthOrAuto,
+    LineSpan, OuterDisplay, Placement, Rect, Spacing, Style,
 };
 
 const EPSILON: f32 = 0.001;
@@ -102,8 +102,6 @@ impl EdgeOption {
 pub enum LayoutItem {
     Node(usize),
     Fragments(std::ops::Range<usize>),
-    Object(usize),
-    #[cfg(feature = "unstable")]
     Custom(usize),
 }
 
@@ -223,11 +221,14 @@ struct FlexPlacementCtx {
     reversed: bool,
 }
 
-/// Layout context passed to [`FlowLayouter::measure`].
+/// Layout context passed to [`crate::CustomLayouter::measure`] and
+/// [`crate::CustomLayouter::layout`].
 ///
 /// Provides size information for the current layout pass, including
 /// containing-block dimensions (for percentage resolution) and
-/// parent-assigned sizes (for flex stretch).
+/// parent-assigned sizes (for flex stretch), plus the inline-flow
+/// line info used while laying out inline-level custom objects.
+#[derive(Debug, Clone, Default)]
 pub struct LayoutContext {
     /// Containing block width for resolving percentages and intrinsic sizing.
     /// Independent of layout results.
@@ -246,6 +247,27 @@ pub struct LayoutContext {
 
     /// Border-box height assigned by the parent (e.g. via flex stretch).
     pub parent_assigned_border_height: Option<f32>,
+
+    /// Start position of the current line in parent coordinates.
+    ///
+    /// Only meaningful while laying out an inline-level object in an
+    /// inline flow context; zero otherwise.
+    pub start_pos: (f32, f32),
+
+    /// Remaining inline size available on the current line before wrapping.
+    ///
+    /// Only meaningful while laying out an inline-level object in an
+    /// inline flow context; zero otherwise.
+    pub available_inline_size: f32,
+
+    /// Line height of the containing inline formatting context.
+    ///
+    /// When an inline-level object's [`crate::LineSpan`]s occupy multiple
+    /// lines, this value is used as the vertical advance between them.
+    ///
+    /// Only meaningful while laying out an inline-level object in an
+    /// inline flow context; zero otherwise.
+    pub line_height: f32,
 }
 
 impl LayoutContext {
@@ -414,6 +436,7 @@ impl LayoutEngine {
             available_width: Some(width),
             parent_assigned_border_width: None,
             parent_assigned_border_height: None,
+            ..Default::default()
         };
 
         let engine = LayoutEngine {
@@ -607,6 +630,7 @@ impl LayoutEngine {
             available_width: content_width_opt.or(ctx.available_width),
             parent_assigned_border_width: None,
             parent_assigned_border_height: None,
+            ..Default::default()
         };
 
         let line_height = node
@@ -663,12 +687,30 @@ impl LayoutEngine {
                 LayoutItem::Node(i) => {
                     self.process_flow_node_item(node, i, ctx, &base_ctx_for_child, &mut state)
                 }
-                LayoutItem::Object(i) => {
-                    self.process_flow_object_item(node, i, outbox_width, line_height, &mut state);
-                }
-                #[cfg(feature = "unstable")]
                 LayoutItem::Custom(i) => {
-                    self.process_flow_custom_item(node, i, ctx, &base_ctx_for_child, &mut state);
+                    match node.children[i].custom().unwrap().formatting_context() {
+                        OuterDisplay::Inline => {
+                            let mut ctx_for_child = base_ctx_for_child.clone();
+                            ctx_for_child.start_pos = state.cursor.pos();
+                            ctx_for_child.available_inline_size =
+                                outbox_width - state.cursor.current_x;
+                            ctx_for_child.line_height = line_height;
+                            self.process_flow_custom_item(
+                                node,
+                                i,
+                                &ctx_for_child,
+                                outbox_width,
+                                &mut state,
+                            );
+                        }
+                        OuterDisplay::Block => self.process_flow_custom_block_item(
+                            node,
+                            i,
+                            &base_ctx_for_child,
+                            &mut state,
+                        ),
+                        OuterDisplay::None => {}
+                    }
                 }
             }
         }
@@ -888,28 +930,57 @@ impl LayoutEngine {
         }
     }
 
-    fn process_flow_object_item(
+    fn process_flow_custom_item(
         &self,
         node: &mut LayoutNode,
         i: usize,
+        ctx_for_child: &LayoutContext,
         outbox_width: f32,
-        line_height: f32,
         state: &mut FlowState,
     ) {
-        use crate::FlowLayoutContext;
-
-        let object = match &mut node.children[i] {
-            LayoutChild::Object(o) => o,
+        let child = match &mut node.children[i] {
+            LayoutChild::Custom(c) => c,
             _ => unreachable!(),
         };
 
-        let flow_ctx = FlowLayoutContext {
-            start_pos: state.cursor.pos(),
-            available_inline_size: outbox_width - state.cursor.current_x,
-            line_height,
-        };
+        let layout_box = child.layouter_mut().layout(ctx_for_child);
 
-        let line_spans = object.layout(&flow_ctx);
+        let line_height = ctx_for_child.line_height;
+
+        let (line_spans, box_model) = match layout_box {
+            LayoutBox::InlineBox(inline) => (inline.line_spans, inline.box_model),
+            LayoutBox::BlockBox(mut bm) => {
+                // The object declared an inline formatting context but
+                // produced a block box. Place it atomically like a fragment:
+                // the box is never split, so when it does not fit on a
+                // non-empty line the whole box wraps to the next line.
+                let width = bm.border_box.width;
+                let height = bm.border_box.height;
+
+                let (mut x, mut y) = state.cursor.pos();
+                let mut line_index = state.cursor.line_index;
+
+                if x + width > outbox_width && x > 0.0 {
+                    x = 0.0;
+                    y += line_height;
+                    line_index += 1;
+                }
+
+                let span = LineSpan {
+                    x_range: x..(x + width),
+                    line_pos: (x, y),
+                    line_index,
+                };
+
+                bm.shift(x - bm.border_box.x, y - bm.border_box.y);
+
+                state.accum.max_inline_line_height = state.accum.max_inline_line_height.max(height);
+                state.accum.children_height = state.accum.children_height.max(y + height);
+
+                (vec![span], bm)
+            }
+            LayoutBox::None => (Vec::new(), BoxModel::default()),
+        };
 
         let had_line_spans = !line_spans.is_empty();
 
@@ -940,8 +1011,8 @@ impl LayoutEngine {
             state.cursor.line_index = last_span.line_index;
         }
 
-        for span in line_spans {
-            push_or_merge_line_span(&mut state.accum.line_span_buf, span);
+        for span in &line_spans {
+            push_or_merge_line_span(&mut state.accum.line_span_buf, span.clone());
         }
 
         state.accum.max_inline_line_height = state.accum.max_inline_line_height.max(line_height);
@@ -949,45 +1020,64 @@ impl LayoutEngine {
         if had_line_spans {
             state.accum.pending_advance = state.accum.max_inline_line_height;
         }
+
+        child.set_result(CustomObjectResult {
+            spans: line_spans,
+            box_model,
+        });
     }
 
-    #[cfg(feature = "unstable")]
-    fn process_flow_custom_item(
+    /// Lays out a block-level [`LayoutChild::Custom`] child in flow.
+    ///
+    /// Mirrors the block branch of [`Self::process_flow_node_item`]: the object
+    /// forces a new line, is placed below the current block content, and its
+    /// border-box [`BoxModel`] is stored in the child's
+    /// [`CustomObjectResult::box_model`].
+    fn process_flow_custom_block_item(
         &self,
         node: &mut LayoutNode,
         i: usize,
-        ctx: &LayoutContext,
-        base_ctx_for_child: &LayoutContext,
+        ctx_for_child: &LayoutContext,
         state: &mut FlowState,
     ) {
-        let content_width_opt = state.content_width_opt.or(ctx.available_width);
-
-        let ctx_for_child = LayoutContext {
-            available_width: content_width_opt,
-            ..*base_ctx_for_child
+        let (mut box_model, mut rect, spans) = match &mut node.children[i] {
+            LayoutChild::Custom(c) => match c.layouter_mut().layout(ctx_for_child) {
+                LayoutBox::BlockBox(bm) => {
+                    let rect = bm.border_box;
+                    (bm, rect, Vec::new())
+                }
+                // The object declared a block formatting context but produced
+                // an inline box. Wrap it in an anonymous block box: its box
+                // model becomes the block (placed below on its own line) and
+                // its spans are preserved for the result.
+                LayoutBox::InlineBox(inline) => {
+                    let rect = inline.box_model.border_box;
+                    (inline.box_model, rect, inline.line_spans)
+                }
+                LayoutBox::None => (BoxModel::default(), Rect::default(), Vec::new()),
+            },
+            _ => unreachable!(),
         };
 
-        let rect = {
-            let layouter = match &mut node.children[i] {
-                LayoutChild::Custom(layouter) => layouter.as_mut(),
-                _ => unreachable!(),
-            };
-            layouter.layout(&ctx_for_child)
-        };
+        let child_position_x = 0.0;
+        let child_position_y = state.cursor.y + state.accum.pending_advance;
 
-        let line_ctx_for_child = state.cursor.line_ctx();
-        let child_position_y = line_ctx_for_child.end_pos.1 + state.accum.pending_advance;
+        box_model.shift(child_position_x - rect.x, child_position_y - rect.y);
+        rect = box_model.border_box;
 
-        state.accum.first_block_child_processed = true;
         state.cursor.set_pos(0.0, child_position_y + rect.height);
-
         state.accum.children_width = state.accum.children_width.max(rect.width);
         state.accum.children_height = state
             .accum
             .children_height
             .max(child_position_y + rect.height);
-
+        state.accum.first_block_child_processed = true;
+        state.accum.prev_child_margin = 0.0;
         state.accum.pending_advance = 0.0;
+
+        if let LayoutChild::Custom(child) = &mut node.children[i] {
+            child.set_result(CustomObjectResult { spans, box_model });
+        }
     }
 
     fn finalize_flow_box(
@@ -1194,6 +1284,7 @@ impl LayoutEngine {
                     available_width: None,
                     parent_assigned_border_width: None,
                     parent_assigned_border_height: None,
+                    ..Default::default()
                 };
                 self.layout_flex_children(node, axis, intrinsic_pass, &base_ctx_for_children)
             } else {
@@ -1257,6 +1348,7 @@ impl LayoutEngine {
                 available_width: None,
                 parent_assigned_border_width: None,
                 parent_assigned_border_height: None,
+                ..Default::default()
             };
 
             let (new_main, new_cross) =
@@ -1271,6 +1363,7 @@ impl LayoutEngine {
                 available_width: None,
                 parent_assigned_border_width: None,
                 parent_assigned_border_height: None,
+                ..Default::default()
             };
             let initial_key = crate::cache::make_layout_key(&initial_ctx, self);
             for child in &mut node.children {
@@ -1441,17 +1534,15 @@ impl LayoutEngine {
                         line_height * line_count as f32
                     }
                 },
-                LayoutItem::Object(index) => {
-                    let object = node.children[*index].object().unwrap();
-                    let measured = object.measure(ctx);
-                    let tuple = (measured.width, measured.height);
-                    axis.tuple_main(tuple)
-                }
-                #[cfg(feature = "unstable")]
                 LayoutItem::Custom(index) => {
-                    if let LayoutChild::Custom(layouter) = &mut node.children[*index] {
-                        let rect = layouter.as_mut().layout(ctx);
-                        axis.tuple_main((rect.width, rect.height))
+                    if let LayoutChild::Custom(child) = &mut node.children[*index] {
+                        if child.layouter().formatting_context() == OuterDisplay::None {
+                            0.0
+                        } else {
+                            let measured = child.layouter_mut().measure(ctx);
+                            let tuple = (measured.width, measured.height);
+                            axis.tuple_main(tuple)
+                        }
                     } else {
                         0.0
                     }
@@ -1697,37 +1788,6 @@ impl LayoutEngine {
         }
     }
 
-    fn position_flex_object(
-        &self,
-        node: &mut LayoutNode,
-        axis: Axis,
-        ctx: &LayoutContext,
-        index: usize,
-        placement: &mut FlexPlacementCtx,
-    ) {
-        let object = node.children[index].object().unwrap();
-        let measured = object.measure(ctx);
-        let tuple = (measured.width, measured.height);
-        let item_main_size = axis.tuple_main(tuple);
-        let item_cross_size = axis.tuple_cross(tuple);
-
-        let available_cross = axis.rect_cross(&placement.content_box);
-        let cross_offset =
-            resolve_align_position(node.style.align_items, item_cross_size, available_cross);
-
-        let _child_cross_pos = match axis {
-            Axis::Horizontal => placement.content_box.y + cross_offset,
-            Axis::Vertical => placement.content_box.x + cross_offset,
-        };
-
-        if placement.reversed {
-            placement.cursor_main -= placement.gap + placement.gap_between;
-        } else {
-            placement.cursor_main += item_main_size + placement.gap + placement.gap_between;
-        }
-    }
-
-    #[cfg(feature = "unstable")]
     fn position_flex_custom(
         &self,
         node: &mut LayoutNode,
@@ -1736,22 +1796,57 @@ impl LayoutEngine {
         index: usize,
         placement: &mut FlexPlacementCtx,
     ) {
-        let rect = if let LayoutChild::Custom(layouter) = &mut node.children[index] {
-            layouter.as_mut().layout(ctx)
-        } else {
-            return;
+        let measured = {
+            let object = node.children[index].custom().unwrap();
+            if object.formatting_context() == OuterDisplay::None {
+                return;
+            }
+            object.measure(ctx)
         };
-
-        let tuple = (rect.width, rect.height);
+        let tuple = (measured.width, measured.height);
         let item_main_size = axis.tuple_main(tuple);
-
-        let available_cross = axis.rect_cross(&placement.content_box);
         let item_cross_size = axis.tuple_cross(tuple);
-        let _cross_offset =
-            resolve_align_position(node.style.align_items, item_cross_size, available_cross);
 
         if placement.reversed {
-            placement.cursor_main -= item_main_size + placement.gap + placement.gap_between;
+            placement.cursor_main -= item_main_size;
+        }
+
+        let item_main_pos = match axis {
+            Axis::Horizontal => placement.content_box.x + placement.cursor_main,
+            Axis::Vertical => placement.content_box.y + placement.cursor_main,
+        };
+
+        let available_cross = axis.rect_cross(&placement.content_box);
+        let cross_offset =
+            resolve_align_position(node.style.align_items, item_cross_size, available_cross);
+
+        let item_cross_pos = match axis {
+            Axis::Horizontal => placement.content_box.y + cross_offset,
+            Axis::Vertical => placement.content_box.x + cross_offset,
+        };
+
+        let (x, y) = match axis {
+            Axis::Horizontal => (item_main_pos, item_cross_pos),
+            Axis::Vertical => (item_cross_pos, item_main_pos),
+        };
+        let (box_w, box_h) = match axis {
+            Axis::Horizontal => (item_main_size, item_cross_size),
+            Axis::Vertical => (item_cross_size, item_main_size),
+        };
+
+        let mut box_model =
+            create_box_model(box_w, box_h, box_w, box_h, Edge::default(), Edge::default());
+        box_model.shift(x, y);
+
+        if let LayoutChild::Custom(child) = &mut node.children[index] {
+            child.set_result(CustomObjectResult {
+                spans: Vec::new(),
+                box_model,
+            });
+        }
+
+        if placement.reversed {
+            placement.cursor_main -= placement.gap + placement.gap_between;
         } else {
             placement.cursor_main += item_main_size + placement.gap + placement.gap_between;
         }
@@ -1838,10 +1933,6 @@ impl LayoutEngine {
                 LayoutItem::Fragments(range) => {
                     self.position_flex_fragments(node, axis, range, &mut placement)
                 }
-                LayoutItem::Object(index) => {
-                    self.position_flex_object(node, axis, ctx, index, &mut placement)
-                }
-                #[cfg(feature = "unstable")]
                 LayoutItem::Custom(index) => {
                     self.position_flex_custom(node, axis, ctx, index, &mut placement)
                 }
@@ -1970,18 +2061,15 @@ impl LayoutEngine {
                         Axis::Vertical => fragment_height,
                     };
                 }
-                LayoutItem::Object(index) => {
-                    let object = node.children.get_mut(*index).unwrap().object().unwrap();
-                    let measured = object.measure(base_ctx_for_children);
-                    let tuple = (measured.width, measured.height);
-                    state.main_size = axis.tuple_main(tuple);
-                }
-                #[cfg(feature = "unstable")]
                 LayoutItem::Custom(index) => {
-                    if let LayoutChild::Custom(layouter) = &mut node.children[*index] {
-                        let rect = layouter.as_mut().layout(base_ctx_for_children);
-                        let tuple = (rect.width, rect.height);
-                        state.main_size = axis.tuple_main(tuple);
+                    if let LayoutChild::Custom(child) = &mut node.children[*index] {
+                        if child.layouter().formatting_context() == OuterDisplay::None {
+                            state.main_size = 0.0;
+                        } else {
+                            let measured = child.layouter_mut().measure(base_ctx_for_children);
+                            let tuple = (measured.width, measured.height);
+                            state.main_size = axis.tuple_main(tuple);
+                        }
                     }
                 }
             }
@@ -2176,18 +2264,13 @@ impl LayoutEngine {
                     total_border_main += axis.tuple_main((fragment_width, fragment_height));
                     max_cross = max_cross.max(axis.tuple_cross((fragment_width, fragment_height)));
                 }
-                LayoutItem::Object(index) => {
-                    let object = node.children.get_mut(*index).unwrap().object().unwrap();
+                LayoutItem::Custom(index) => {
+                    let object = node.children.get_mut(*index).unwrap().custom().unwrap();
+                    if object.formatting_context() == OuterDisplay::None {
+                        continue;
+                    }
                     let measured = object.measure(base_ctx_for_children);
                     let tuple = (measured.width, measured.height);
-                    total_border_main += axis.tuple_main(tuple);
-                    max_cross = max_cross.max(axis.tuple_cross(tuple));
-                }
-                #[cfg(feature = "unstable")]
-                LayoutItem::Custom(index) => {
-                    let layouter = node.children.get_mut(*index).unwrap().custom_mut().unwrap();
-                    let rect = layouter.layout(base_ctx_for_children);
-                    let tuple = (rect.width, rect.height);
                     total_border_main += axis.tuple_main(tuple);
                     max_cross = max_cross.max(axis.tuple_cross(tuple));
                 }
@@ -2673,11 +2756,6 @@ impl<'a> Iterator for LayoutItems<'a> {
                 self.index = end;
                 Some(LayoutItem::Fragments(start..end))
             }
-            LayoutChild::Object(_) => {
-                self.index = i + 1;
-                Some(LayoutItem::Object(i))
-            }
-            #[cfg(feature = "unstable")]
             LayoutChild::Custom(_) => {
                 self.index = i + 1;
                 Some(LayoutItem::Custom(i))
@@ -2963,59 +3041,59 @@ pub fn resolve_custom_box_size(
     viewport_height: f32,
 ) -> (f32, f32) {
     // Resolve CSS width/height
-    let resolved_width = style.size.width.resolve_with(
-        containing_block_width,
-        viewport_width,
-        viewport_height,
-    );
-    let resolved_height = style.size.height.resolve_with(
-        containing_block_height,
-        viewport_width,
-        viewport_height,
-    );
+    let resolved_width =
+        style
+            .size
+            .width
+            .resolve_with(containing_block_width, viewport_width, viewport_height);
+    let resolved_height =
+        style
+            .size
+            .height
+            .resolve_with(containing_block_height, viewport_width, viewport_height);
 
     // Convert to content-box based on box-sizing
-    let pb_h = style.spacing.padding_left.resolve_with(
-        containing_block_width,
-        viewport_width,
-        viewport_height,
-    ).unwrap_or(0.0)
-    + style.spacing.padding_right.resolve_with(
-        containing_block_width,
-        viewport_width,
-        viewport_height,
-    ).unwrap_or(0.0)
-    + style.spacing.border_left.resolve_with(
-        containing_block_width,
-        viewport_width,
-        viewport_height,
-    ).unwrap_or(0.0)
-    + style.spacing.border_right.resolve_with(
-        containing_block_width,
-        viewport_width,
-        viewport_height,
-    ).unwrap_or(0.0);
+    let pb_h = style
+        .spacing
+        .padding_left
+        .resolve_with(containing_block_width, viewport_width, viewport_height)
+        .unwrap_or(0.0)
+        + style
+            .spacing
+            .padding_right
+            .resolve_with(containing_block_width, viewport_width, viewport_height)
+            .unwrap_or(0.0)
+        + style
+            .spacing
+            .border_left
+            .resolve_with(containing_block_width, viewport_width, viewport_height)
+            .unwrap_or(0.0)
+        + style
+            .spacing
+            .border_right
+            .resolve_with(containing_block_width, viewport_width, viewport_height)
+            .unwrap_or(0.0);
 
-    let pb_v = style.spacing.padding_top.resolve_with(
-        containing_block_height,
-        viewport_width,
-        viewport_height,
-    ).unwrap_or(0.0)
-    + style.spacing.padding_bottom.resolve_with(
-        containing_block_height,
-        viewport_width,
-        viewport_height,
-    ).unwrap_or(0.0)
-    + style.spacing.border_top.resolve_with(
-        containing_block_height,
-        viewport_width,
-        viewport_height,
-    ).unwrap_or(0.0)
-    + style.spacing.border_bottom.resolve_with(
-        containing_block_height,
-        viewport_width,
-        viewport_height,
-    ).unwrap_or(0.0);
+    let pb_v = style
+        .spacing
+        .padding_top
+        .resolve_with(containing_block_height, viewport_width, viewport_height)
+        .unwrap_or(0.0)
+        + style
+            .spacing
+            .padding_bottom
+            .resolve_with(containing_block_height, viewport_width, viewport_height)
+            .unwrap_or(0.0)
+        + style
+            .spacing
+            .border_top
+            .resolve_with(containing_block_height, viewport_width, viewport_height)
+            .unwrap_or(0.0)
+        + style
+            .spacing
+            .border_bottom
+            .resolve_with(containing_block_height, viewport_width, viewport_height)
+            .unwrap_or(0.0);
 
     let content_width = resolved_width.map(|w| match style.box_sizing {
         BoxSizing::ContentBox => w,
@@ -3048,32 +3126,36 @@ pub fn resolve_custom_box_size(
     );
 
     // Apply min/max constraints
-    if let Some(min_w) = style.size.min_width.resolve_with(
-        containing_block_width,
-        viewport_width,
-        viewport_height,
-    ) {
+    if let Some(min_w) =
+        style
+            .size
+            .min_width
+            .resolve_with(containing_block_width, viewport_width, viewport_height)
+    {
         width = width.max(min_w);
     }
-    if let Some(max_w) = style.size.max_width.resolve_with(
-        containing_block_width,
-        viewport_width,
-        viewport_height,
-    ) {
+    if let Some(max_w) =
+        style
+            .size
+            .max_width
+            .resolve_with(containing_block_width, viewport_width, viewport_height)
+    {
         width = width.min(max_w);
     }
-    if let Some(min_h) = style.size.min_height.resolve_with(
-        containing_block_height,
-        viewport_width,
-        viewport_height,
-    ) {
+    if let Some(min_h) =
+        style
+            .size
+            .min_height
+            .resolve_with(containing_block_height, viewport_width, viewport_height)
+    {
         height = height.max(min_h);
     }
-    if let Some(max_h) = style.size.max_height.resolve_with(
-        containing_block_height,
-        viewport_width,
-        viewport_height,
-    ) {
+    if let Some(max_h) =
+        style
+            .size
+            .max_height
+            .resolve_with(containing_block_height, viewport_width, viewport_height)
+    {
         height = height.min(max_h);
     }
 

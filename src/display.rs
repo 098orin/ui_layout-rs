@@ -401,21 +401,19 @@ fn write_child(
     match child {
         LayoutChild::Node(n) => write_node(f, n, prefix, is_last),
         LayoutChild::Fragment(frag) => write_fragment(f, frag, prefix, is_last),
-        LayoutChild::Object(o) => {
+        LayoutChild::Custom(child) => {
             let branch = if is_last { "└── " } else { "├── " };
 
             write!(f, "{}{}", prefix, branch)?;
 
-            o.write_debug(f)?;
-            writeln!(f)
-        }
-        #[cfg(feature = "unstable")]
-        LayoutChild::Custom(layouter) => {
-            let branch = if is_last { "└── " } else { "├── " };
+            child.layouter().write_debug(f)?;
 
-            write!(f, "{}{}", prefix, branch)?;
-
-            layouter.write_debug(f)?;
+            if f.alternate()
+                && let Some(result) = child.result()
+            {
+                let b = &result.box_model.border_box;
+                write!(f, " [{}x{} @({}, {})]", b.width, b.height, b.x, b.y)?;
+            }
             writeln!(f)
         }
     }
