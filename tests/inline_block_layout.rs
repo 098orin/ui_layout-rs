@@ -434,3 +434,49 @@ fn with_fragments() {
     // Both on same line (50 + 60 = 110 < 200)
     assert_eq!(ib.content_box.height, 20.0);
 }
+
+#[test]
+fn inline_block_respects_explicit_width_with_nested_inline_child() {
+    // Outer inline-block: width 50px, height 50px
+    // Inner inline-block: width auto, containing fragment of 160px
+    let inner_inline_block = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline-block").unwrap(),
+            ..Default::default()
+        },
+        vec![LayoutChild::from(fragment(160.0, 16.0))],
+    );
+
+    let outer_inline_block = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline-block").unwrap(),
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(50.0)),
+                height: LengthOrAuto::Length(Length::Px(50.0)),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        vec![inner_inline_block],
+    );
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(624.0)),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        vec![outer_inline_block],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    let outer_node = node(&root, 0);
+    let ib = inline_box_model(outer_node);
+
+    assert_eq!(ib.content_box.width, 50.0);
+    assert_eq!(outer_node.layout_box.width_box(), 50.0);
+    assert_eq!(format!("{}", outer_node.layout_box), "inline(50x50 @0,0)");
+}

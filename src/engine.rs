@@ -1198,13 +1198,22 @@ impl LayoutEngine {
                 box_model.shift(-(border.left + padding.left), -(border.top + padding.top));
             }
 
-            for (i, span) in line_span_buf.iter_mut().enumerate() {
-                span.line_index = i;
-            }
+            let line_spans = if node.style.display.inner == InnerDisplay::FlowRoot {
+                vec![LineSpan {
+                    x_range: 0.0..content_w,
+                    line_pos: (start_x, end_y),
+                    line_index: 0,
+                }]
+            } else {
+                for (i, span) in line_span_buf.iter_mut().enumerate() {
+                    span.line_index = i;
+                }
+                line_span_buf
+            };
 
             node.layout_box = LayoutBox::InlineBox(InlineBox {
                 box_model,
-                line_spans: line_span_buf,
+                line_spans,
             });
 
             // Inline-block advances the inline cursor by its full width (it is
@@ -1212,7 +1221,7 @@ impl LayoutEngine {
             // by the placed current_x (the line-end position within the line).
             let (end_pos, current_x) = if node.style.display.inner == InnerDisplay::FlowRoot {
                 let width = node.layout_box.width();
-                ((start_x + width, cursor_y), parent_current_x + width)
+                ((start_x + width, end_y), parent_current_x + width)
             } else {
                 ((cursor_x, cursor_y), parent_current_x + current_x)
             };
