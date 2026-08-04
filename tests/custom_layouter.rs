@@ -564,3 +564,63 @@ fn block_declared_inline_forces_new_line_after_inline() {
     let b = block_box(&root);
     assert!(b.content_box.height >= 50.0);
 }
+
+#[derive(Debug)]
+struct EmptySpanInlineWidget {
+    width: f32,
+    height: f32,
+}
+
+impl CustomLayouter for EmptySpanInlineWidget {
+    fn formatting_context(&self) -> OuterDisplay {
+        OuterDisplay::Inline
+    }
+
+    fn layout(&mut self, ctx: &LayoutContext) -> LayoutBox {
+        let (x, y) = ctx.start_pos;
+        LayoutBox::InlineBox(InlineBox {
+            box_model: BoxModel::from(rect(x, y, self.width, self.height)),
+            line_spans: vec![],
+        })
+    }
+
+    fn measure(&self, _ctx: &LayoutContext) -> MeasureResult {
+        MeasureResult {
+            width: self.width,
+            height: self.height,
+        }
+    }
+}
+
+#[test]
+fn inline_block_auto_width_with_empty_span_custom_child() {
+    let custom_child = EmptySpanInlineWidget {
+        width: 160.0,
+        height: 16.0,
+    };
+
+    let inline_block = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline-block").unwrap(),
+            ..Default::default()
+        },
+        vec![LayoutChild::from(custom_child)],
+    );
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(400.0)),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        vec![inline_block],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    let ib_node = node(&root, 0);
+    assert_eq!(ib_node.layout_box.width(), 160.0);
+    assert_eq!(ib_node.layout_box.width_box(), 160.0);
+}

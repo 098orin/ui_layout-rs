@@ -975,7 +975,38 @@ impl LayoutEngine {
         let line_height = ctx_for_child.line_height;
 
         let (line_spans, box_model) = match layout_box {
-            LayoutBox::InlineBox(inline) => (inline.line_spans, inline.box_model),
+            LayoutBox::InlineBox(inline) => {
+                if inline.line_spans.is_empty() {
+                    let mut bm = inline.box_model;
+                    let width = bm.border_box.width;
+                    let height = bm.border_box.height;
+
+                    let (mut x, mut y) = state.cursor.pos();
+                    let mut line_index = state.cursor.line_index;
+
+                    if x + width > outbox_width && x > 0.0 {
+                        x = 0.0;
+                        y += line_height;
+                        line_index += 1;
+                    }
+
+                    let span = LineSpan {
+                        x_range: x..(x + width),
+                        line_pos: (x, y),
+                        line_index,
+                    };
+
+                    bm.shift(x - bm.border_box.x, y - bm.border_box.y);
+
+                    state.accum.max_inline_line_height =
+                        state.accum.max_inline_line_height.max(height);
+                    state.accum.children_height = state.accum.children_height.max(y + height);
+
+                    (vec![span], bm)
+                } else {
+                    (inline.line_spans, inline.box_model)
+                }
+            }
             LayoutBox::BlockBox(mut bm) => {
                 // The object declared an inline formatting context but
                 // produced a block box. Place it atomically like a fragment:
@@ -1034,6 +1065,7 @@ impl LayoutEngine {
                 last_span.line_pos.0 + last_span.width(),
                 last_span.line_pos.1,
             );
+            state.cursor.current_x = state.cursor.x;
 
             state.cursor.line_index = last_span.line_index;
         }
