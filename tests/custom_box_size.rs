@@ -70,10 +70,7 @@ fn intrinsic_ratio_fallback_derives_other_axis() {
         },
         ..Default::default()
     };
-    assert_eq!(
-        resolve(&style, 200.0, 100.0, Some(2.0)),
-        (100.0, 50.0)
-    );
+    assert_eq!(resolve(&style, 200.0, 100.0, Some(2.0)), (100.0, 50.0));
 }
 
 #[test]

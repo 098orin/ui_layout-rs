@@ -1572,8 +1572,9 @@ impl LayoutEngine {
                         if child.layouter().formatting_context() == OuterDisplay::None {
                             0.0
                         } else {
-                            let measured =
-                                child.layouter_mut().measure(&crate::LayoutContext::from(ctx));
+                            let measured = child
+                                .layouter_mut()
+                                .measure(&crate::LayoutContext::from(ctx));
                             let tuple = (measured.width, measured.height);
                             axis.tuple_main(tuple)
                         }
@@ -2305,7 +2306,8 @@ impl LayoutEngine {
                     if object.formatting_context() == OuterDisplay::None {
                         continue;
                     }
-                    let measured = object.measure(&crate::LayoutContext::from(base_ctx_for_children));
+                    let measured =
+                        object.measure(&crate::LayoutContext::from(base_ctx_for_children));
                     let tuple = (measured.width, measured.height);
                     total_border_main += axis.tuple_main(tuple);
                     max_cross = max_cross.max(axis.tuple_cross(tuple));
