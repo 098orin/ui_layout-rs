@@ -268,6 +268,12 @@ pub struct LayoutContext {
     /// Only meaningful while laying out an inline-level object in an
     /// inline flow context; zero otherwise.
     pub line_height: f32,
+
+    /// Viewport width, used for resolving `Vw` units.
+    pub viewport_width: f32,
+
+    /// Viewport height, used for resolving `Vh` units.
+    pub viewport_height: f32,
 }
 
 impl LayoutContext {
@@ -436,6 +442,8 @@ impl LayoutEngine {
             available_width: Some(width),
             parent_assigned_border_width: None,
             parent_assigned_border_height: None,
+            viewport_width: width,
+            viewport_height: height,
             ..Default::default()
         };
 

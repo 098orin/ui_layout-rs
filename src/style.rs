@@ -431,6 +431,11 @@ pub struct SizeStyle {
     pub max_width: LengthOrAuto,
     pub min_height: LengthOrAuto,
     pub max_height: LengthOrAuto,
+    /// Explicit `aspect-ratio` (width / height). `None` when unspecified.
+    ///
+    /// Used to derive the missing axis when only one of `width` / `height`
+    /// is resolved. Takes precedence over the object's intrinsic ratio.
+    pub aspect_ratio: Option<f32>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
