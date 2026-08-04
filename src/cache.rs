@@ -1,4 +1,7 @@
-pub fn make_layout_key(ctx: &crate::engine::LayoutContext, engine: &crate::LayoutEngine) -> u32 {
+pub(crate) fn make_layout_key(
+    ctx: &crate::engine::InternalLayoutContext,
+    engine: &crate::LayoutEngine,
+) -> u32 {
     use std::hash::{Hash, Hasher};
 
     let mut h = self::LayoutHasher::default();

@@ -221,44 +221,44 @@ struct FlexPlacementCtx {
     reversed: bool,
 }
 
-/// Layout context passed to [`crate::CustomLayouter::measure`] and
-/// [`crate::CustomLayouter::layout`].
+/// Engine-internal layout context threaded through every layout pass.
 ///
-/// Provides size information for the current layout pass, including
-/// containing-block dimensions (for percentage resolution) and
-/// parent-assigned sizes (for flex stretch), plus the inline-flow
-/// line info used while laying out inline-level custom objects.
+/// Unlike the public [`crate::LayoutContext`] handed to custom objects, this
+/// carries the full bookkeeping the engine needs: the containing block, the
+/// actual free space and parent-assigned sizes for flex, and the inline-flow
+/// line info. It is private to the crate and never exposed to custom layout
+/// objects directly.
 #[derive(Debug, Clone, Default)]
-pub struct LayoutContext {
+pub(crate) struct InternalLayoutContext {
     /// Containing block width for resolving percentages and intrinsic sizing.
     /// Independent of layout results.
-    pub containing_block_width: Option<f32>,
+    pub(crate) containing_block_width: Option<f32>,
 
     /// Containing block height for resolving percentages and intrinsic sizing.
     /// Independent of layout results.
-    pub containing_block_height: Option<f32>,
+    pub(crate) containing_block_height: Option<f32>,
 
     /// The actual free space available for layout after considering
     /// constraints such as sibling layout, margins, and line breaking.
-    pub available_width: Option<f32>,
+    pub(crate) available_width: Option<f32>,
 
     /// Border-box width assigned by the parent (e.g. via flex stretch).
-    pub parent_assigned_border_width: Option<f32>,
+    pub(crate) parent_assigned_border_width: Option<f32>,
 
     /// Border-box height assigned by the parent (e.g. via flex stretch).
-    pub parent_assigned_border_height: Option<f32>,
+    pub(crate) parent_assigned_border_height: Option<f32>,
 
     /// Start position of the current line in parent coordinates.
     ///
     /// Only meaningful while laying out an inline-level object in an
     /// inline flow context; zero otherwise.
-    pub start_pos: (f32, f32),
+    pub(crate) start_pos: (f32, f32),
 
     /// Remaining inline size available on the current line before wrapping.
     ///
     /// Only meaningful while laying out an inline-level object in an
     /// inline flow context; zero otherwise.
-    pub available_inline_size: f32,
+    pub(crate) available_inline_size: f32,
 
     /// Line height of the containing inline formatting context.
     ///
@@ -267,16 +267,16 @@ pub struct LayoutContext {
     ///
     /// Only meaningful while laying out an inline-level object in an
     /// inline flow context; zero otherwise.
-    pub line_height: f32,
+    pub(crate) line_height: f32,
 
     /// Viewport width, used for resolving `Vw` units.
-    pub viewport_width: f32,
+    pub(crate) viewport_width: f32,
 
     /// Viewport height, used for resolving `Vh` units.
-    pub viewport_height: f32,
+    pub(crate) viewport_height: f32,
 }
 
-impl LayoutContext {
+impl InternalLayoutContext {
     /// Returns the containing-block size along the main axis.
     fn containing_block_main(&self, axis: Axis) -> Option<f32> {
         match axis {
@@ -290,6 +290,20 @@ impl LayoutContext {
         match axis {
             Axis::Horizontal => self.containing_block_height,
             Axis::Vertical => self.containing_block_width,
+        }
+    }
+}
+
+impl From<&InternalLayoutContext> for crate::LayoutContext {
+    fn from(ctx: &InternalLayoutContext) -> Self {
+        Self {
+            containing_block_width: ctx.containing_block_width,
+            containing_block_height: ctx.containing_block_height,
+            start_pos: ctx.start_pos,
+            available_inline_size: ctx.available_inline_size,
+            line_height: ctx.line_height,
+            viewport_width: ctx.viewport_width,
+            viewport_height: ctx.viewport_height,
         }
     }
 }
@@ -436,7 +450,7 @@ impl LayoutEngine {
     /// Main layout entry point.
     /// Initiates layout computation from the root node with specified viewport dimensions.
     pub fn layout(root: &mut LayoutNode, width: f32, height: f32) {
-        let ctx = LayoutContext {
+        let ctx = InternalLayoutContext {
             containing_block_width: Some(width),
             containing_block_height: Some(height),
             available_width: Some(width),
@@ -479,7 +493,7 @@ impl LayoutEngine {
     fn layout_node(
         &self,
         node: &mut LayoutNode,
-        ctx: &LayoutContext,
+        ctx: &InternalLayoutContext,
         line_ctx: LineContext,
         intrinsic_pass: bool,
     ) -> LineContext {
@@ -513,7 +527,7 @@ impl LayoutEngine {
     fn layout_by_display(
         &self,
         node: &mut LayoutNode,
-        ctx: &LayoutContext,
+        ctx: &InternalLayoutContext,
         line_ctx: LineContext,
         intrinsic_pass: bool,
     ) -> LineContext {
@@ -530,7 +544,7 @@ impl LayoutEngine {
     fn layout_block_level(
         &self,
         node: &mut LayoutNode,
-        ctx: &LayoutContext,
+        ctx: &InternalLayoutContext,
         line_ctx: LineContext,
         intrinsic_pass: bool,
     ) -> LineContext {
@@ -570,7 +584,7 @@ impl LayoutEngine {
     fn layout_inline_level(
         &self,
         node: &mut LayoutNode,
-        ctx: &LayoutContext,
+        ctx: &InternalLayoutContext,
         line_ctx: LineContext,
         intrinsic_pass: bool,
     ) -> LineContext {
@@ -594,7 +608,7 @@ impl LayoutEngine {
     fn layout_by_inner_display(
         &self,
         node: &mut LayoutNode,
-        ctx: &LayoutContext,
+        ctx: &InternalLayoutContext,
         line_ctx: LineContext,
         size_opt: (Option<f32>, Option<f32>),
         intrinsic_pass: bool,
@@ -616,7 +630,7 @@ impl LayoutEngine {
     fn layout_flow(
         &self,
         node: &mut LayoutNode,
-        ctx: &LayoutContext,
+        ctx: &InternalLayoutContext,
         line_ctx: LineContext,
         content_size_opt: (Option<f32>, Option<f32>),
         intrinsic_pass: bool,
@@ -632,12 +646,14 @@ impl LayoutEngine {
             ..
         } = line_ctx;
 
-        let base_ctx_for_child = LayoutContext {
+        let base_ctx_for_child = InternalLayoutContext {
             containing_block_width: content_width_opt,
             containing_block_height: content_height_opt,
             available_width: content_width_opt.or(ctx.available_width),
             parent_assigned_border_width: None,
             parent_assigned_border_height: None,
+            viewport_width: ctx.viewport_width,
+            viewport_height: ctx.viewport_height,
             ..Default::default()
         };
 
@@ -698,7 +714,7 @@ impl LayoutEngine {
                 LayoutItem::Custom(i) => {
                     match node.children[i].custom().unwrap().formatting_context() {
                         OuterDisplay::Inline => {
-                            let mut ctx_for_child = base_ctx_for_child.clone();
+                            let mut ctx_for_child = crate::LayoutContext::from(&base_ctx_for_child);
                             ctx_for_child.start_pos = state.cursor.pos();
                             ctx_for_child.available_inline_size =
                                 outbox_width - state.cursor.current_x;
@@ -711,12 +727,15 @@ impl LayoutEngine {
                                 &mut state,
                             );
                         }
-                        OuterDisplay::Block => self.process_flow_custom_block_item(
-                            node,
-                            i,
-                            &base_ctx_for_child,
-                            &mut state,
-                        ),
+                        OuterDisplay::Block => {
+                            let ctx_for_child = crate::LayoutContext::from(&base_ctx_for_child);
+                            self.process_flow_custom_block_item(
+                                node,
+                                i,
+                                &ctx_for_child,
+                                &mut state,
+                            );
+                        }
                         OuterDisplay::None => {}
                     }
                 }
@@ -787,8 +806,8 @@ impl LayoutEngine {
         &self,
         node: &mut LayoutNode,
         i: usize,
-        ctx: &LayoutContext,
-        base_ctx_for_child: &LayoutContext,
+        ctx: &InternalLayoutContext,
+        base_ctx_for_child: &InternalLayoutContext,
         state: &mut FlowState,
     ) {
         let child_node = match &mut node.children[i] {
@@ -798,7 +817,7 @@ impl LayoutEngine {
 
         let child_margin = self.resolve_margin(&child_node.style.spacing, ctx);
 
-        let ctx_for_child = LayoutContext {
+        let ctx_for_child = InternalLayoutContext {
             available_width: state
                 .content_width_opt
                 .or(ctx.available_width)
@@ -942,7 +961,7 @@ impl LayoutEngine {
         &self,
         node: &mut LayoutNode,
         i: usize,
-        ctx_for_child: &LayoutContext,
+        ctx_for_child: &crate::LayoutContext,
         outbox_width: f32,
         state: &mut FlowState,
     ) {
@@ -1045,7 +1064,7 @@ impl LayoutEngine {
         &self,
         node: &mut LayoutNode,
         i: usize,
-        ctx_for_child: &LayoutContext,
+        ctx_for_child: &crate::LayoutContext,
         state: &mut FlowState,
     ) {
         let (mut box_model, mut rect, spans) = match &mut node.children[i] {
@@ -1091,7 +1110,7 @@ impl LayoutEngine {
     fn finalize_flow_box(
         &self,
         node: &mut LayoutNode,
-        ctx: &LayoutContext,
+        ctx: &InternalLayoutContext,
         content_width_opt: Option<f32>,
         content_height_opt: Option<f32>,
         state: FlowState,
@@ -1275,7 +1294,7 @@ impl LayoutEngine {
     fn layout_flex(
         &self,
         node: &mut LayoutNode,
-        ctx: &LayoutContext,
+        ctx: &InternalLayoutContext,
         line_ctx: LineContext,
         content_size_opt: (Option<f32>, Option<f32>),
         intrinsic_pass: bool,
@@ -1286,12 +1305,14 @@ impl LayoutEngine {
 
         let (children_main, children_cross) =
             if !intrinsic_pass || content_width_opt.is_none() || content_height_opt.is_none() {
-                let base_ctx_for_children = LayoutContext {
+                let base_ctx_for_children = InternalLayoutContext {
                     containing_block_width: content_width_opt,
                     containing_block_height: content_height_opt,
                     available_width: None,
                     parent_assigned_border_width: None,
                     parent_assigned_border_height: None,
+                    viewport_width: ctx.viewport_width,
+                    viewport_height: ctx.viewport_height,
                     ..Default::default()
                 };
                 self.layout_flex_children(node, axis, intrinsic_pass, &base_ctx_for_children)
@@ -1350,12 +1371,14 @@ impl LayoutEngine {
 
         if relayout_needed {
             // Update context
-            let base_ctx_for_children = LayoutContext {
+            let base_ctx_for_children = InternalLayoutContext {
                 containing_block_width: Some(final_width),
                 containing_block_height: Some(final_height),
                 available_width: None,
                 parent_assigned_border_width: None,
                 parent_assigned_border_height: None,
+                viewport_width: ctx.viewport_width,
+                viewport_height: ctx.viewport_height,
                 ..Default::default()
             };
 
@@ -1365,12 +1388,14 @@ impl LayoutEngine {
             // Re-key children's cache so the next layout's initial call hits.
             // The relayout stores entries with hash(Some(final_w), ...), but the
             // initial call on the next layout uses hash(content_width_opt, ...).
-            let initial_ctx = LayoutContext {
+            let initial_ctx = InternalLayoutContext {
                 containing_block_width: content_width_opt,
                 containing_block_height: content_height_opt,
                 available_width: None,
                 parent_assigned_border_width: None,
                 parent_assigned_border_height: None,
+                viewport_width: ctx.viewport_width,
+                viewport_height: ctx.viewport_height,
                 ..Default::default()
             };
             let initial_key = crate::cache::make_layout_key(&initial_ctx, self);
@@ -1426,7 +1451,7 @@ impl LayoutEngine {
         node: &mut LayoutNode,
         axis: Axis,
         intrinsic_pass: bool,
-        base_ctx_for_children: &LayoutContext,
+        base_ctx_for_children: &InternalLayoutContext,
     ) -> (f32, f32) {
         let children_count = node.children.len();
         if children_count == 0 {
@@ -1502,7 +1527,7 @@ impl LayoutEngine {
         &self,
         node: &mut LayoutNode,
         axis: Axis,
-        ctx: &LayoutContext,
+        ctx: &InternalLayoutContext,
         items: &[LayoutItem],
     ) -> f32 {
         let vw = self.viewport_width;
@@ -1547,7 +1572,8 @@ impl LayoutEngine {
                         if child.layouter().formatting_context() == OuterDisplay::None {
                             0.0
                         } else {
-                            let measured = child.layouter_mut().measure(ctx);
+                            let measured =
+                                child.layouter_mut().measure(&crate::LayoutContext::from(ctx));
                             let tuple = (measured.width, measured.height);
                             axis.tuple_main(tuple)
                         }
@@ -1591,7 +1617,7 @@ impl LayoutEngine {
         &self,
         node: &mut LayoutNode,
         axis: Axis,
-        ctx: &LayoutContext,
+        ctx: &InternalLayoutContext,
         index: usize,
         placement: &mut FlexPlacementCtx,
     ) {
@@ -1800,7 +1826,7 @@ impl LayoutEngine {
         &self,
         node: &mut LayoutNode,
         axis: Axis,
-        ctx: &LayoutContext,
+        ctx: &InternalLayoutContext,
         index: usize,
         placement: &mut FlexPlacementCtx,
     ) {
@@ -1809,7 +1835,7 @@ impl LayoutEngine {
             if object.formatting_context() == OuterDisplay::None {
                 return;
             }
-            object.measure(ctx)
+            object.measure(&crate::LayoutContext::from(ctx))
         };
         let tuple = (measured.width, measured.height);
         let item_main_size = axis.tuple_main(tuple);
@@ -1861,7 +1887,7 @@ impl LayoutEngine {
     }
 
     /// Set child positions.
-    fn flow_flex_children(&self, node: &mut LayoutNode, axis: Axis, ctx: &LayoutContext) {
+    fn flow_flex_children(&self, node: &mut LayoutNode, axis: Axis, ctx: &InternalLayoutContext) {
         if node.children.is_empty() {
             return;
         }
@@ -1952,7 +1978,7 @@ impl LayoutEngine {
         &self,
         node: &mut LayoutNode,
         axis: Axis,
-        base_ctx_for_children: &LayoutContext,
+        base_ctx_for_children: &InternalLayoutContext,
         flex_items: &[LayoutItem],
         states: &mut [FlexItemState],
     ) -> f32 {
@@ -2074,7 +2100,9 @@ impl LayoutEngine {
                         if child.layouter().formatting_context() == OuterDisplay::None {
                             state.main_size = 0.0;
                         } else {
-                            let measured = child.layouter_mut().measure(base_ctx_for_children);
+                            let measured = child
+                                .layouter_mut()
+                                .measure(&crate::LayoutContext::from(base_ctx_for_children));
                             let tuple = (measured.width, measured.height);
                             state.main_size = axis.tuple_main(tuple);
                         }
@@ -2194,7 +2222,7 @@ impl LayoutEngine {
         &self,
         node: &mut LayoutNode,
         axis: Axis,
-        base_ctx_for_children: &LayoutContext,
+        base_ctx_for_children: &InternalLayoutContext,
         intrinsic_pass: bool,
         flex_items: &[LayoutItem],
         states: Vec<FlexItemState>,
@@ -2231,7 +2259,7 @@ impl LayoutEngine {
                         }
                     };
 
-                    let ctx_for_child = LayoutContext {
+                    let ctx_for_child = InternalLayoutContext {
                         parent_assigned_border_width,
                         parent_assigned_border_height,
                         ..*base_ctx_for_children
@@ -2277,7 +2305,7 @@ impl LayoutEngine {
                     if object.formatting_context() == OuterDisplay::None {
                         continue;
                     }
-                    let measured = object.measure(base_ctx_for_children);
+                    let measured = object.measure(&crate::LayoutContext::from(base_ctx_for_children));
                     let tuple = (measured.width, measured.height);
                     total_border_main += axis.tuple_main(tuple);
                     max_cross = max_cross.max(axis.tuple_cross(tuple));
@@ -2445,7 +2473,7 @@ impl LayoutEngine {
         size_style: &crate::SizeStyle,
         spacing: &crate::Spacing,
         box_sizing: &BoxSizing,
-        ctx: &LayoutContext,
+        ctx: &InternalLayoutContext,
     ) -> ((Option<f32>, Option<f32>), Edge, Edge) {
         let border = self.resolve_border(spacing, ctx);
         let padding = self.resolve_padding(spacing, ctx);
@@ -2519,7 +2547,7 @@ impl LayoutEngine {
         &self,
         value: f32,
         size_style: &crate::SizeStyle,
-        ctx: &LayoutContext,
+        ctx: &InternalLayoutContext,
         is_width: bool,
         box_sizing: Option<&BoxSizing>,
         padding_border_edge: f32,
@@ -2549,7 +2577,7 @@ impl LayoutEngine {
         clamp(value, min_constraint, max_constraint)
     }
 
-    fn resolve_padding(&self, spacing: &Spacing, ctx: &LayoutContext) -> Edge {
+    fn resolve_padding(&self, spacing: &Spacing, ctx: &InternalLayoutContext) -> Edge {
         let containing_width = ctx.containing_block_width;
         let vw = self.viewport_width;
         let vh = self.viewport_height;
@@ -2574,7 +2602,7 @@ impl LayoutEngine {
         }
     }
 
-    fn resolve_border(&self, spacing: &Spacing, ctx: &LayoutContext) -> Edge {
+    fn resolve_border(&self, spacing: &Spacing, ctx: &InternalLayoutContext) -> Edge {
         let containing_width = ctx.containing_block_width;
         let vw = self.viewport_width;
         let vh = self.viewport_height;
@@ -2599,7 +2627,7 @@ impl LayoutEngine {
         }
     }
 
-    fn resolve_margin(&self, spacing: &Spacing, ctx: &LayoutContext) -> EdgeOption {
+    fn resolve_margin(&self, spacing: &Spacing, ctx: &InternalLayoutContext) -> EdgeOption {
         let vw = self.viewport_width;
         let vh = self.viewport_height;
 

@@ -1,4 +1,4 @@
-use crate::{LayoutBox, LayoutContext, OuterDisplay};
+use crate::{LayoutBox, OuterDisplay};
 use std::fmt::{self, Debug};
 
 /// The measured size of a [`CustomLayouter`] object.
@@ -12,6 +12,55 @@ pub struct MeasureResult {
     pub width: f32,
     /// The object's intrinsic height.
     pub height: f32,
+}
+
+/// Read-only layout information handed to [`CustomLayouter::layout`] and
+/// [`CustomLayouter::measure`].
+///
+/// This is a slim, stable view of the current layout situation tailored to
+/// custom objects. It deliberately exposes only what a custom object needs to
+/// size and position itself; the engine's own bookkeeping context (line
+/// cursors, flex state, assigned sizes, …) is kept internal.
+///
+/// The engine constructs a `LayoutContext` for every custom object at each
+/// layout / measure call, so the values describe the *current* pass and must
+/// not be cached across calls.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct LayoutContext {
+    /// Containing block width, used for resolving percentage lengths and
+    /// intrinsic sizing. `None` when unknown.
+    pub containing_block_width: Option<f32>,
+
+    /// Containing block height, used for resolving percentage lengths and
+    /// intrinsic sizing. `None` when unknown.
+    pub containing_block_height: Option<f32>,
+
+    /// Start position of the current line in the parent's coordinate space.
+    ///
+    /// Only meaningful for objects participating in an inline flow context;
+    /// zero otherwise.
+    pub start_pos: (f32, f32),
+
+    /// Remaining inline size on the current line before wrapping.
+    ///
+    /// Only meaningful for objects participating in an inline flow context;
+    /// zero otherwise.
+    pub available_inline_size: f32,
+
+    /// Line height of the containing inline formatting context.
+    ///
+    /// When an inline-level object's [`crate::LineSpan`]s occupy multiple
+    /// lines, this value is used as the vertical advance between them.
+    ///
+    /// Only meaningful for objects participating in an inline flow context;
+    /// zero otherwise.
+    pub line_height: f32,
+
+    /// Viewport width, used for resolving `Vw` units.
+    pub viewport_width: f32,
+
+    /// Viewport height, used for resolving `Vh` units.
+    pub viewport_height: f32,
 }
 
 /// A unified trait for custom layout objects that can participate in

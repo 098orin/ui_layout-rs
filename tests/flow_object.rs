@@ -614,9 +614,6 @@ fn flow_object_measure() {
     let ctx = LayoutContext {
         containing_block_width: Some(200.0),
         containing_block_height: Some(100.0),
-        available_width: None,
-        parent_assigned_border_width: None,
-        parent_assigned_border_height: None,
         ..Default::default()
     };
 
