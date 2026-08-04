@@ -3140,16 +3140,17 @@ pub fn resolve_custom_box_size(
         BoxSizing::BorderBox => (h - pb_v).max(0.0),
     });
 
-    // Apply aspect ratio
-    let (content_width, content_height) = if let Some(_ratio) = aspect_ratio {
-        match (content_width, content_height) {
-            (Some(w), None) if intrinsic_height > 0.0 => {
-                (Some(w), Some(intrinsic_height * w / intrinsic_width))
+    // Apply aspect ratio (ratio = width / height). Derives the missing axis
+    // when exactly one of width / height is specified.
+    let (content_width, content_height) = if let Some(ratio) = aspect_ratio {
+        if ratio > 0.0 {
+            match (content_width, content_height) {
+                (Some(w), None) => (Some(w), Some(w / ratio)),
+                (None, Some(h)) => (Some(h * ratio), Some(h)),
+                _ => (content_width, content_height),
             }
-            (None, Some(h)) if intrinsic_width > 0.0 => {
-                (Some(intrinsic_width * h / intrinsic_height), Some(h))
-            }
-            _ => (content_width, content_height),
+        } else {
+            (content_width, content_height)
         }
     } else {
         (content_width, content_height)
