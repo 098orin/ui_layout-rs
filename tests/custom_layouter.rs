@@ -624,3 +624,30 @@ fn inline_block_auto_width_with_empty_span_custom_child() {
     assert_eq!(ib_node.layout_box.width(), 160.0);
     assert_eq!(ib_node.layout_box.width_box(), 160.0);
 }
+
+#[test]
+fn flex_item_inline_block_with_custom_child_gets_intrinsic_width() {
+    let custom_child = InlineWidget {
+        width: 160.0,
+        height: 16.0,
+    };
+
+    let inline_block = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline-block").unwrap(),
+            ..Default::default()
+        },
+        vec![LayoutChild::from(custom_child)],
+    );
+
+    let mut root = LayoutNode::with_children(
+        flex_container(400.0, 200.0, FlexDirection::Row),
+        vec![inline_block],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    let ib_node = node(&root, 0);
+    assert_eq!(ib_node.layout_box.width_box(), 160.0);
+    assert_eq!(ib_node.layout_box.width(), 160.0);
+}

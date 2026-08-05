@@ -2060,12 +2060,9 @@ impl LayoutEngine {
                                     EMPTY_LINE_CONTEXT,
                                     true,
                                 );
-                                if let LayoutBox::BlockBox(ref box_model) = node.layout_box {
-                                    let content_main = axis.rect_main(&box_model.content_box);
-                                    v.max(content_main)
-                                } else {
-                                    v
-                                }
+                                let content_main =
+                                    axis.rect_main(&layout_box_content_box(&node.layout_box));
+                                v.max(content_main)
                             } else {
                                 v
                             }
@@ -2091,11 +2088,7 @@ impl LayoutEngine {
                                         EMPTY_LINE_CONTEXT,
                                         true,
                                     );
-                                    if let LayoutBox::BlockBox(ref box_model) = node.layout_box {
-                                        axis.rect_main(&box_model.content_box)
-                                    } else {
-                                        0.0
-                                    }
+                                    axis.rect_main(&layout_box_content_box(&node.layout_box))
                                 }
                                 Some(v) => v,
                             }
@@ -2771,6 +2764,21 @@ fn resolve_content_size_with_box_sizing(
         }
     }
     .max(0.0)
+}
+
+/// Returns the content box of a laid-out box, regardless of whether it was
+/// produced as a block or an inline box.
+///
+/// Flex item measurement needs the intrinsic main size of the child; an
+/// inline-level child (e.g. `display: inline-block`) yields an
+/// [`LayoutBox::InlineBox`], so reading only the block branch collapses it to
+/// zero.
+fn layout_box_content_box(layout_box: &LayoutBox) -> Rect {
+    match layout_box {
+        LayoutBox::BlockBox(b) => b.content_box,
+        LayoutBox::InlineBox(l) => l.box_model.content_box,
+        LayoutBox::None => Rect::default(),
+    }
 }
 
 /// Clamps a value between optional minimum and maximum bounds.
