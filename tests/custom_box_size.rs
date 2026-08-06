@@ -121,6 +121,40 @@ fn min_max_constraints_applied() {
 }
 
 #[test]
+fn max_width_clamp_preserves_aspect_ratio_when_both_auto() {
+    let style = Style {
+        size: ui_layout::SizeStyle {
+            max_width: LengthOrAuto::Length(Length::Percent(100.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let (w, h) = resolve(&style, 1183.0, 683.0, Some(1183.0 / 683.0));
+    assert!((w - 400.0).abs() < 0.01, "width should clamp to 400");
+    assert!(
+        (h - 400.0 / (1183.0 / 683.0)).abs() < 0.01,
+        "height should derive from the clamped width, got {h}"
+    );
+}
+
+#[test]
+fn max_height_clamp_preserves_aspect_ratio_when_both_auto() {
+    let style = Style {
+        size: ui_layout::SizeStyle {
+            max_height: LengthOrAuto::Length(Length::Percent(100.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let (w, h) = resolve(&style, 1183.0, 683.0, Some(1183.0 / 683.0));
+    assert!((h - 300.0).abs() < 0.01, "height should clamp to 300, got {h}");
+    assert!(
+        (w - 300.0 * (1183.0 / 683.0)).abs() < 0.01,
+        "width should derive from the clamped height, got {w}"
+    );
+}
+
+#[test]
 fn percentage_width_resolves_against_containing_block() {
     let style = Style {
         size: ui_layout::SizeStyle {

@@ -3138,6 +3138,11 @@ pub fn resolve_custom_box_size(
             .size
             .height
             .resolve_with(containing_block_height, viewport_width, viewport_height);
+    // Whether each axis was given an explicit CSS size (before any
+    // aspect-ratio derivation). An axis left `auto` is flexible and must
+    // absorb min/max clamping so the aspect ratio survives.
+    let width_specified = resolved_width.is_some();
+    let height_specified = resolved_height.is_some();
 
     // Convert to content-box based on box-sizing
     let pb_h = style
@@ -3213,38 +3218,131 @@ pub fn resolve_custom_box_size(
         content_height.unwrap_or(intrinsic_height),
     );
 
-    // Apply min/max constraints
-    if let Some(min_w) =
-        style
-            .size
-            .min_width
-            .resolve_with(containing_block_width, viewport_width, viewport_height)
-    {
-        width = width.max(min_w);
-    }
-    if let Some(max_w) =
-        style
-            .size
-            .max_width
-            .resolve_with(containing_block_width, viewport_width, viewport_height)
-    {
-        width = width.min(max_w);
-    }
-    if let Some(min_h) =
-        style
-            .size
-            .min_height
-            .resolve_with(containing_block_height, viewport_width, viewport_height)
-    {
-        height = height.max(min_h);
-    }
-    if let Some(max_h) =
-        style
-            .size
-            .max_height
-            .resolve_with(containing_block_height, viewport_width, viewport_height)
-    {
-        height = height.min(max_h);
+    // Apply min/max constraints.
+    //
+    // When the element has an aspect ratio and at least one axis is
+    // flexible (`auto`), the constraints are solved while preserving the
+    // ratio (CSS 2.1 §10.4): clamping one axis re-derives the other, so
+    // `img { max-width: 100% }` keeps its proportions. When both axes are
+    // explicitly sized, constraints apply independently and the user's
+    // dimensions win (matching browsers).
+    let preserves_ratio =
+        aspect_ratio.is_some_and(|r| r > 0.0) && (!width_specified || !height_specified);
+
+    if preserves_ratio {
+        if let Some(max_w) =
+            style
+                .size
+                .max_width
+                .resolve_with(containing_block_width, viewport_width, viewport_height)
+            && width > max_w
+        {
+            width = max_w;
+            height = width / aspect_ratio.unwrap();
+            if let Some(min_h) =
+                style
+                    .size
+                    .min_height
+                    .resolve_with(containing_block_height, viewport_width, viewport_height)
+                && height < min_h
+            {
+                height = min_h;
+                width = height * aspect_ratio.unwrap();
+            }
+        }
+        if let Some(max_h) =
+            style
+                .size
+                .max_height
+                .resolve_with(containing_block_height, viewport_width, viewport_height)
+            && height > max_h
+        {
+            height = max_h;
+            width = height * aspect_ratio.unwrap();
+            if let Some(min_w) =
+                style
+                    .size
+                    .min_width
+                    .resolve_with(containing_block_width, viewport_width, viewport_height)
+                && width < min_w
+            {
+                width = min_w;
+                height = width / aspect_ratio.unwrap();
+            }
+        }
+        if let Some(min_w) =
+            style
+                .size
+                .min_width
+                .resolve_with(containing_block_width, viewport_width, viewport_height)
+            && width < min_w
+        {
+            width = min_w;
+            height = width / aspect_ratio.unwrap();
+            if let Some(max_h) =
+                style
+                    .size
+                    .max_height
+                    .resolve_with(containing_block_height, viewport_width, viewport_height)
+                && height > max_h
+            {
+                height = max_h;
+                width = height * aspect_ratio.unwrap();
+            }
+        }
+        if let Some(min_h) =
+            style
+                .size
+                .min_height
+                .resolve_with(containing_block_height, viewport_width, viewport_height)
+            && height < min_h
+        {
+            height = min_h;
+            width = height * aspect_ratio.unwrap();
+            if let Some(max_w) =
+                style
+                    .size
+                    .max_width
+                    .resolve_with(containing_block_width, viewport_width, viewport_height)
+                && width > max_w
+            {
+                width = max_w;
+                height = width / aspect_ratio.unwrap();
+            }
+        }
+    } else {
+        if let Some(min_w) =
+            style
+                .size
+                .min_width
+                .resolve_with(containing_block_width, viewport_width, viewport_height)
+        {
+            width = width.max(min_w);
+        }
+        if let Some(max_w) =
+            style
+                .size
+                .max_width
+                .resolve_with(containing_block_width, viewport_width, viewport_height)
+        {
+            width = width.min(max_w);
+        }
+        if let Some(min_h) =
+            style
+                .size
+                .min_height
+                .resolve_with(containing_block_height, viewport_width, viewport_height)
+        {
+            height = height.max(min_h);
+        }
+        if let Some(max_h) =
+            style
+                .size
+                .max_height
+                .resolve_with(containing_block_height, viewport_width, viewport_height)
+        {
+            height = height.min(max_h);
+        }
     }
 
     (width, height)
