@@ -627,3 +627,147 @@ fn flex_item_inline_block_with_custom_child_gets_intrinsic_width() {
     assert_eq!(ib_node.layout_box.width_box(), 160.0);
     assert_eq!(ib_node.layout_box.width(), 160.0);
 }
+
+// ========================
+// Replaced-element leaf shrink-to-fit
+// ========================
+
+/// A block-level node wrapping exactly one custom child behaves as a
+/// replaced element (e.g. `<button>/<img>/<input>`): `auto` width/height
+/// shrink to the custom child's intrinsic-based box instead of stretching
+/// to the containing block.
+#[test]
+fn block_custom_leaf_auto_size_shrink_wraps_to_child() {
+    let mut leaf = LayoutNode::with_children(
+        Style::default(),
+        [custom_block(BlockBox {
+            width: 80.0,
+            height: 30.0,
+        })],
+    );
+
+    LayoutEngine::layout(&mut leaf, 800.0, 600.0);
+
+    let b = block_box(&leaf);
+    assert_eq!(b.border_box.width, 80.0);
+    assert_eq!(b.border_box.height, 30.0);
+    assert_eq!(b.content_box.width, 80.0);
+    assert_eq!(b.content_box.height, 30.0);
+}
+
+#[test]
+fn block_custom_leaf_padding_keeps_border_box_at_child_extent() {
+    let mut leaf = LayoutNode::with_children(
+        Style {
+            spacing: Spacing {
+                padding_left: Length::Px(20.0),
+                padding_right: Length::Px(20.0),
+                padding_top: Length::Px(10.0),
+                padding_bottom: Length::Px(10.0),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        [custom_block(BlockBox {
+            width: 80.0,
+            height: 30.0,
+        })],
+    );
+
+    LayoutEngine::layout(&mut leaf, 800.0, 600.0);
+
+    let b = block_box(&leaf);
+    // Border box matches the child's intrinsic extent; padding sits inside.
+    assert_eq!(b.border_box.width, 80.0);
+    assert_eq!(b.border_box.height, 30.0);
+    assert_eq!(b.content_box.width, 40.0);
+    assert_eq!(b.content_box.height, 10.0);
+}
+
+#[test]
+fn block_custom_leaf_auto_margins_center_within_parent() {
+    let leaf = LayoutNode::with_children(
+        Style {
+            spacing: Spacing {
+                margin_left: LengthOrAuto::Auto,
+                margin_right: LengthOrAuto::Auto,
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        [custom_block(BlockBox {
+            width: 80.0,
+            height: 30.0,
+        })],
+    );
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Length(Length::Px(100.0)),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        [leaf],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    let leaf = node(&root, 0);
+    let b = block_box(leaf);
+    assert_eq!(b.border_box.width, 80.0);
+    assert_eq!(b.border_box.x, 60.0);
+}
+
+#[test]
+fn block_custom_leaf_explicit_width_not_shrunk() {
+    let mut leaf = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(300.0)),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        [custom_block(BlockBox {
+            width: 80.0,
+            height: 30.0,
+        })],
+    );
+
+    LayoutEngine::layout(&mut leaf, 800.0, 600.0);
+
+    let b = block_box(&leaf);
+    assert_eq!(b.border_box.width, 300.0);
+    assert_eq!(b.content_box.width, 300.0);
+}
+
+#[test]
+fn flex_keeps_custom_leaf_at_assigned_main_size() {
+    let leaf = LayoutNode::with_children(
+        Style {
+            item_style: ItemStyle {
+                flex_grow: 1.0,
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        [custom_block(BlockBox {
+            width: 80.0,
+            height: 30.0,
+        })],
+    );
+
+    let mut root = LayoutNode::with_children(
+        flex_container(200.0, 50.0, FlexDirection::Row),
+        [leaf],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    // The flex-assigned main size wins over the intrinsic shrink-to-fit.
+    let leaf = node(&root, 0);
+    assert_eq!(leaf.layout_box.width_box(), 200.0);
+}

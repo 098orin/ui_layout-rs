@@ -1265,7 +1265,25 @@ impl LayoutEngine {
                 margin_end: 0.0,
             }
         } else {
-            let content_width = content_width_opt.unwrap_or(children_width);
+            // A block-level node wrapping exactly one custom child behaves as
+            // a replaced element (e.g. <button>/<img>/<input>): when its
+            // width/height are `auto` it shrink-wraps to the custom child's
+            // intrinsic-based box instead of stretching to the containing
+            // block.  This also lets `margin: auto` center such elements.
+            // `content_width_opt` may already be Some(available_width) for an
+            // `auto` size, so the explicit-ness is read from the style and the
+            // parent assignment (flex) instead.
+            let is_custom_leaf = node.style.display.outer == OuterDisplay::Block
+                && matches!(&node.children[..], [LayoutChild::Custom(_)]);
+            let width_auto = matches!(node.style.size.width, LengthOrAuto::Auto);
+            let height_auto = matches!(node.style.size.height, LengthOrAuto::Auto);
+
+            let content_width =
+                if is_custom_leaf && width_auto && ctx.parent_assigned_border_width.is_none() {
+                    (children_width - pb_w).max(0.0)
+                } else {
+                    content_width_opt.unwrap_or(children_width)
+                };
 
             // Margin collapsing only applies to InnerDisplay::Flow.
             // For FlowRoot the flags stay false so children_height is used as-is.
@@ -1273,11 +1291,18 @@ impl LayoutEngine {
             let bottom_collapses =
                 collapse_margins && border.bottom == 0.0 && padding.bottom == 0.0;
 
-            let content_height = content_height_opt.unwrap_or(if bottom_collapses {
-                children_height - prev_child_margin
+            let content_height = if is_custom_leaf
+                && height_auto
+                && ctx.parent_assigned_border_height.is_none()
+            {
+                (children_height - pb_h).max(0.0)
             } else {
-                children_height
-            });
+                content_height_opt.unwrap_or(if bottom_collapses {
+                    children_height - prev_child_margin
+                } else {
+                    children_height
+                })
+            };
             let children_h = if bottom_collapses {
                 (children_height - prev_child_margin).max(0.0)
             } else {

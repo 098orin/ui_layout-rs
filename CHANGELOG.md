@@ -43,6 +43,15 @@ and this project loosely follows Semantic Versioning.
   block/flex placement), observable via `LayoutChild::Custom` without
   downcasting.
 
+### Fixed
+
+- **Block custom leaves shrink-to-fit**: a block-level node wrapping exactly one
+  `LayoutChild::Custom` behaves as a replaced element (e.g. `<button>/<img>/
+  <input>`): when its width/height are `auto` it shrinks to the custom child's
+  intrinsic-based box instead of stretching to the containing block. This also
+  lets `margin: auto` center such elements. Flex-assigned sizes and explicit
+  widths/heights are still honored.
+
 ### Removed
 
 - **`CustomLayouter::formatting_context()`**: custom objects no longer report
