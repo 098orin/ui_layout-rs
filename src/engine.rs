@@ -712,7 +712,7 @@ impl LayoutEngine {
                     self.process_flow_node_item(node, i, ctx, &base_ctx_for_child, &mut state)
                 }
                 LayoutItem::Custom(i) => {
-                    match node.children[i].custom().unwrap().formatting_context() {
+                    match node.children[i].custom_child().unwrap().style().display.outer {
                         OuterDisplay::Inline => {
                             let mut ctx_for_child = crate::LayoutContext::from(&base_ctx_for_child);
                             ctx_for_child.start_pos = state.cursor.pos();
@@ -1610,7 +1610,7 @@ impl LayoutEngine {
                 },
                 LayoutItem::Custom(index) => {
                     if let LayoutChild::Custom(child) = &mut node.children[*index] {
-                        if child.layouter().formatting_context() == OuterDisplay::None {
+                        if child.style().display.outer == OuterDisplay::None {
                             0.0
                         } else {
                             let measured = child
@@ -1873,11 +1873,11 @@ impl LayoutEngine {
         placement: &mut FlexPlacementCtx,
     ) {
         let measured = {
-            let object = node.children[index].custom().unwrap();
-            if object.formatting_context() == OuterDisplay::None {
+            let object = node.children[index].custom_child().unwrap();
+            if object.style().display.outer == OuterDisplay::None {
                 return;
             }
-            object.measure(&crate::LayoutContext::from(ctx))
+            object.layouter().measure(&crate::LayoutContext::from(ctx))
         };
         let tuple = (measured.width, measured.height);
         let item_main_size = axis.tuple_main(tuple);
@@ -2132,7 +2132,7 @@ impl LayoutEngine {
                 }
                 LayoutItem::Custom(index) => {
                     if let LayoutChild::Custom(child) = &mut node.children[*index] {
-                        if child.layouter().formatting_context() == OuterDisplay::None {
+                        if child.style().display.outer == OuterDisplay::None {
                             state.main_size = 0.0;
                         } else {
                             let measured = child
@@ -2336,12 +2336,11 @@ impl LayoutEngine {
                     max_cross = max_cross.max(axis.tuple_cross((fragment_width, fragment_height)));
                 }
                 LayoutItem::Custom(index) => {
-                    let object = node.children.get_mut(*index).unwrap().custom().unwrap();
-                    if object.formatting_context() == OuterDisplay::None {
+                    let object = node.children.get_mut(*index).unwrap().custom_child().unwrap();
+                    if object.style().display.outer == OuterDisplay::None {
                         continue;
                     }
-                    let measured =
-                        object.measure(&crate::LayoutContext::from(base_ctx_for_children));
+                    let measured = object.layouter().measure(&crate::LayoutContext::from(base_ctx_for_children));
                     let tuple = (measured.width, measured.height);
                     total_border_main += axis.tuple_main(tuple);
                     max_cross = max_cross.max(axis.tuple_cross(tuple));

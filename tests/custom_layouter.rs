@@ -14,10 +14,6 @@ struct InlineWidget {
 }
 
 impl CustomLayouter for InlineWidget {
-    fn formatting_context(&self) -> OuterDisplay {
-        OuterDisplay::Inline
-    }
-
     fn layout(&mut self, ctx: &LayoutContext) -> LayoutBox {
         let (x, y) = ctx.start_pos;
         LayoutBox::InlineBox(InlineBox {
@@ -46,10 +42,6 @@ struct BlockBox {
 }
 
 impl CustomLayouter for BlockBox {
-    fn formatting_context(&self) -> OuterDisplay {
-        OuterDisplay::Block
-    }
-
     fn layout(&mut self, _ctx: &LayoutContext) -> LayoutBox {
         LayoutBox::BlockBox(BoxModel::from(rect(0.0, 0.0, self.width, self.height)))
     }
@@ -67,10 +59,6 @@ impl CustomLayouter for BlockBox {
 struct HiddenBox;
 
 impl CustomLayouter for HiddenBox {
-    fn formatting_context(&self) -> OuterDisplay {
-        OuterDisplay::None
-    }
-
     fn measure(&self, _ctx: &LayoutContext) -> MeasureResult {
         MeasureResult::default()
     }
@@ -84,10 +72,6 @@ struct InlineDeclaredBlock {
 }
 
 impl CustomLayouter for InlineDeclaredBlock {
-    fn formatting_context(&self) -> OuterDisplay {
-        OuterDisplay::Inline
-    }
-
     fn layout(&mut self, _ctx: &LayoutContext) -> LayoutBox {
         LayoutBox::BlockBox(BoxModel::from(rect(0.0, 0.0, self.width, self.height)))
     }
@@ -108,10 +92,6 @@ struct BlockDeclaredInline {
 }
 
 impl CustomLayouter for BlockDeclaredInline {
-    fn formatting_context(&self) -> OuterDisplay {
-        OuterDisplay::Block
-    }
-
     fn layout(&mut self, _ctx: &LayoutContext) -> LayoutBox {
         LayoutBox::InlineBox(InlineBox {
             box_model: BoxModel::from(rect(0.0, 0.0, self.width, self.height)),
@@ -147,15 +127,15 @@ fn block_custom_stacks_vertically_in_flow() {
             ..Default::default()
         },
         [
-            LayoutChild::from(BlockBox {
+            custom_block(BlockBox {
                 width: 100.0,
                 height: 30.0,
             }),
-            LayoutChild::from(BlockBox {
+            custom_block(BlockBox {
                 width: 100.0,
                 height: 50.0,
             }),
-            LayoutChild::from(BlockBox {
+            custom_block(BlockBox {
                 width: 100.0,
                 height: 20.0,
             }),
@@ -201,7 +181,7 @@ fn block_custom_result_observable_via_custom_result() {
             },
             ..Default::default()
         },
-        [LayoutChild::from(BlockBox {
+        [custom_block(BlockBox {
             width: 80.0,
             height: 40.0,
         })],
@@ -231,7 +211,7 @@ fn inline_custom_result_stores_spans_and_box() {
             line_height: Length::Px(20.0),
             ..Default::default()
         },
-        [LayoutChild::from(InlineWidget {
+        [custom_inline(InlineWidget {
             width: 40.0,
             height: 10.0,
         })],
@@ -263,11 +243,11 @@ fn block_custom_after_inline_forces_new_line() {
             ..Default::default()
         },
         [
-            LayoutChild::from(InlineWidget {
+            custom_inline(InlineWidget {
                 width: 40.0,
                 height: 10.0,
             }),
-            LayoutChild::from(BlockBox {
+            custom_block(BlockBox {
                 width: 100.0,
                 height: 30.0,
             }),
@@ -301,11 +281,11 @@ fn inline_custom_after_block_flows_below() {
             ..Default::default()
         },
         [
-            LayoutChild::from(BlockBox {
+            custom_block(BlockBox {
                 width: 100.0,
                 height: 30.0,
             }),
-            LayoutChild::from(InlineWidget {
+            custom_inline(InlineWidget {
                 width: 40.0,
                 height: 10.0,
             }),
@@ -337,7 +317,7 @@ fn none_custom_is_skipped_in_flow() {
             },
             ..Default::default()
         },
-        [LayoutChild::from(HiddenBox)],
+        [custom_none(HiddenBox)],
     );
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
@@ -356,11 +336,11 @@ fn flex_stores_block_custom_final_rect() {
     let mut root = LayoutNode::with_children(
         flex_container(200.0, 50.0, FlexDirection::Row),
         [
-            LayoutChild::from(BlockBox {
+            custom_block(BlockBox {
                 width: 60.0,
                 height: 30.0,
             }),
-            LayoutChild::from(BlockBox {
+            custom_block(BlockBox {
                 width: 40.0,
                 height: 20.0,
             }),
@@ -390,11 +370,11 @@ fn flex_skips_none_custom() {
     let mut root = LayoutNode::with_children(
         flex_container(200.0, 50.0, FlexDirection::Row),
         [
-            LayoutChild::from(BlockBox {
+            custom_block(BlockBox {
                 width: 60.0,
                 height: 30.0,
             }),
-            LayoutChild::from(HiddenBox),
+            custom_none(HiddenBox),
         ],
     );
 
@@ -427,7 +407,7 @@ fn inline_declared_block_placed_atomically_on_line() {
         },
         [
             LayoutChild::from(fragment(30.0, 10.0)),
-            LayoutChild::from(InlineDeclaredBlock {
+            custom_inline(InlineDeclaredBlock {
                 width: 40.0,
                 height: 15.0,
             }),
@@ -464,7 +444,7 @@ fn inline_declared_block_wraps_whole_to_next_line() {
         },
         [
             LayoutChild::from(fragment(30.0, 10.0)),
-            LayoutChild::from(InlineDeclaredBlock {
+            custom_inline(InlineDeclaredBlock {
                 width: 40.0,
                 height: 15.0,
             }),
@@ -507,7 +487,7 @@ fn block_declared_inline_placed_as_anonymous_block() {
             line_height: Length::Px(20.0),
             ..Default::default()
         },
-        [LayoutChild::from(BlockDeclaredInline {
+        [custom_block(BlockDeclaredInline {
             width: 100.0,
             height: 30.0,
         })],
@@ -540,11 +520,11 @@ fn block_declared_inline_forces_new_line_after_inline() {
             ..Default::default()
         },
         [
-            LayoutChild::from(InlineWidget {
+            custom_inline(InlineWidget {
                 width: 40.0,
                 height: 10.0,
             }),
-            LayoutChild::from(BlockDeclaredInline {
+            custom_block(BlockDeclaredInline {
                 width: 100.0,
                 height: 30.0,
             }),
@@ -572,10 +552,6 @@ struct EmptySpanInlineWidget {
 }
 
 impl CustomLayouter for EmptySpanInlineWidget {
-    fn formatting_context(&self) -> OuterDisplay {
-        OuterDisplay::Inline
-    }
-
     fn layout(&mut self, ctx: &LayoutContext) -> LayoutBox {
         let (x, y) = ctx.start_pos;
         LayoutBox::InlineBox(InlineBox {
@@ -604,7 +580,7 @@ fn inline_block_auto_width_with_empty_span_custom_child() {
             display: Display::parse("inline-block").unwrap(),
             ..Default::default()
         },
-        vec![LayoutChild::from(custom_child)],
+        vec![custom_inline(custom_child)],
     );
 
     let mut root = LayoutNode::with_children(
@@ -637,7 +613,7 @@ fn flex_item_inline_block_with_custom_child_gets_intrinsic_width() {
             display: Display::parse("inline-block").unwrap(),
             ..Default::default()
         },
-        vec![LayoutChild::from(custom_child)],
+        vec![custom_inline(custom_child)],
     );
 
     let mut root = LayoutNode::with_children(

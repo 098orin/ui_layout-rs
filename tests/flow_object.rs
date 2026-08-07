@@ -14,10 +14,6 @@ struct FixedObject {
 }
 
 impl CustomLayouter for FixedObject {
-    fn formatting_context(&self) -> OuterDisplay {
-        OuterDisplay::Inline
-    }
-
     fn layout(&mut self, ctx: &LayoutContext) -> LayoutBox {
         let (x, y) = ctx.start_pos;
         let box_model = BoxModel::from(rect(x, y, self.width, ctx.line_height));
@@ -58,10 +54,6 @@ struct TextRun {
 }
 
 impl CustomLayouter for TextRun {
-    fn formatting_context(&self) -> OuterDisplay {
-        OuterDisplay::Inline
-    }
-
     fn layout(&mut self, ctx: &LayoutContext) -> LayoutBox {
         let (x, y) = ctx.start_pos;
         let box_model = BoxModel::from(rect(x, y, self.total_width, ctx.line_height));
@@ -123,7 +115,7 @@ fn flow_object_in_block_single_line() {
             },
             ..Default::default()
         },
-        [LayoutChild::from(obj)],
+        [custom_inline(obj)],
     );
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
@@ -149,7 +141,7 @@ fn flow_object_in_flow_container_single() {
             line_height: Length::Px(20.0),
             ..Default::default()
         },
-        [LayoutChild::from(obj)],
+        [custom_inline(obj)],
     );
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
@@ -176,7 +168,7 @@ fn flow_object_wraps_to_next_line() {
             line_height: Length::Px(20.0),
             ..Default::default()
         },
-        [LayoutChild::from(obj)],
+        [custom_inline(obj)],
     );
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
@@ -206,7 +198,7 @@ fn flex_row_with_object() {
 
     let mut root = LayoutNode::with_children(
         flex_container(200.0, 50.0, FlexDirection::Row),
-        [LayoutChild::from(obj), LayoutChild::from(child)],
+        [custom_inline(obj), LayoutChild::from(child)],
     );
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
@@ -232,7 +224,7 @@ fn flex_column_with_object() {
 
     let mut root = LayoutNode::with_children(
         flex_container(100.0, 200.0, FlexDirection::Column),
-        [LayoutChild::from(obj), LayoutChild::from(child)],
+        [custom_inline(obj), LayoutChild::from(child)],
     );
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
@@ -259,9 +251,9 @@ fn flex_row_with_multiple_objects() {
     let mut root = LayoutNode::with_children(
         flex_container(200.0, 50.0, FlexDirection::Row),
         [
-            LayoutChild::from(obj1),
-            LayoutChild::from(obj2),
-            LayoutChild::from(obj3),
+            custom_inline(obj1),
+            custom_inline(obj2),
+            custom_inline(obj3),
         ],
     );
 
@@ -283,7 +275,7 @@ fn flex_column_with_multiple_objects() {
 
     let mut root = LayoutNode::with_children(
         flex_container(100.0, 200.0, FlexDirection::Column),
-        [LayoutChild::from(obj1), LayoutChild::from(obj2)],
+        [custom_inline(obj1), custom_inline(obj2)],
     );
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
@@ -319,7 +311,7 @@ fn flex_row_with_object_and_fragments() {
         },
         [
             LayoutChild::from(fragment(30.0, 10.0)),
-            LayoutChild::from(obj),
+            custom_inline(obj),
             LayoutChild::from(fragment(20.0, 10.0)),
         ],
     );
@@ -359,7 +351,7 @@ fn flow_with_object_and_fragments() {
         },
         [
             LayoutChild::from(fragment(30.0, 10.0)),
-            LayoutChild::from(obj),
+            custom_inline(obj),
             LayoutChild::from(fragment(50.0, 10.0)),
         ],
     );
@@ -395,7 +387,7 @@ fn flex_object_contributes_to_container_auto_height() {
             flex_direction: FlexDirection::Column,
             ..Default::default()
         },
-        [LayoutChild::from(obj)],
+        [custom_inline(obj)],
     );
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
@@ -434,7 +426,7 @@ fn flex_object_with_gap() {
             column_gap: LengthOrAuto::Length(Length::Px(30.0)),
             ..Default::default()
         },
-        [LayoutChild::from(obj1), LayoutChild::from(obj2)],
+        [custom_inline(obj1), custom_inline(obj2)],
     );
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
@@ -468,7 +460,7 @@ fn flex_object_align_items_center() {
             align_items: AlignItems::Center,
             ..Default::default()
         },
-        [LayoutChild::from(obj)],
+        [custom_inline(obj)],
     );
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
@@ -505,7 +497,7 @@ fn flex_object_justify_center() {
             justify_content: JustifyContent::Center,
             ..Default::default()
         },
-        [LayoutChild::from(obj)],
+        [custom_inline(obj)],
     );
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
@@ -549,7 +541,7 @@ fn flex_row_reverse_with_object() {
             flex_direction: FlexDirection::RowReverse,
             ..Default::default()
         },
-        [LayoutChild::from(obj), LayoutChild::from(child)],
+        [custom_inline(obj), LayoutChild::from(child)],
     );
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
@@ -589,7 +581,7 @@ fn flex_column_reverse_with_object() {
             flex_direction: FlexDirection::ColumnReverse,
             ..Default::default()
         },
-        [LayoutChild::from(obj), LayoutChild::from(child)],
+        [custom_inline(obj), LayoutChild::from(child)],
     );
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
@@ -643,7 +635,7 @@ fn flow_object_wraps_when_exceeding_available_width() {
             line_height: Length::Px(20.0),
             ..Default::default()
         },
-        [LayoutChild::from(obj)],
+        [custom_inline(obj)],
     );
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
@@ -687,7 +679,7 @@ fn flow_mixed_object_fragment_inline_node() {
         },
         [
             LayoutChild::from(fragment(15.0, 10.0)),
-            LayoutChild::from(obj),
+            custom_inline(obj),
             LayoutChild::from(inline_span),
         ],
     );
@@ -719,7 +711,7 @@ fn flow_textrun_object_single_line() {
             line_height: Length::Px(20.0),
             ..Default::default()
         },
-        [LayoutChild::from(text)],
+        [custom_inline(text)],
     );
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
@@ -745,7 +737,7 @@ fn flow_textrun_object_multi_line() {
             line_height: Length::Px(20.0),
             ..Default::default()
         },
-        [LayoutChild::from(text)],
+        [custom_inline(text)],
     );
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
@@ -788,7 +780,7 @@ fn flow_single_object_children_box_tracks_object_size() {
             line_height: Length::Px(20.0),
             ..Default::default()
         },
-        [LayoutChild::from(obj)],
+        [custom_inline(obj)],
     );
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);

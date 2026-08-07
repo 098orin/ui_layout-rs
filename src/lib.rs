@@ -84,8 +84,8 @@
 //! in layout. Custom objects implement a single
 //! [`layout`](CustomLayouter::layout) method returning a [`LayoutBox`] —
 //! [`LayoutBox::InlineBox`] for inline content, [`LayoutBox::BlockBox`] for
-//! block-level boxes — and declare how they participate through
-//! [`formatting_context`](CustomLayouter::formatting_context):
+//! block-level boxes. How the object participates is declared by the
+//! [`Style`] it carries in its [`LayoutChild::Custom`]:
 //!
 //! - `OuterDisplay::Block` → the engine lays the object out as a block
 //! - `OuterDisplay::Inline` → the engine lays the object out inline

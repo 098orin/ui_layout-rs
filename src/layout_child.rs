@@ -1,29 +1,39 @@
-use crate::{CustomLayouter, CustomObjectResult, FragmentNode, ItemFragment, LayoutNode};
+use crate::{CustomLayouter, CustomObjectResult, FragmentNode, ItemFragment, LayoutNode, Style};
 
 /// A custom layout object together with its last layout result.
 ///
 /// Wraps a [`Box<dyn CustomLayouter>`] and stores the [`CustomObjectResult`]
 /// produced by the engine during layout, so callers can observe how the
 /// object was positioned without downcasting the trait object.
+///
+/// The object carries its own [`Style`]. The engine reads the resolved
+/// [`crate::Display`] from it — just like it does for a childless
+/// [`LayoutNode`] — to decide how the object participates in the parent
+/// formatting context.
 #[derive(Debug)]
 pub struct CustomChild {
     layouter: Box<dyn CustomLayouter>,
+    style: Style,
     result: Option<CustomObjectResult>,
 }
 
 impl CustomChild {
-    /// Wraps a [`CustomLayouter`] object without a layout result yet.
-    pub fn new(layouter: impl CustomLayouter + 'static) -> Self {
+    /// Wraps a [`CustomLayouter`] object with its [`Style`] and without a
+    /// layout result yet.
+    pub fn new(style: Style, layouter: impl CustomLayouter + 'static) -> Self {
         Self {
             layouter: Box::new(layouter),
+            style,
             result: None,
         }
     }
 
-    /// Wraps a boxed [`CustomLayouter`] object without a layout result yet.
-    pub fn from_box(layouter: Box<dyn CustomLayouter>) -> Self {
+    /// Wraps a boxed [`CustomLayouter`] object with its [`Style`] and without
+    /// a layout result yet.
+    pub fn from_box(style: Style, layouter: Box<dyn CustomLayouter>) -> Self {
         Self {
             layouter,
+            style,
             result: None,
         }
     }
@@ -36,6 +46,17 @@ impl CustomChild {
     /// Returns a mutable reference to the underlying [`CustomLayouter`].
     pub fn layouter_mut(&mut self) -> &mut dyn CustomLayouter {
         &mut *self.layouter
+    }
+
+    /// Returns the [`Style`] that drives this object's layout.
+    pub fn style(&self) -> &Style {
+        &self.style
+    }
+
+    /// Returns a mutable reference to the [`Style`] that drives this object's
+    /// layout.
+    pub fn style_mut(&mut self) -> &mut Style {
+        &mut self.style
     }
 
     /// Returns the last layout result of this object, if any.
@@ -80,8 +101,9 @@ pub enum LayoutChild {
     ///
     /// Custom objects can participate in both inline and block formatting
     /// contexts. The object determines its own layout behavior based on
-    /// the context in which it's used.
-    Custom(CustomChild),
+    /// the context in which it's used. Its [`crate::Display`] is taken from
+    /// the owned [`Style`], exactly as for a childless [`LayoutNode`].
+    Custom(Box<CustomChild>),
 }
 
 impl LayoutChild {
@@ -143,7 +165,7 @@ impl LayoutChild {
     /// child is a [`Custom`](LayoutChild::Custom).
     pub fn custom_child(&self) -> Option<&CustomChild> {
         match self {
-            LayoutChild::Custom(c) => Some(c),
+            LayoutChild::Custom(c) => Some(c.as_ref()),
             _ => None,
         }
     }
@@ -152,7 +174,7 @@ impl LayoutChild {
     /// child is a [`Custom`](LayoutChild::Custom).
     pub fn custom_child_mut(&mut self) -> Option<&mut CustomChild> {
         match self {
-            LayoutChild::Custom(c) => Some(c),
+            LayoutChild::Custom(c) => Some(c.as_mut()),
             _ => None,
         }
     }
@@ -187,11 +209,11 @@ impl From<ItemFragment> for LayoutChild {
     }
 }
 
-impl<L> From<L> for LayoutChild
+impl<L> From<(Style, L)> for LayoutChild
 where
     L: CustomLayouter + 'static,
 {
-    fn from(layouter: L) -> Self {
-        LayoutChild::Custom(CustomChild::new(layouter))
+    fn from((style, layouter): (Style, L)) -> Self {
+        LayoutChild::Custom(Box::new(CustomChild::new(style, layouter)))
     }
 }

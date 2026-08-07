@@ -1,4 +1,4 @@
-use crate::{LayoutBox, OuterDisplay};
+use crate::LayoutBox;
 use std::fmt::{self, Debug};
 
 /// The measured size of a [`CustomLayouter`] object.
@@ -75,13 +75,14 @@ pub struct LayoutContext {
 /// - [`LayoutBox::BlockBox`] — the object produced a block-level box.
 /// - [`LayoutBox::None`] — the object produced nothing.
 ///
-/// The engine selects how the object participates through
-/// [`formatting_context`](Self::formatting_context):
+/// The engine selects how the object participates through the [`crate::Style`]
+/// owned by the wrapping [`crate::CustomChild`] (exactly as for a childless
+/// [`crate::LayoutNode`]):
 ///
-/// - [`OuterDisplay::Block`] → block-level layout: forces a new line and stacks
+/// - [`crate::OuterDisplay::Block`] → block-level layout: forces a new line and stacks
 ///   vertically.
-/// - [`OuterDisplay::Inline`] → inline-level layout: shares the current line.
-/// - [`OuterDisplay::None`] → the object is skipped entirely.
+/// - [`crate::OuterDisplay::Inline`] → inline-level layout: shares the current line.
+/// - [`crate::OuterDisplay::None`] → the object is skipped entirely.
 ///
 /// The returned [`LayoutBox`] need not match the declared context. Mismatches
 /// are handled gracefully:
@@ -101,22 +102,13 @@ pub struct LayoutContext {
 /// [`measure`](Self::measure) for sizing regardless of the reported context.
 /// Objects may therefore implement only the methods their context needs.
 pub trait CustomLayouter: Debug {
-    /// Reports the outer formatting context in which this object participates.
-    ///
-    /// The engine uses this to select how the object is laid out:
-    /// - [`OuterDisplay::Block`] → the object is laid out as a block-level box.
-    /// - [`OuterDisplay::Inline`] → the object is laid out inline.
-    /// - [`OuterDisplay::None`] → the object is skipped (display: none).
-    ///
-    /// This must be implemented so the engine knows how to treat the object.
-    fn formatting_context(&self) -> OuterDisplay;
-
     /// Computes and returns this object's layout result.
     ///
     /// The engine calls this during layout and interprets the returned
-    /// [`LayoutBox`] according to [`formatting_context`](Self::formatting_context).
-    /// The returned variant need not match the declared context; see the
-    /// trait-level docs for how mismatches are handled.
+    /// [`LayoutBox`] according to the [`crate::OuterDisplay`] carried by the
+    /// [`crate::CustomChild`]'s [`crate::Style`]. The returned variant need
+    /// not match the declared context; see the trait-level docs for how
+    /// mismatches are handled.
     ///
     /// - A block box is expected to be positioned at the origin; the engine
     ///   translates it to its final position.

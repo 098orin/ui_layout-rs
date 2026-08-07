@@ -10,10 +10,6 @@ struct MockBlock {
 }
 
 impl CustomLayouter for MockBlock {
-    fn formatting_context(&self) -> OuterDisplay {
-        OuterDisplay::Block
-    }
-
     fn layout(&mut self, ctx: &LayoutContext) -> LayoutBox {
         let w = ctx
             .available_width
@@ -35,7 +31,7 @@ impl CustomLayouter for MockBlock {
 }
 
 fn block_child(w: f32, h: f32) -> LayoutChild {
-    LayoutChild::from(MockBlock {
+    custom_block(MockBlock {
         width: w,
         height: h,
     })
@@ -409,7 +405,7 @@ fn block_with_margin() {
             },
             ..Default::default()
         },
-        [LayoutChild::from(MockBlock {
+        [custom_block(MockBlock {
             width: 100.0,
             height: 40.0,
         })],
@@ -436,7 +432,7 @@ fn block_with_padding() {
             },
             ..Default::default()
         },
-        [LayoutChild::from(MockBlock {
+        [custom_block(MockBlock {
             width: 100.0,
             height: 40.0,
         })],
@@ -463,7 +459,7 @@ fn block_with_border() {
             },
             ..Default::default()
         },
-        [LayoutChild::from(MockBlock {
+        [custom_block(MockBlock {
             width: 100.0,
             height: 40.0,
         })],
@@ -491,11 +487,11 @@ fn block_in_flow_with_margin_collapse() {
             ..Default::default()
         },
         [
-            LayoutChild::from(MockBlock {
+            custom_block(MockBlock {
                 width: 100.0,
                 height: 30.0,
             }),
-            LayoutChild::from(MockBlock {
+            custom_block(MockBlock {
                 width: 100.0,
                 height: 30.0,
             }),

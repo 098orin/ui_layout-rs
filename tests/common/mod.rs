@@ -73,6 +73,32 @@ pub fn rect(x: f32, y: f32, width: f32, height: f32) -> Rect {
     }
 }
 
+fn style_with_outer(outer: OuterDisplay) -> Style {
+    Style {
+        display: Display {
+            outer,
+            ..Default::default()
+        },
+        ..Default::default()
+    }
+}
+
+/// Wraps an inline-level [`CustomLayouter`] object as a [`LayoutChild::Custom`].
+pub fn custom_inline(obj: impl CustomLayouter + 'static) -> LayoutChild {
+    LayoutChild::from((style_with_outer(OuterDisplay::Inline), obj))
+}
+
+/// Wraps a block-level [`CustomLayouter`] object as a [`LayoutChild::Custom`].
+pub fn custom_block(obj: impl CustomLayouter + 'static) -> LayoutChild {
+    LayoutChild::from((style_with_outer(OuterDisplay::Block), obj))
+}
+
+/// Wraps a hidden (display: none) [`CustomLayouter`] object as a
+/// [`LayoutChild::Custom`].
+pub fn custom_none(obj: impl CustomLayouter + 'static) -> LayoutChild {
+    LayoutChild::from((style_with_outer(OuterDisplay::None), obj))
+}
+
 pub fn approx_eq(a: f32, b: f32) -> bool {
     (a - b).abs() < 0.01
 }

@@ -15,21 +15,25 @@ and this project loosely follows Semantic Versioning.
   `layout_block` methods with a single unified entry point that returns a
   [`LayoutBox`] (`BlockBox` for block-level objects, `InlineBox` for inline
   objects, `None` for nothing).
-- **`CustomLayouter::formatting_context()`**: custom objects now declare how they
-  participate in their parent's formatting context.
+- **`CustomChild` carries its own `Style`**: the object's participation in its
+  parent's formatting context is now declared by the style's `display`, exactly
+  as for a childless [`LayoutNode`].
   - `OuterDisplay::Block` → the object is laid out as a block (forces a new line
     and stacks vertically).
   - `OuterDisplay::Inline` → the object is laid out inline (shares the current
     line).
   - `OuterDisplay::None` → the object is skipped (display: none).
+  - `CustomChild::new` / `CustomChild::from_box` take the [`Style`] as their
+    first argument, and `LayoutChild::from((Style, L))` builds a custom child
+    from a style and a [`CustomLayouter`].
 - **Graceful `LayoutBox` mismatches**: the returned [`LayoutBox`] variant need
-  not match the declared `formatting_context`.
+  not match the display declared by the custom child's style.
   - An inline-level object returning `BlockBox` is placed atomically on the
     current line like a fragment (the box is never split; it wraps whole to the
     next line when it does not fit), with its `box_model` shifted to the placed
     position.
   - A block-level object returning `InlineBox` is wrapped in an anonymous block
-    box: its `box_model` is placed on its own line and its `spans` are preserved
+  box: its `box_model` is placed on its own line and its `spans` are preserved
     in the result.
 - **Block-level custom objects in flow**: the engine now dispatches block layout
   for custom children reporting `OuterDisplay::Block`, placing them like
@@ -38,6 +42,13 @@ and this project loosely follows Semantic Versioning.
   child as a [`CustomObjectResult`] (`spans` for inline objects, `box_model` for
   block/flex placement), observable via `LayoutChild::Custom` without
   downcasting.
+
+### Removed
+
+- **`CustomLayouter::formatting_context()`**: custom objects no longer report
+  their formatting context from the trait. The engine reads the resolved
+  [`Display`] from the [`Style`] carried by the wrapping [`CustomChild`], so
+  custom children participate exactly like childless [`LayoutNode`]s.
 - **Flex custom result**: `position_flex_custom` now records the final
   border-box rect of custom flex items instead of discarding it.
 
