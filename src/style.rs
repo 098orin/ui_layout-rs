@@ -423,6 +423,18 @@ impl Default for ItemStyle {
     }
 }
 
+/// How a block-level replaced element (a node wrapping exactly one
+/// [`LayoutChild::Custom`], e.g. `<button>/<img>/<input>`) resolves an
+/// `auto` width/height.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum AutoSizeBehavior {
+    /// Stretch to the containing block and fill the available space.
+    #[default]
+    Fill,
+    /// Shrink to the custom child's intrinsic-based box.
+    ShrinkToFit,
+}
+
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct SizeStyle {
     pub width: LengthOrAuto,
@@ -436,6 +448,8 @@ pub struct SizeStyle {
     /// Used to derive the missing axis when only one of `width` / `height`
     /// is resolved. Takes precedence over the object's intrinsic ratio.
     pub aspect_ratio: Option<f32>,
+    /// How `auto` width/height resolve for a block replaced-element leaf.
+    pub auto_behavior: AutoSizeBehavior,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]

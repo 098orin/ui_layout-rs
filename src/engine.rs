@@ -1,7 +1,7 @@
 use crate::{
-    AlignItems, BoxModel, BoxSizing, CustomObjectResult, FlexDirection, FragmentNode, InlineBox,
-    InnerDisplay, ItemFragment, JustifyContent, LayoutBox, LayoutChild, LayoutNode, LengthOrAuto,
-    LineSpan, OuterDisplay, Placement, Rect, Spacing, Style,
+    AlignItems, AutoSizeBehavior, BoxModel, BoxSizing, CustomObjectResult, FlexDirection,
+    FragmentNode, InlineBox, InnerDisplay, ItemFragment, JustifyContent, LayoutBox, LayoutChild,
+    LayoutNode, LengthOrAuto, LineSpan, OuterDisplay, Placement, Rect, Spacing, Style,
 };
 
 const EPSILON: f32 = 0.001;
@@ -1266,20 +1266,24 @@ impl LayoutEngine {
             }
         } else {
             // A block-level node wrapping exactly one custom child behaves as
-            // a replaced element (e.g. <button>/<img>/<input>): when its
-            // width/height are `auto` it shrink-wraps to the custom child's
+            // a replaced element (e.g. <button>/<img>/<input>). When
+            // `SizeStyle::auto_behavior` is `AutoSizeBehavior::ShrinkToFit`,
+            // an `auto` width/height shrink-wraps to the custom child's
             // intrinsic-based box instead of stretching to the containing
-            // block.  This also lets `margin: auto` center such elements.
+            // block (which also lets `margin: auto` center such elements).
+            // The default is `AutoSizeBehavior::Fill`, i.e. stretch.
             // `content_width_opt` may already be Some(available_width) for an
             // `auto` size, so the explicit-ness is read from the style and the
             // parent assignment (flex) instead.
             let is_custom_leaf = node.style.display.outer == OuterDisplay::Block
                 && matches!(&node.children[..], [LayoutChild::Custom(_)]);
+            let shrink_to_fit = is_custom_leaf
+                && node.style.size.auto_behavior == AutoSizeBehavior::ShrinkToFit;
             let width_auto = matches!(node.style.size.width, LengthOrAuto::Auto);
             let height_auto = matches!(node.style.size.height, LengthOrAuto::Auto);
 
             let content_width =
-                if is_custom_leaf && width_auto && ctx.parent_assigned_border_width.is_none() {
+                if shrink_to_fit && width_auto && ctx.parent_assigned_border_width.is_none() {
                     (children_width - pb_w).max(0.0)
                 } else {
                     content_width_opt.unwrap_or(children_width)
@@ -1291,7 +1295,7 @@ impl LayoutEngine {
             let bottom_collapses =
                 collapse_margins && border.bottom == 0.0 && padding.bottom == 0.0;
 
-            let content_height = if is_custom_leaf
+            let content_height = if shrink_to_fit
                 && height_auto
                 && ctx.parent_assigned_border_height.is_none()
             {

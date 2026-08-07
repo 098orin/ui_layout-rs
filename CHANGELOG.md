@@ -11,6 +11,13 @@ and this project loosely follows Semantic Versioning.
 
 ### Added
 
+- **`AutoSizeBehavior` + `SizeStyle::auto_behavior`**: controls how a block
+  replaced-element leaf (a block-level node wrapping exactly one
+  `LayoutChild::Custom`, e.g. `<button>/<img>/<input>`) resolves an `auto`
+  width/height.
+  - `AutoSizeBehavior::Fill` (default) — stretches to the containing block.
+  - `AutoSizeBehavior::ShrinkToFit` — shrinks to the custom child's
+    intrinsic-based box, which also lets `margin: auto` center such elements.
 - **`CustomLayouter::layout()`**: replaces the separate `layout_flow` /
   `layout_block` methods with a single unified entry point that returns a
   [`LayoutBox`] (`BlockBox` for block-level objects, `InlineBox` for inline
@@ -43,14 +50,12 @@ and this project loosely follows Semantic Versioning.
   block/flex placement), observable via `LayoutChild::Custom` without
   downcasting.
 
-### Fixed
+### Changed
 
-- **Block custom leaves shrink-to-fit**: a block-level node wrapping exactly one
-  `LayoutChild::Custom` behaves as a replaced element (e.g. `<button>/<img>/
-  <input>`): when its width/height are `auto` it shrinks to the custom child's
-  intrinsic-based box instead of stretching to the containing block. This also
-  lets `margin: auto` center such elements. Flex-assigned sizes and explicit
-  widths/heights are still honored.
+- **Block replaced-element leaves no longer shrink-to-fit by default**: `auto`
+  width/height now stretch to the containing block (`AutoSizeBehavior::Fill`).
+  Opt into shrink-to-fit per-style via `SizeStyle::auto_behavior =
+  AutoSizeBehavior::ShrinkToFit`.
 
 ### Removed
 

@@ -629,17 +629,97 @@ fn flex_item_inline_block_with_custom_child_gets_intrinsic_width() {
 }
 
 // ========================
-// Replaced-element leaf shrink-to-fit
+// Replaced-element leaf auto-size behavior
 // ========================
 
-/// A block-level node wrapping exactly one custom child behaves as a
-/// replaced element (e.g. `<button>/<img>/<input>`): `auto` width/height
-/// shrink to the custom child's intrinsic-based box instead of stretching
+/// A [`Style`] that opts a block replaced-element leaf into shrink-to-fit.
+fn shrink_style() -> Style {
+    Style {
+        size: SizeStyle {
+            auto_behavior: AutoSizeBehavior::ShrinkToFit,
+            ..Default::default()
+        },
+        ..Default::default()
+    }
+}
+
+/// By default (`AutoSizeBehavior::Fill`) a block replaced-element leaf
+/// stretches to the containing block, like any block box.
+#[test]
+fn block_custom_leaf_default_auto_size_fills_parent() {
+    let leaf = LayoutNode::with_children(
+        Style::default(),
+        [custom_block(BlockBox {
+            width: 80.0,
+            height: 30.0,
+        })],
+    );
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Length(Length::Px(100.0)),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        [leaf],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    // Auto width fills the containing block; auto height follows content.
+    let leaf = node(&root, 0);
+    let b = block_box(leaf);
+    assert_eq!(b.border_box.width, 200.0);
+    assert_eq!(b.border_box.height, 30.0);
+}
+
+/// With `AutoSizeBehavior::Fill` (the default), `margin: auto` cannot center
+/// a block replaced-element leaf because it fills the whole line.
+#[test]
+fn block_custom_leaf_fill_auto_margins_do_not_center() {
+    let leaf = LayoutNode::with_children(
+        Style {
+            spacing: Spacing {
+                margin_left: LengthOrAuto::Auto,
+                margin_right: LengthOrAuto::Auto,
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        [custom_block(BlockBox {
+            width: 80.0,
+            height: 30.0,
+        })],
+    );
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Length(Length::Px(100.0)),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        [leaf],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    let leaf = node(&root, 0);
+    let b = block_box(leaf);
+    assert_eq!(b.border_box.width, 200.0);
+    assert_eq!(b.border_box.x, 0.0);
+}
+
+/// With `AutoSizeBehavior::ShrinkToFit`, a block replaced-element leaf
+/// shrinks to the custom child's intrinsic-based box instead of stretching
 /// to the containing block.
 #[test]
 fn block_custom_leaf_auto_size_shrink_wraps_to_child() {
     let mut leaf = LayoutNode::with_children(
-        Style::default(),
+        shrink_style(),
         [custom_block(BlockBox {
             width: 80.0,
             height: 30.0,
@@ -659,6 +739,10 @@ fn block_custom_leaf_auto_size_shrink_wraps_to_child() {
 fn block_custom_leaf_padding_keeps_border_box_at_child_extent() {
     let mut leaf = LayoutNode::with_children(
         Style {
+            size: SizeStyle {
+                auto_behavior: AutoSizeBehavior::ShrinkToFit,
+                ..Default::default()
+            },
             spacing: Spacing {
                 padding_left: Length::Px(20.0),
                 padding_right: Length::Px(20.0),
@@ -688,6 +772,10 @@ fn block_custom_leaf_padding_keeps_border_box_at_child_extent() {
 fn block_custom_leaf_auto_margins_center_within_parent() {
     let leaf = LayoutNode::with_children(
         Style {
+            size: SizeStyle {
+                auto_behavior: AutoSizeBehavior::ShrinkToFit,
+                ..Default::default()
+            },
             spacing: Spacing {
                 margin_left: LengthOrAuto::Auto,
                 margin_right: LengthOrAuto::Auto,
@@ -727,6 +815,7 @@ fn block_custom_leaf_explicit_width_not_shrunk() {
         Style {
             size: SizeStyle {
                 width: LengthOrAuto::Length(Length::Px(300.0)),
+                auto_behavior: AutoSizeBehavior::ShrinkToFit,
                 ..Default::default()
             },
             ..Default::default()
@@ -748,6 +837,10 @@ fn block_custom_leaf_explicit_width_not_shrunk() {
 fn flex_keeps_custom_leaf_at_assigned_main_size() {
     let leaf = LayoutNode::with_children(
         Style {
+            size: SizeStyle {
+                auto_behavior: AutoSizeBehavior::ShrinkToFit,
+                ..Default::default()
+            },
             item_style: ItemStyle {
                 flex_grow: 1.0,
                 ..Default::default()

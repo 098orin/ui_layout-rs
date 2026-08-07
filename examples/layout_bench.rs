@@ -22,6 +22,7 @@ fn make_node(is_flex: bool) -> LayoutNode {
             min_height: LengthOrAuto::Length(Length::Px(0.0)),
             max_height: LengthOrAuto::Length(Length::Px(10_000.0)),
             aspect_ratio: None,
+            auto_behavior: AutoSizeBehavior::Fill,
         },
         spacing: Spacing {
             margin_left: LengthOrAuto::Length(Length::Px(2.0)),
