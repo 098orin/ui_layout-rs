@@ -516,6 +516,34 @@ pub enum AlignItems {
     Stretch,
 }
 
+/// Controls whether a box participates in normal flow and establishes a
+/// containing block for positioned descendants.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum Position {
+    #[default]
+    Static,
+    Relative,
+    Absolute,
+    Fixed,
+}
+
+impl Position {
+    /// Returns whether the box is removed from normal flow.
+    pub fn is_out_of_flow(self) -> bool {
+        matches!(self, Self::Absolute | Self::Fixed)
+    }
+}
+
+/// Positioning mode and offsets used to place a box.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct PositionStyle {
+    pub kind: Position,
+    pub top: LengthOrAuto,
+    pub right: LengthOrAuto,
+    pub bottom: LengthOrAuto,
+    pub left: LengthOrAuto,
+}
+
 trait PercentCheck {
     fn is_pct(&self) -> bool;
 }
@@ -535,6 +563,8 @@ impl PercentCheck for LengthOrAuto {
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Style {
     pub display: Display,
+
+    pub position: PositionStyle,
 
     pub item_style: ItemStyle,
     pub size: SizeStyle,
@@ -575,6 +605,10 @@ impl Style {
             || self.column_gap.is_pct()
             || self.row_gap.is_pct()
             || self.line_height.is_pct()
+            || self.position.top.is_pct()
+            || self.position.right.is_pct()
+            || self.position.bottom.is_pct()
+            || self.position.left.is_pct()
     }
 }
 
