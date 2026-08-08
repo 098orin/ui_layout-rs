@@ -108,3 +108,93 @@ fn auto_track_uses_item_intrinsic_width() {
     assert_eq!(block_box(node(&root, 1)).border_box.x, 50.0);
     assert_eq!(block_box(node(&root, 1)).border_box.width, 200.0);
 }
+
+#[test]
+fn fixed_repeat_expands_track_pattern() {
+    let style = grid_container(
+        300.0,
+        vec![GridTrack::Repeat(
+            GridRepeat::Count(3),
+            vec![GridTrack::Flex(1.0)],
+        )],
+    );
+    let mut root =
+        LayoutNode::with_children(style, [new_child(10.0), new_child(10.0), new_child(10.0)]);
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    assert_eq!(block_box(node(&root, 0)).border_box.x, 0.0);
+    assert_eq!(block_box(node(&root, 1)).border_box.x, 100.0);
+    assert_eq!(block_box(node(&root, 2)).border_box.x, 200.0);
+}
+
+#[test]
+fn auto_fit_minmax_collapses_empty_tracks() {
+    let mut style = grid_container(
+        550.0,
+        vec![GridTrack::Repeat(
+            GridRepeat::AutoFit,
+            vec![GridTrack::MinMax(
+                Box::new(GridTrack::Breadth(LengthOrAuto::Length(Length::Px(100.0)))),
+                Box::new(GridTrack::Flex(1.0)),
+            )],
+        )],
+    );
+    style.column_gap = LengthOrAuto::Length(Length::Px(10.0));
+    let mut root =
+        LayoutNode::with_children(style, [new_child(10.0), new_child(10.0), new_child(10.0)]);
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    assert!((block_box(node(&root, 0)).border_box.width - 176.66667).abs() < 0.01);
+    assert!((block_box(node(&root, 1)).border_box.x - 186.66667).abs() < 0.01);
+    assert!((block_box(node(&root, 2)).border_box.x - 373.33334).abs() < 0.01);
+}
+
+#[test]
+fn named_areas_place_and_span_items() {
+    let mut style = grid_container(300.0, vec![GridTrack::Flex(1.0), GridTrack::Flex(2.0)]);
+    style.grid_template_areas = vec![
+        vec!["header".into(), "header".into()],
+        vec!["sidebar".into(), "main".into()],
+        vec!["footer".into(), "footer".into()],
+    ];
+    let item = |area: &str| {
+        LayoutNode::new(Style {
+            grid_area: Some(area.into()),
+            size: SizeStyle {
+                height: LengthOrAuto::Length(Length::Px(20.0)),
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+    };
+    let mut root = LayoutNode::with_children(
+        style,
+        [
+            item("header"),
+            item("sidebar"),
+            item("main"),
+            item("footer"),
+        ],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    assert_eq!(
+        block_box(node(&root, 0)).border_box,
+        rect(0.0, 0.0, 300.0, 20.0)
+    );
+    assert_eq!(
+        block_box(node(&root, 1)).border_box,
+        rect(0.0, 20.0, 100.0, 20.0)
+    );
+    assert_eq!(
+        block_box(node(&root, 2)).border_box,
+        rect(100.0, 20.0, 200.0, 20.0)
+    );
+    assert_eq!(
+        block_box(node(&root, 3)).border_box,
+        rect(0.0, 40.0, 300.0, 20.0)
+    );
+}

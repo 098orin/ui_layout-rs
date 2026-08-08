@@ -1,11 +1,12 @@
 use crate::{
     AlignItems, AutoSizeBehavior, BoxModel, BoxSizing, CustomObjectResult, FlexDirection,
-    FragmentNode, GridPlacement, GridTrack, InlineBox, InnerDisplay, ItemFragment, JustifyContent,
-    LayoutBox, LayoutChild, LayoutNode, LengthOrAuto, LineSpan, OuterDisplay, Placement, Rect,
-    Spacing, Style,
+    FragmentNode, GridPlacement, GridRepeat, GridTrack, InlineBox, InnerDisplay, ItemFragment,
+    JustifyContent, LayoutBox, LayoutChild, LayoutNode, LengthOrAuto, LineSpan, OuterDisplay,
+    Placement, Rect, Spacing, Style,
 };
 
 const EPSILON: f32 = 0.001;
+const MAX_GRID_TRACKS: usize = 10_000;
 
 //=====================
 // Benchmark
@@ -685,7 +686,30 @@ impl LayoutEngine {
         let items: Vec<_> = LayoutItems::new(&node.children)
             .filter(|item| item_participates_in_normal_flow(&node.children, item))
             .collect();
-        let mut slots = build_grid_slots(node, items);
+        let columns = expand_grid_tracks(
+            &node.style.grid_template_columns,
+            available_width,
+            column_gap,
+            items.len(),
+            self.viewport_width,
+            self.viewport_height,
+        );
+        let rows = expand_grid_tracks(
+            &node.style.grid_template_rows,
+            content_height_opt,
+            row_gap,
+            items.len(),
+            self.viewport_width,
+            self.viewport_height,
+        );
+        let area_column_count = node
+            .style
+            .grid_template_areas
+            .iter()
+            .map(Vec::len)
+            .max()
+            .unwrap_or(0);
+        let mut slots = build_grid_slots(node, items, columns.len().max(area_column_count));
 
         for slot in &mut slots {
             let (width, height) =
@@ -699,14 +723,16 @@ impl LayoutEngine {
             .map(|slot| slot.column + slot.column_span)
             .max()
             .unwrap_or(1)
-            .max(node.style.grid_template_columns.len())
+            .max(columns.len())
+            .max(area_column_count)
             .max(1);
         let row_count = slots
             .iter()
             .map(|slot| slot.row + slot.row_span)
             .max()
             .unwrap_or(1)
-            .max(node.style.grid_template_rows.len())
+            .max(rows.len())
+            .max(node.style.grid_template_areas.len())
             .max(1);
 
         let mut column_intrinsic = vec![0.0f32; column_count];
@@ -722,7 +748,7 @@ impl LayoutEngine {
         }
 
         let columns = resolve_grid_tracks(
-            &node.style.grid_template_columns,
+            &columns,
             column_count,
             available_width,
             column_gap,
@@ -731,7 +757,7 @@ impl LayoutEngine {
             self.viewport_height,
         );
         let rows = resolve_grid_tracks(
-            &node.style.grid_template_rows,
+            &rows,
             row_count,
             content_height_opt,
             row_gap,
@@ -3192,8 +3218,12 @@ fn compute_flex_remaining(
     .unwrap_or(0.0)
 }
 
-fn build_grid_slots(node: &LayoutNode, items: Vec<LayoutItem>) -> Vec<GridItemSlot> {
-    let mut column_count = node.style.grid_template_columns.len().max(1);
+fn build_grid_slots(
+    node: &LayoutNode,
+    items: Vec<LayoutItem>,
+    explicit_column_count: usize,
+) -> Vec<GridItemSlot> {
+    let mut column_count = explicit_column_count.max(1);
     for item in &items {
         let (column, _) = grid_item_placements(node, item);
         if let Some(start) = column.start {
@@ -3284,9 +3314,42 @@ fn grid_item_placements(node: &LayoutNode, item: &LayoutItem) -> (GridPlacement,
             .map(|child| child.style()),
         LayoutItem::Fragments(_) => None,
     };
-    style
-        .map(|style| (style.grid_column, style.grid_row))
-        .unwrap_or_default()
+    let Some(style) = style else {
+        return Default::default();
+    };
+    if let Some(area) = style.grid_area.as_deref()
+        && let Some(placement) = named_grid_area(&node.style.grid_template_areas, area)
+    {
+        return placement;
+    }
+    (style.grid_column, style.grid_row)
+}
+
+fn named_grid_area(areas: &[Vec<String>], name: &str) -> Option<(GridPlacement, GridPlacement)> {
+    let mut min_column = usize::MAX;
+    let mut max_column = 0;
+    let mut min_row = usize::MAX;
+    let mut max_row = 0;
+    for (row, names) in areas.iter().enumerate() {
+        for (column, area) in names.iter().enumerate() {
+            if area == name {
+                min_column = min_column.min(column);
+                max_column = max_column.max(column);
+                min_row = min_row.min(row);
+                max_row = max_row.max(row);
+            }
+        }
+    }
+    (min_column != usize::MAX).then_some((
+        GridPlacement {
+            start: Some(min_column + 1),
+            span: max_column - min_column + 1,
+        },
+        GridPlacement {
+            start: Some(min_row + 1),
+            span: max_row - min_row + 1,
+        },
+    ))
 }
 
 fn grid_cells_available(
@@ -3325,6 +3388,89 @@ fn mark_grid_cells(
 }
 
 #[allow(clippy::too_many_arguments)]
+fn expand_grid_tracks(
+    tracks: &[GridTrack],
+    available: Option<f32>,
+    gap: f32,
+    item_count: usize,
+    viewport_width: f32,
+    viewport_height: f32,
+) -> Vec<GridTrack> {
+    let mut expanded = Vec::new();
+    for track in tracks {
+        let GridTrack::Repeat(repeat, pattern) = track else {
+            expanded.push(track.clone());
+            continue;
+        };
+        if pattern.is_empty() {
+            continue;
+        }
+        let count = match repeat {
+            GridRepeat::Count(count) => *count,
+            GridRepeat::AutoFit | GridRepeat::AutoFill => {
+                let pattern_width = pattern
+                    .iter()
+                    .map(|track| {
+                        grid_track_minimum(track, available, viewport_width, viewport_height)
+                    })
+                    .sum::<f32>()
+                    + gap * pattern.len().saturating_sub(1) as f32;
+                let fit = if pattern_width <= EPSILON {
+                    1
+                } else {
+                    available
+                        .map(|available| {
+                            ((available + gap) / (pattern_width + gap)).floor() as usize
+                        })
+                        .unwrap_or(1)
+                        .max(1)
+                };
+                match repeat {
+                    GridRepeat::AutoFit => fit.min(item_count.div_ceil(pattern.len()).max(1)),
+                    GridRepeat::AutoFill => fit,
+                    GridRepeat::Count(_) => unreachable!(),
+                }
+            }
+        }
+        .min(MAX_GRID_TRACKS / pattern.len());
+        for _ in 0..count {
+            expanded.extend(pattern.iter().cloned());
+        }
+    }
+    expanded
+}
+
+fn grid_track_minimum(
+    track: &GridTrack,
+    available: Option<f32>,
+    viewport_width: f32,
+    viewport_height: f32,
+) -> f32 {
+    match track {
+        GridTrack::Breadth(breadth) => breadth
+            .resolve_with(available, viewport_width, viewport_height)
+            .unwrap_or(0.0)
+            .max(0.0),
+        GridTrack::Flex(_) => 0.0,
+        GridTrack::MinMax(minimum, _) => {
+            grid_track_minimum(minimum, available, viewport_width, viewport_height)
+        }
+        GridTrack::Repeat(_, pattern) => pattern
+            .iter()
+            .map(|track| grid_track_minimum(track, available, viewport_width, viewport_height))
+            .sum(),
+    }
+}
+
+fn grid_track_flex_factor(track: &GridTrack) -> f32 {
+    match track {
+        GridTrack::Flex(factor) => factor.max(0.0),
+        GridTrack::MinMax(_, maximum) => grid_track_flex_factor(maximum),
+        _ => 0.0,
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
 fn resolve_grid_tracks(
     explicit: &[GridTrack],
     count: usize,
@@ -3350,6 +3496,27 @@ fn resolve_grid_tracks(
                     sizes[index] = intrinsic[index];
                 }
             }
+            GridTrack::MinMax(minimum, maximum) => {
+                let minimum =
+                    grid_track_minimum(&minimum, available, viewport_width, viewport_height);
+                let factor = grid_track_flex_factor(&maximum);
+                flex_total += factor;
+                sizes[index] = minimum.max(if available.is_none() {
+                    intrinsic[index]
+                } else {
+                    0.0
+                });
+                if factor == 0.0 {
+                    sizes[index] = match maximum.as_ref() {
+                        GridTrack::Breadth(breadth) => breadth
+                            .resolve_with(available, viewport_width, viewport_height)
+                            .unwrap_or(intrinsic[index]),
+                        _ => intrinsic[index],
+                    }
+                    .max(minimum);
+                }
+            }
+            GridTrack::Repeat(_, _) => unreachable!("grid repeats must be expanded first"),
         }
     }
 
@@ -3359,8 +3526,11 @@ fn resolve_grid_tracks(
         let gaps = gap * count.saturating_sub(1) as f32;
         let remaining = (available - gaps - sizes.iter().sum::<f32>()).max(0.0);
         for (index, size) in sizes.iter_mut().enumerate() {
-            if let Some(GridTrack::Flex(factor)) = explicit.get(index) {
-                *size = remaining * factor.max(0.0) / flex_total;
+            if let Some(track) = explicit.get(index) {
+                let factor = grid_track_flex_factor(track);
+                if factor > 0.0 {
+                    *size += remaining * factor / flex_total;
+                }
             }
         }
     }
