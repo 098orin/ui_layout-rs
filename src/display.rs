@@ -60,6 +60,7 @@ impl fmt::Display for InnerDisplay {
             InnerDisplay::Flow => write!(f, "flow"),
             InnerDisplay::FlowRoot => write!(f, "flow-root"),
             InnerDisplay::Flex => write!(f, "flex"),
+            InnerDisplay::Grid => write!(f, "grid"),
         }
     }
 }
@@ -74,6 +75,8 @@ impl fmt::Display for Display {
             (OuterDisplay::Inline, InnerDisplay::FlowRoot) => write!(f, "inline-block"),
             (OuterDisplay::Block, InnerDisplay::Flex) => write!(f, "flex"),
             (OuterDisplay::Inline, InnerDisplay::Flex) => write!(f, "inline-flex"),
+            (OuterDisplay::Block, InnerDisplay::Grid) => write!(f, "grid"),
+            (OuterDisplay::Inline, InnerDisplay::Grid) => write!(f, "inline-grid"),
             (outer, inner) => write!(f, "{} {}", outer, inner),
         }
     }
