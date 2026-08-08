@@ -469,6 +469,16 @@ impl LayoutEngine {
         };
 
         let _ = engine.layout_node(root, &ctx, EMPTY_LINE_CONTEXT, false);
+        engine.apply_positioning(
+            root,
+            (0.0, 0.0),
+            Rect {
+                x: 0.0,
+                y: 0.0,
+                width,
+                height,
+            },
+        );
 
         #[cfg(feature = "layout-bench")]
         println!(
@@ -814,6 +824,16 @@ impl LayoutEngine {
             LayoutChild::Node(n) => n,
             _ => unreachable!(),
         };
+
+        if child_node.style.position.kind.is_out_of_flow() {
+            let _ = self.layout_node(
+                child_node,
+                base_ctx_for_child,
+                EMPTY_LINE_CONTEXT,
+                state.intrinsic_pass,
+            );
+            return;
+        }
 
         let child_margin = self.resolve_margin(&child_node.style.spacing, ctx);
 
@@ -1523,8 +1543,12 @@ impl LayoutEngine {
         intrinsic_pass: bool,
         base_ctx_for_children: &InternalLayoutContext,
     ) -> (f32, f32) {
-        let children_count = node.children.len();
-        if children_count == 0 {
+        self.layout_out_of_flow_node_children(node, base_ctx_for_children, intrinsic_pass);
+
+        let flex_items: Vec<_> = LayoutItems::new(&node.children)
+            .filter(|item| item_participates_in_normal_flow(&node.children, item))
+            .collect();
+        if flex_items.is_empty() {
             return (0.0, 0.0);
         }
 
@@ -1539,7 +1563,6 @@ impl LayoutEngine {
             .max(0.0);
 
         // --------- Convert to FlexItem ----------
-        let flex_items: Vec<_> = LayoutItems::new(&node.children).collect();
         let item_len = flex_items.len();
 
         let mut states = vec![FlexItemState::default(); item_len];
@@ -1660,6 +1683,9 @@ impl LayoutEngine {
         let mut count = 0usize;
         for child in &node.children {
             if let crate::LayoutChild::Node(n) = child {
+                if n.style.position.kind.is_out_of_flow() {
+                    continue;
+                }
                 let spacing = &n.style.spacing;
                 match axis {
                     Axis::Horizontal => {
@@ -1978,7 +2004,9 @@ impl LayoutEngine {
             .unwrap_or(0.0)
             .max(0.0);
 
-        let items: Vec<_> = LayoutItems::new(&node.children).collect();
+        let items: Vec<_> = LayoutItems::new(&node.children)
+            .filter(|item| item_participates_in_normal_flow(&node.children, item))
+            .collect();
 
         let children_main_total = self.flex_children_main_total(node, axis, ctx, &items);
 
@@ -2041,6 +2069,133 @@ impl LayoutEngine {
                 LayoutItem::Custom(index) => {
                     self.position_flex_custom(node, axis, ctx, index, &mut placement)
                 }
+            }
+        }
+    }
+
+    fn layout_out_of_flow_node_children(
+        &self,
+        node: &mut LayoutNode,
+        ctx: &InternalLayoutContext,
+        intrinsic_pass: bool,
+    ) {
+        for child in &mut node.children {
+            let LayoutChild::Node(child) = child else {
+                continue;
+            };
+            if child.style.position.kind.is_out_of_flow() {
+                let _ = self.layout_node(child, ctx, EMPTY_LINE_CONTEXT, intrinsic_pass);
+            }
+        }
+    }
+
+    /// Applies relative and out-of-flow offsets after normal sizing is complete.
+    /// Coordinates passed to children are absolute solely for resolving a
+    /// positioned descendant against an ancestor containing block; stored box
+    /// coordinates remain relative to the direct parent's content box.
+    fn apply_positioning(
+        &self,
+        node: &mut LayoutNode,
+        parent_content_origin: (f32, f32),
+        containing_block: Rect,
+    ) {
+        let Some(initial_box) = node.layout_box.iter().next() else {
+            return;
+        };
+        let initial_border = initial_box.border_box;
+        let border_size = initial_border.size();
+
+        let offset_basis = if node.style.position.kind == crate::Position::Fixed {
+            (self.viewport_width, self.viewport_height)
+        } else {
+            (containing_block.width, containing_block.height)
+        };
+        let resolve_x = |value: &LengthOrAuto| {
+            value.resolve_with(
+                Some(offset_basis.0),
+                self.viewport_width,
+                self.viewport_height,
+            )
+        };
+        let resolve_y = |value: &LengthOrAuto| {
+            value.resolve_with(
+                Some(offset_basis.1),
+                self.viewport_width,
+                self.viewport_height,
+            )
+        };
+
+        let left = resolve_x(&node.style.position.left);
+        let right = resolve_x(&node.style.position.right);
+        let top = resolve_y(&node.style.position.top);
+        let bottom = resolve_y(&node.style.position.bottom);
+
+        let (dx, dy) = match node.style.position.kind {
+            crate::Position::Static => (0.0, 0.0),
+            crate::Position::Relative => (
+                left.unwrap_or_else(|| -right.unwrap_or_default()),
+                top.unwrap_or_else(|| -bottom.unwrap_or_default()),
+            ),
+            crate::Position::Absolute | crate::Position::Fixed => {
+                let target = if node.style.position.kind == crate::Position::Fixed {
+                    Rect {
+                        x: 0.0,
+                        y: 0.0,
+                        width: self.viewport_width,
+                        height: self.viewport_height,
+                    }
+                } else {
+                    containing_block
+                };
+                let target_x = if let Some(left) = left {
+                    target.x + left
+                } else if let Some(right) = right {
+                    target.right() - right - border_size.0
+                } else {
+                    parent_content_origin.0 + initial_border.x
+                };
+                let target_y = if let Some(top) = top {
+                    target.y + top
+                } else if let Some(bottom) = bottom {
+                    target.bottom() - bottom - border_size.1
+                } else {
+                    parent_content_origin.1 + initial_border.y
+                };
+                (
+                    target_x - parent_content_origin.0 - initial_border.x,
+                    target_y - parent_content_origin.1 - initial_border.y,
+                )
+            }
+        };
+
+        node.layout_box.shift(dx, dy);
+
+        let Some(positioned_box) = node.layout_box.iter().next() else {
+            return;
+        };
+        let border = positioned_box.border_box;
+        let border_origin = (
+            parent_content_origin.0 + border.x,
+            parent_content_origin.1 + border.y,
+        );
+        let content_origin = (
+            border_origin.0 + positioned_box.content_box.x - border.x,
+            border_origin.1 + positioned_box.content_box.y - border.y,
+        );
+        let child_containing_block = if node.style.position.kind == crate::Position::Static {
+            containing_block
+        } else {
+            Rect {
+                x: border_origin.0 + positioned_box.padding_box.x - border.x,
+                y: border_origin.1 + positioned_box.padding_box.y - border.y,
+                width: positioned_box.padding_box.width,
+                height: positioned_box.padding_box.height,
+            }
+        };
+
+        for child in &mut node.children {
+            if let LayoutChild::Node(child) = child {
+                self.apply_positioning(child, content_origin, child_containing_block);
             }
         }
     }
@@ -2833,6 +2988,19 @@ fn clamp_flex_main_size(
             (clamped_border - padding_border_main).max(0.0)
         }
         None => clamp(proposed_content, min, max),
+    }
+}
+
+fn item_participates_in_normal_flow(children: &[LayoutChild], item: &LayoutItem) -> bool {
+    match item {
+        LayoutItem::Node(index) => !children[*index]
+            .node()
+            .unwrap()
+            .style
+            .position
+            .kind
+            .is_out_of_flow(),
+        LayoutItem::Fragments(_) | LayoutItem::Custom(_) => true,
     }
 }
 
