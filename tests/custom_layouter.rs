@@ -853,10 +853,8 @@ fn flex_keeps_custom_leaf_at_assigned_main_size() {
         })],
     );
 
-    let mut root = LayoutNode::with_children(
-        flex_container(200.0, 50.0, FlexDirection::Row),
-        [leaf],
-    );
+    let mut root =
+        LayoutNode::with_children(flex_container(200.0, 50.0, FlexDirection::Row), [leaf]);
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
