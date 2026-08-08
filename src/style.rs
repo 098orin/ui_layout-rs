@@ -620,8 +620,10 @@ pub struct Style {
     pub align_items: AlignItems,
 
     pub flex_direction: FlexDirection,
+
     pub column_gap: LengthOrAuto,
     pub row_gap: LengthOrAuto,
+
     pub grid_template_columns: Vec<GridTrack>,
     pub grid_template_rows: Vec<GridTrack>,
     pub grid_column: GridPlacement,
