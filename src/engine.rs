@@ -598,13 +598,14 @@ impl LayoutEngine {
             content_width_opt
         } else {
             content_width_opt.or(ctx.available_width.map(|v| {
+                let padding_border_edge = border.left + border.right + padding.left + padding.right;
                 self.apply_size_constraints(
-                    v,
+                    v - padding_border_edge,
                     &node.style.size,
                     ctx,
                     true,
                     &node.style.box_sizing,
-                    border.left + border.right + padding.left + padding.right,
+                    padding_border_edge,
                 )
             }))
         };
