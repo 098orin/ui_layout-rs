@@ -198,3 +198,33 @@ fn named_areas_place_and_span_items() {
         rect(0.0, 40.0, 300.0, 20.0)
     );
 }
+
+#[test]
+fn grid_children_are_relative_to_padded_content_box() {
+    let mut style = grid_container(300.0, vec![GridTrack::Flex(1.0), GridTrack::Flex(1.0)]);
+    style.column_gap = LengthOrAuto::Length(Length::Px(10.0));
+    style.spacing = Spacing {
+        padding_left: Length::Px(10.0),
+        padding_right: Length::Px(10.0),
+        padding_top: Length::Px(10.0),
+        padding_bottom: Length::Px(10.0),
+        border_left: Length::Px(2.0),
+        border_right: Length::Px(2.0),
+        border_top: Length::Px(2.0),
+        border_bottom: Length::Px(2.0),
+        ..Default::default()
+    };
+    let mut root = LayoutNode::with_children(style, [new_child(20.0), new_child(20.0)]);
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    let root_box = block_box(&root);
+    assert_eq!(root_box.content_box.x, 12.0);
+    assert_eq!(root_box.content_box.y, 12.0);
+    assert_eq!(root_box.content_box.width, 300.0);
+    assert_eq!(root_box.border_box.width, 324.0);
+    assert_eq!(block_box(node(&root, 0)).border_box.x, 0.0);
+    assert_eq!(block_box(node(&root, 0)).border_box.y, 0.0);
+    assert_eq!(block_box(node(&root, 0)).border_box.width, 145.0);
+    assert_eq!(block_box(node(&root, 1)).border_box.x, 155.0);
+}

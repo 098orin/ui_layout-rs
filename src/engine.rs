@@ -794,7 +794,6 @@ impl LayoutEngine {
         ));
 
         if !intrinsic_pass {
-            let content_box = layout_box_content_box(&node.layout_box);
             self.place_grid_items(
                 node,
                 &slots,
@@ -802,7 +801,6 @@ impl LayoutEngine {
                 &rows,
                 column_gap,
                 row_gap,
-                content_box,
                 &base_ctx,
             );
         }
@@ -871,15 +869,12 @@ impl LayoutEngine {
         rows: &[f32],
         column_gap: f32,
         row_gap: f32,
-        content_box: Rect,
         base_ctx: &InternalLayoutContext,
     ) {
         for slot in slots {
-            let x = content_box.x
-                + columns[..slot.column].iter().sum::<f32>()
+            let x = columns[..slot.column].iter().sum::<f32>()
                 + column_gap * slot.column as f32;
-            let y =
-                content_box.y + rows[..slot.row].iter().sum::<f32>() + row_gap * slot.row as f32;
+            let y = rows[..slot.row].iter().sum::<f32>() + row_gap * slot.row as f32;
             let width = columns[slot.column..slot.column + slot.column_span]
                 .iter()
                 .sum::<f32>()
