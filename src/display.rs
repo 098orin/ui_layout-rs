@@ -33,6 +33,17 @@ impl fmt::Display for LengthOrAuto {
     }
 }
 
+impl fmt::Display for Position {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Position::Static => write!(f, "static"),
+            Position::Relative => write!(f, "relative"),
+            Position::Absolute => write!(f, "absolute"),
+            Position::Fixed => write!(f, "fixed"),
+        }
+    }
+}
+
 impl fmt::Display for OuterDisplay {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -227,6 +238,11 @@ fn collect_style_entries(style: &Style) -> Vec<String> {
     let mut entries: Vec<String> = Vec::new();
 
     entry_if!(entries, style.display, "display");
+    entry_if!(entries, style.position.kind, "position");
+    entry_if!(entries, style.position.top, "top");
+    entry_if!(entries, style.position.right, "right");
+    entry_if!(entries, style.position.bottom, "bottom");
+    entry_if!(entries, style.position.left, "left");
     entry_if!(entries, style.item_style.flex_grow, "flex-grow");
     entry_if!(entries, style.item_style.flex_shrink, "flex-shrink", 1.0);
     entry_if!(entries, style.item_style.flex_basis, "flex-basis");

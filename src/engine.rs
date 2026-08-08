@@ -578,9 +578,17 @@ impl LayoutEngine {
             };
         }
 
-        let content_width_opt = content_width_opt.or(ctx
-            .available_width
-            .map(|v| (v - border.left - border.right - padding.left - padding.right).max(0.0)));
+        // In-flow block boxes with an `auto` width stretch to the available
+        // width. Out-of-flow (absolute/fixed) boxes shrink-to-fit instead,
+        // so keep `auto` as `None` to let the inner display shrink-wrap
+        // around its content.
+        let content_width_opt = if node.style.position.kind.is_out_of_flow() {
+            content_width_opt
+        } else {
+            content_width_opt.or(ctx
+                .available_width
+                .map(|v| (v - border.left - border.right - padding.left - padding.right).max(0.0)))
+        };
 
         self.layout_by_inner_display(
             node,
@@ -722,7 +730,13 @@ impl LayoutEngine {
                     self.process_flow_node_item(node, i, ctx, &base_ctx_for_child, &mut state)
                 }
                 LayoutItem::Custom(i) => {
-                    match node.children[i].custom_child().unwrap().style().display.outer {
+                    match node.children[i]
+                        .custom_child()
+                        .unwrap()
+                        .style()
+                        .display
+                        .outer
+                    {
                         OuterDisplay::Inline => {
                             let mut ctx_for_child = crate::LayoutContext::from(&base_ctx_for_child);
                             ctx_for_child.start_pos = state.cursor.pos();
@@ -1297,8 +1311,8 @@ impl LayoutEngine {
             // parent assignment (flex) instead.
             let is_custom_leaf = node.style.display.outer == OuterDisplay::Block
                 && matches!(&node.children[..], [LayoutChild::Custom(_)]);
-            let shrink_to_fit = is_custom_leaf
-                && node.style.size.auto_behavior == AutoSizeBehavior::ShrinkToFit;
+            let shrink_to_fit =
+                is_custom_leaf && node.style.size.auto_behavior == AutoSizeBehavior::ShrinkToFit;
             let width_auto = matches!(node.style.size.width, LengthOrAuto::Auto);
             let height_auto = matches!(node.style.size.height, LengthOrAuto::Auto);
 
@@ -1315,18 +1329,16 @@ impl LayoutEngine {
             let bottom_collapses =
                 collapse_margins && border.bottom == 0.0 && padding.bottom == 0.0;
 
-            let content_height = if shrink_to_fit
-                && height_auto
-                && ctx.parent_assigned_border_height.is_none()
-            {
-                (children_height - pb_h).max(0.0)
-            } else {
-                content_height_opt.unwrap_or(if bottom_collapses {
-                    children_height - prev_child_margin
+            let content_height =
+                if shrink_to_fit && height_auto && ctx.parent_assigned_border_height.is_none() {
+                    (children_height - pb_h).max(0.0)
                 } else {
-                    children_height
-                })
-            };
+                    content_height_opt.unwrap_or(if bottom_collapses {
+                        children_height - prev_child_margin
+                    } else {
+                        children_height
+                    })
+                };
             let children_h = if bottom_collapses {
                 (children_height - prev_child_margin).max(0.0)
             } else {
@@ -2520,11 +2532,18 @@ impl LayoutEngine {
                     max_cross = max_cross.max(axis.tuple_cross((fragment_width, fragment_height)));
                 }
                 LayoutItem::Custom(index) => {
-                    let object = node.children.get_mut(*index).unwrap().custom_child().unwrap();
+                    let object = node
+                        .children
+                        .get_mut(*index)
+                        .unwrap()
+                        .custom_child()
+                        .unwrap();
                     if object.style().display.outer == OuterDisplay::None {
                         continue;
                     }
-                    let measured = object.layouter().measure(&crate::LayoutContext::from(base_ctx_for_children));
+                    let measured = object
+                        .layouter()
+                        .measure(&crate::LayoutContext::from(base_ctx_for_children));
                     let tuple = (measured.width, measured.height);
                     total_border_main += axis.tuple_main(tuple);
                     max_cross = max_cross.max(axis.tuple_cross(tuple));
@@ -3426,117 +3445,105 @@ pub fn resolve_custom_box_size(
         aspect_ratio.is_some_and(|r| r > 0.0) && (!width_specified || !height_specified);
 
     if preserves_ratio {
-        if let Some(max_w) =
-            style
-                .size
-                .max_width
-                .resolve_with(containing_block_width, viewport_width, viewport_height)
-            && width > max_w
+        if let Some(max_w) = style.size.max_width.resolve_with(
+            containing_block_width,
+            viewport_width,
+            viewport_height,
+        ) && width > max_w
         {
             width = max_w;
             height = width / aspect_ratio.unwrap();
-            if let Some(min_h) =
-                style
-                    .size
-                    .min_height
-                    .resolve_with(containing_block_height, viewport_width, viewport_height)
-                && height < min_h
+            if let Some(min_h) = style.size.min_height.resolve_with(
+                containing_block_height,
+                viewport_width,
+                viewport_height,
+            ) && height < min_h
             {
                 height = min_h;
                 width = height * aspect_ratio.unwrap();
             }
         }
-        if let Some(max_h) =
-            style
-                .size
-                .max_height
-                .resolve_with(containing_block_height, viewport_width, viewport_height)
-            && height > max_h
+        if let Some(max_h) = style.size.max_height.resolve_with(
+            containing_block_height,
+            viewport_width,
+            viewport_height,
+        ) && height > max_h
         {
             height = max_h;
             width = height * aspect_ratio.unwrap();
-            if let Some(min_w) =
-                style
-                    .size
-                    .min_width
-                    .resolve_with(containing_block_width, viewport_width, viewport_height)
-                && width < min_w
+            if let Some(min_w) = style.size.min_width.resolve_with(
+                containing_block_width,
+                viewport_width,
+                viewport_height,
+            ) && width < min_w
             {
                 width = min_w;
                 height = width / aspect_ratio.unwrap();
             }
         }
-        if let Some(min_w) =
-            style
-                .size
-                .min_width
-                .resolve_with(containing_block_width, viewport_width, viewport_height)
-            && width < min_w
+        if let Some(min_w) = style.size.min_width.resolve_with(
+            containing_block_width,
+            viewport_width,
+            viewport_height,
+        ) && width < min_w
         {
             width = min_w;
             height = width / aspect_ratio.unwrap();
-            if let Some(max_h) =
-                style
-                    .size
-                    .max_height
-                    .resolve_with(containing_block_height, viewport_width, viewport_height)
-                && height > max_h
+            if let Some(max_h) = style.size.max_height.resolve_with(
+                containing_block_height,
+                viewport_width,
+                viewport_height,
+            ) && height > max_h
             {
                 height = max_h;
                 width = height * aspect_ratio.unwrap();
             }
         }
-        if let Some(min_h) =
-            style
-                .size
-                .min_height
-                .resolve_with(containing_block_height, viewport_width, viewport_height)
-            && height < min_h
+        if let Some(min_h) = style.size.min_height.resolve_with(
+            containing_block_height,
+            viewport_width,
+            viewport_height,
+        ) && height < min_h
         {
             height = min_h;
             width = height * aspect_ratio.unwrap();
-            if let Some(max_w) =
-                style
-                    .size
-                    .max_width
-                    .resolve_with(containing_block_width, viewport_width, viewport_height)
-                && width > max_w
+            if let Some(max_w) = style.size.max_width.resolve_with(
+                containing_block_width,
+                viewport_width,
+                viewport_height,
+            ) && width > max_w
             {
                 width = max_w;
                 height = width / aspect_ratio.unwrap();
             }
         }
     } else {
-        if let Some(min_w) =
-            style
-                .size
-                .min_width
-                .resolve_with(containing_block_width, viewport_width, viewport_height)
-        {
+        if let Some(min_w) = style.size.min_width.resolve_with(
+            containing_block_width,
+            viewport_width,
+            viewport_height,
+        ) {
             width = width.max(min_w);
         }
-        if let Some(max_w) =
-            style
-                .size
-                .max_width
-                .resolve_with(containing_block_width, viewport_width, viewport_height)
-        {
+        if let Some(max_w) = style.size.max_width.resolve_with(
+            containing_block_width,
+            viewport_width,
+            viewport_height,
+        ) {
             width = width.min(max_w);
         }
-        if let Some(min_h) =
-            style
-                .size
-                .min_height
-                .resolve_with(containing_block_height, viewport_width, viewport_height)
-        {
+        if let Some(min_h) = style.size.min_height.resolve_with(
+            containing_block_height,
+            viewport_width,
+            viewport_height,
+        ) {
             height = height.max(min_h);
         }
-        if let Some(max_h) =
-            style
-                .size
-                .max_height
-                .resolve_with(containing_block_height, viewport_width, viewport_height)
-        {
+        if let Some(max_h) = style.size.max_height.resolve_with(
+            containing_block_height,
+            viewport_width,
+            viewport_height,
+        ) {
             height = height.min(max_h);
         }
     }
