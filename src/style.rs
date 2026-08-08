@@ -19,6 +19,7 @@ pub enum InnerDisplay {
     Flow,
     FlowRoot,
     Flex,
+    Grid,
 }
 
 // for future implementation:
@@ -82,6 +83,14 @@ impl Display {
                 outer: OuterDisplay::Inline,
                 inner: InnerDisplay::Flex,
             }),
+            "grid" => Some(Self {
+                outer: OuterDisplay::Block,
+                inner: InnerDisplay::Grid,
+            }),
+            "inline-grid" => Some(Self {
+                outer: OuterDisplay::Inline,
+                inner: InnerDisplay::Grid,
+            }),
             "flow-root" => Some(Self {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::FlowRoot,
@@ -144,6 +153,7 @@ impl Display {
                 "flow" => inner = Some(InnerDisplay::Flow),
                 "flow-root" => inner = Some(InnerDisplay::FlowRoot),
                 "flex" => inner = Some(InnerDisplay::Flex),
+                "grid" => inner = Some(InnerDisplay::Grid),
 
                 _ => {}
             }
@@ -516,6 +526,39 @@ pub enum AlignItems {
     Stretch,
 }
 
+/// A single explicit or implicit CSS Grid track.
+#[derive(Debug, Clone, PartialEq)]
+pub enum GridTrack {
+    /// A fixed, percentage, or content-sized track breadth.
+    Breadth(LengthOrAuto),
+    /// A fraction of the remaining grid container space.
+    Flex(f32),
+}
+
+impl Default for GridTrack {
+    fn default() -> Self {
+        Self::Breadth(LengthOrAuto::Auto)
+    }
+}
+
+/// Placement of a grid item on one axis.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct GridPlacement {
+    /// One-based start line, or `None` for automatic placement.
+    pub start: Option<usize>,
+    /// Number of tracks occupied by the item.
+    pub span: usize,
+}
+
+impl Default for GridPlacement {
+    fn default() -> Self {
+        Self {
+            start: None,
+            span: 1,
+        }
+    }
+}
+
 /// Controls whether a box participates in normal flow and establishes a
 /// containing block for positioned descendants.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -579,6 +622,10 @@ pub struct Style {
     pub flex_direction: FlexDirection,
     pub column_gap: LengthOrAuto,
     pub row_gap: LengthOrAuto,
+    pub grid_template_columns: Vec<GridTrack>,
+    pub grid_template_rows: Vec<GridTrack>,
+    pub grid_column: GridPlacement,
+    pub grid_row: GridPlacement,
 }
 
 impl Style {

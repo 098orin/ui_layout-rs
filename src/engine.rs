@@ -1,7 +1,8 @@
 use crate::{
     AlignItems, AutoSizeBehavior, BoxModel, BoxSizing, CustomObjectResult, FlexDirection,
-    FragmentNode, InlineBox, InnerDisplay, ItemFragment, JustifyContent, LayoutBox, LayoutChild,
-    LayoutNode, LengthOrAuto, LineSpan, OuterDisplay, Placement, Rect, Spacing, Style,
+    FragmentNode, GridPlacement, GridTrack, InlineBox, InnerDisplay, ItemFragment, JustifyContent,
+    LayoutBox, LayoutChild, LayoutNode, LengthOrAuto, LineSpan, OuterDisplay, Placement, Rect,
+    Spacing, Style,
 };
 
 const EPSILON: f32 = 0.001;
@@ -103,6 +104,16 @@ pub enum LayoutItem {
     Node(usize),
     Fragments(std::ops::Range<usize>),
     Custom(usize),
+}
+
+struct GridItemSlot {
+    item: LayoutItem,
+    column: usize,
+    row: usize,
+    column_span: usize,
+    row_span: usize,
+    intrinsic_width: f32,
+    intrinsic_height: f32,
 }
 
 #[derive(Clone)]
@@ -628,6 +639,292 @@ impl LayoutEngine {
                 self.layout_flow(node, ctx, line_ctx, size_opt, intrinsic_pass)
             }
             InnerDisplay::Flex => self.layout_flex(node, ctx, line_ctx, size_opt, intrinsic_pass),
+            InnerDisplay::Grid => self.layout_grid(node, ctx, line_ctx, size_opt, intrinsic_pass),
+        }
+    }
+
+    fn layout_grid(
+        &self,
+        node: &mut LayoutNode,
+        ctx: &InternalLayoutContext,
+        line_ctx: LineContext,
+        content_size_opt: (Option<f32>, Option<f32>),
+        intrinsic_pass: bool,
+    ) -> LineContext {
+        let (content_width_opt, content_height_opt) = content_size_opt;
+        let available_width = content_width_opt.or(ctx.available_width);
+        let column_gap = node
+            .style
+            .column_gap
+            .resolve_with(available_width, self.viewport_width, self.viewport_height)
+            .unwrap_or(0.0)
+            .max(0.0);
+        let row_gap = node
+            .style
+            .row_gap
+            .resolve_with(
+                content_height_opt,
+                self.viewport_width,
+                self.viewport_height,
+            )
+            .unwrap_or(0.0)
+            .max(0.0);
+
+        let base_ctx = InternalLayoutContext {
+            containing_block_width: available_width,
+            containing_block_height: content_height_opt,
+            available_width,
+            parent_assigned_border_width: None,
+            parent_assigned_border_height: None,
+            viewport_width: ctx.viewport_width,
+            viewport_height: ctx.viewport_height,
+            ..Default::default()
+        };
+        self.layout_out_of_flow_node_children(node, &base_ctx, intrinsic_pass);
+
+        let items: Vec<_> = LayoutItems::new(&node.children)
+            .filter(|item| item_participates_in_normal_flow(&node.children, item))
+            .collect();
+        let mut slots = build_grid_slots(node, items);
+
+        for slot in &mut slots {
+            let (width, height) =
+                self.measure_grid_item(node, &slot.item, &base_ctx, intrinsic_pass);
+            slot.intrinsic_width = width;
+            slot.intrinsic_height = height;
+        }
+
+        let column_count = slots
+            .iter()
+            .map(|slot| slot.column + slot.column_span)
+            .max()
+            .unwrap_or(1)
+            .max(node.style.grid_template_columns.len())
+            .max(1);
+        let row_count = slots
+            .iter()
+            .map(|slot| slot.row + slot.row_span)
+            .max()
+            .unwrap_or(1)
+            .max(node.style.grid_template_rows.len())
+            .max(1);
+
+        let mut column_intrinsic = vec![0.0f32; column_count];
+        let mut row_intrinsic = vec![0.0f32; row_count];
+        for slot in &slots {
+            if slot.column_span == 1 {
+                column_intrinsic[slot.column] =
+                    column_intrinsic[slot.column].max(slot.intrinsic_width);
+            }
+            if slot.row_span == 1 {
+                row_intrinsic[slot.row] = row_intrinsic[slot.row].max(slot.intrinsic_height);
+            }
+        }
+
+        let columns = resolve_grid_tracks(
+            &node.style.grid_template_columns,
+            column_count,
+            available_width,
+            column_gap,
+            &column_intrinsic,
+            self.viewport_width,
+            self.viewport_height,
+        );
+        let rows = resolve_grid_tracks(
+            &node.style.grid_template_rows,
+            row_count,
+            content_height_opt,
+            row_gap,
+            &row_intrinsic,
+            self.viewport_width,
+            self.viewport_height,
+        );
+
+        let children_width =
+            columns.iter().sum::<f32>() + column_gap * column_count.saturating_sub(1) as f32;
+        let children_height =
+            rows.iter().sum::<f32>() + row_gap * row_count.saturating_sub(1) as f32;
+        let width = content_width_opt
+            .or(available_width)
+            .unwrap_or(children_width);
+        let height = content_height_opt.unwrap_or(children_height);
+        let padding = self.resolve_padding(&node.style.spacing, ctx);
+        let border = self.resolve_border(&node.style.spacing, ctx);
+        node.layout_box = LayoutBox::BlockBox(create_box_model(
+            width,
+            height,
+            children_width,
+            children_height,
+            padding,
+            border,
+        ));
+
+        if !intrinsic_pass {
+            let content_box = layout_box_content_box(&node.layout_box);
+            self.place_grid_items(
+                node,
+                &slots,
+                &columns,
+                &rows,
+                column_gap,
+                row_gap,
+                content_box,
+                &base_ctx,
+            );
+        }
+
+        LineContext {
+            end_pos: match node.style.display.outer {
+                OuterDisplay::Block => (0.0, line_ctx.end_pos.1 + node.layout_box.height_box()),
+                _ => (
+                    line_ctx.end_pos.0 + node.layout_box.width_box(),
+                    line_ctx.end_pos.1,
+                ),
+            },
+            current_x: line_ctx.current_x + node.layout_box.width_box(),
+            margin_start: 0.0,
+            margin_end: 0.0,
+        }
+    }
+
+    fn measure_grid_item(
+        &self,
+        node: &mut LayoutNode,
+        item: &LayoutItem,
+        ctx: &InternalLayoutContext,
+        intrinsic_pass: bool,
+    ) -> (f32, f32) {
+        match item {
+            LayoutItem::Node(index) => {
+                let child = node.children[*index].node_mut().unwrap();
+                let _ = self.layout_node(child, ctx, EMPTY_LINE_CONTEXT, intrinsic_pass);
+                (child.layout_box.width_box(), child.layout_box.height_box())
+            }
+            LayoutItem::Fragments(range) => {
+                let line_height = resolved_fragment_line_height(
+                    &node.children,
+                    range.clone(),
+                    node.style.line_height.resolve_with(
+                        None,
+                        self.viewport_width,
+                        self.viewport_height,
+                    ),
+                );
+                let (width, height, _) = flow_fragment_range(
+                    &mut node.children,
+                    range.clone(),
+                    EMPTY_LINE_CONTEXT,
+                    0,
+                    line_height,
+                    ctx.available_width.unwrap_or(self.viewport_width),
+                );
+                (width, height)
+            }
+            LayoutItem::Custom(index) => {
+                let object = node.children[*index].custom_child().unwrap();
+                let measured = object.layouter().measure(&crate::LayoutContext::from(ctx));
+                (measured.width, measured.height)
+            }
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn place_grid_items(
+        &self,
+        node: &mut LayoutNode,
+        slots: &[GridItemSlot],
+        columns: &[f32],
+        rows: &[f32],
+        column_gap: f32,
+        row_gap: f32,
+        content_box: Rect,
+        base_ctx: &InternalLayoutContext,
+    ) {
+        for slot in slots {
+            let x = content_box.x
+                + columns[..slot.column].iter().sum::<f32>()
+                + column_gap * slot.column as f32;
+            let y =
+                content_box.y + rows[..slot.row].iter().sum::<f32>() + row_gap * slot.row as f32;
+            let width = columns[slot.column..slot.column + slot.column_span]
+                .iter()
+                .sum::<f32>()
+                + column_gap * slot.column_span.saturating_sub(1) as f32;
+            let height = rows[slot.row..slot.row + slot.row_span].iter().sum::<f32>()
+                + row_gap * slot.row_span.saturating_sub(1) as f32;
+
+            match &slot.item {
+                LayoutItem::Node(index) => {
+                    let child = node.children[*index].node_mut().unwrap();
+                    let assigned_width =
+                        matches!(child.style.size.width, LengthOrAuto::Auto).then_some(width);
+                    let assigned_height =
+                        matches!(child.style.size.height, LengthOrAuto::Auto).then_some(height);
+                    let child_ctx = InternalLayoutContext {
+                        containing_block_width: Some(width),
+                        containing_block_height: Some(height),
+                        available_width: Some(width),
+                        parent_assigned_border_width: assigned_width,
+                        parent_assigned_border_height: assigned_height,
+                        ..*base_ctx
+                    };
+                    let _ = self.layout_node(child, &child_ctx, EMPTY_LINE_CONTEXT, false);
+                    child.layout_box.shift(x, y);
+                }
+                LayoutItem::Fragments(range) => {
+                    let line_height = resolved_fragment_line_height(
+                        &node.children,
+                        range.clone(),
+                        node.style.line_height.resolve_with(
+                            None,
+                            self.viewport_width,
+                            self.viewport_height,
+                        ),
+                    );
+                    let _ = flow_fragment_range(
+                        &mut node.children,
+                        range.clone(),
+                        LineContext {
+                            end_pos: (x, y),
+                            current_x: x,
+                            margin_start: 0.0,
+                            margin_end: 0.0,
+                        },
+                        0,
+                        line_height,
+                        x + width,
+                    );
+                }
+                LayoutItem::Custom(index) => {
+                    let object = node.children[*index].custom_child_mut().unwrap();
+                    let measured = object
+                        .layouter()
+                        .measure(&crate::LayoutContext::from(base_ctx));
+                    let box_width = if node.style.align_items == AlignItems::Stretch {
+                        width
+                    } else {
+                        measured.width
+                    };
+                    let box_height = if node.style.align_items == AlignItems::Stretch {
+                        height
+                    } else {
+                        measured.height
+                    };
+                    let mut box_model = create_box_model(
+                        box_width,
+                        box_height,
+                        box_width,
+                        box_height,
+                        Edge::default(),
+                        Edge::default(),
+                    );
+                    box_model.shift(x, y);
+                    object.set_result(CustomObjectResult {
+                        spans: Vec::new(),
+                        box_model,
+                    });
+                }
+            }
         }
     }
 
@@ -2893,6 +3190,181 @@ fn compute_flex_remaining(
         m - (total_base_main + gaps + total_main_padding + total_main_border + total_main_margin)
     })
     .unwrap_or(0.0)
+}
+
+fn build_grid_slots(node: &LayoutNode, items: Vec<LayoutItem>) -> Vec<GridItemSlot> {
+    let mut column_count = node.style.grid_template_columns.len().max(1);
+    for item in &items {
+        let (column, _) = grid_item_placements(node, item);
+        if let Some(start) = column.start {
+            column_count = column_count.max(start.saturating_sub(1) + column.span.max(1));
+        }
+    }
+
+    let mut occupied: Vec<Vec<bool>> = Vec::new();
+    let mut cursor = 0usize;
+    let mut slots = Vec::with_capacity(items.len());
+    for item in items {
+        let (column, row) = grid_item_placements(node, &item);
+        let column_span = column.span.max(1).min(column_count);
+        let row_span = row.span.max(1);
+        let explicit_column = column.start.map(|line| line.saturating_sub(1));
+        let explicit_row = row.start.map(|line| line.saturating_sub(1));
+
+        let (placed_row, placed_column) = if let (Some(row), Some(column)) =
+            (explicit_row, explicit_column)
+        {
+            (row, column.min(column_count.saturating_sub(column_span)))
+        } else {
+            let mut candidate = explicit_row
+                .map(|row| row * column_count)
+                .or_else(|| {
+                    explicit_column.map(|column| cursor / column_count * column_count + column)
+                })
+                .unwrap_or(cursor);
+            loop {
+                let candidate_row = candidate / column_count;
+                let candidate_column = explicit_column.unwrap_or(candidate % column_count);
+                let row_matches = explicit_row.is_none_or(|row| row == candidate_row);
+                if row_matches
+                    && candidate_column + column_span <= column_count
+                    && grid_cells_available(
+                        &occupied,
+                        candidate_row,
+                        candidate_column,
+                        row_span,
+                        column_span,
+                    )
+                {
+                    break (candidate_row, candidate_column);
+                }
+                candidate = if explicit_column.is_some() {
+                    (candidate_row + 1) * column_count + explicit_column.unwrap_or(0)
+                } else {
+                    candidate + 1
+                };
+                if explicit_row.is_some() && candidate / column_count > explicit_row.unwrap_or(0) {
+                    break (
+                        explicit_row.unwrap_or(0),
+                        explicit_column
+                            .unwrap_or(0)
+                            .min(column_count.saturating_sub(column_span)),
+                    );
+                }
+            }
+        };
+
+        mark_grid_cells(
+            &mut occupied,
+            placed_row,
+            placed_column,
+            row_span,
+            column_span,
+            column_count,
+        );
+        cursor = cursor.max(placed_row * column_count + placed_column + column_span);
+        slots.push(GridItemSlot {
+            item,
+            column: placed_column,
+            row: placed_row,
+            column_span,
+            row_span,
+            intrinsic_width: 0.0,
+            intrinsic_height: 0.0,
+        });
+    }
+    slots
+}
+
+fn grid_item_placements(node: &LayoutNode, item: &LayoutItem) -> (GridPlacement, GridPlacement) {
+    let style = match item {
+        LayoutItem::Node(index) => node.children[*index].node().map(|child| &child.style),
+        LayoutItem::Custom(index) => node.children[*index]
+            .custom_child()
+            .map(|child| child.style()),
+        LayoutItem::Fragments(_) => None,
+    };
+    style
+        .map(|style| (style.grid_column, style.grid_row))
+        .unwrap_or_default()
+}
+
+fn grid_cells_available(
+    occupied: &[Vec<bool>],
+    row: usize,
+    column: usize,
+    row_span: usize,
+    column_span: usize,
+) -> bool {
+    (row..row + row_span).all(|r| {
+        (column..column + column_span).all(|c| {
+            occupied
+                .get(r)
+                .and_then(|columns| columns.get(c))
+                .copied()
+                .unwrap_or(false)
+                == false
+        })
+    })
+}
+
+fn mark_grid_cells(
+    occupied: &mut Vec<Vec<bool>>,
+    row: usize,
+    column: usize,
+    row_span: usize,
+    column_span: usize,
+    column_count: usize,
+) {
+    occupied.resize_with(row + row_span, || vec![false; column_count]);
+    for columns in occupied.iter_mut().skip(row).take(row_span) {
+        for cell in columns.iter_mut().skip(column).take(column_span) {
+            *cell = true;
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn resolve_grid_tracks(
+    explicit: &[GridTrack],
+    count: usize,
+    available: Option<f32>,
+    gap: f32,
+    intrinsic: &[f32],
+    viewport_width: f32,
+    viewport_height: f32,
+) -> Vec<f32> {
+    let mut sizes = vec![0.0; count];
+    let mut flex_total = 0.0;
+    for index in 0..count {
+        match explicit.get(index).cloned().unwrap_or_default() {
+            GridTrack::Breadth(breadth) => {
+                sizes[index] = breadth
+                    .resolve_with(available, viewport_width, viewport_height)
+                    .unwrap_or(intrinsic[index])
+                    .max(0.0);
+            }
+            GridTrack::Flex(factor) => {
+                flex_total += factor.max(0.0);
+                if available.is_none() {
+                    sizes[index] = intrinsic[index];
+                }
+            }
+        }
+    }
+
+    if let Some(available) = available
+        && flex_total > 0.0
+    {
+        let gaps = gap * count.saturating_sub(1) as f32;
+        let remaining = (available - gaps - sizes.iter().sum::<f32>()).max(0.0);
+        for (index, size) in sizes.iter_mut().enumerate() {
+            if let Some(GridTrack::Flex(factor)) = explicit.get(index) {
+                *size = remaining * factor.max(0.0) / flex_total;
+            }
+        }
+    }
+    sizes
 }
 
 fn flex_item_box_sizing(item: &LayoutItem, node: &LayoutNode) -> Option<BoxSizing> {

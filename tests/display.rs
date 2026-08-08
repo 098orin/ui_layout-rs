@@ -118,6 +118,7 @@ fn display_length_and_enum_variants() {
 
     assert_eq!(format!("{}", OuterDisplay::Block), "block");
     assert_eq!(format!("{}", InnerDisplay::Flex), "flex");
+    assert_eq!(format!("{}", InnerDisplay::Grid), "grid");
     assert_eq!(format!("{}", FlexDirection::Column), "column");
     assert_eq!(format!("{}", JustifyContent::Center), "center");
     assert_eq!(format!("{}", AlignItems::Stretch), "stretch");
@@ -269,6 +270,20 @@ fn display_from_css_name_all_variants() {
         Display {
             outer: OuterDisplay::Inline,
             inner: InnerDisplay::Flex,
+        }
+    );
+    assert_eq!(
+        Display::from_css_name("grid").unwrap(),
+        Display {
+            outer: OuterDisplay::Block,
+            inner: InnerDisplay::Grid,
+        }
+    );
+    assert_eq!(
+        Display::from_css_name("inline-grid").unwrap(),
+        Display {
+            outer: OuterDisplay::Inline,
+            inner: InnerDisplay::Grid,
         }
     );
     assert_eq!(
