@@ -126,6 +126,35 @@ impl fmt::Display for BoxSizing {
     }
 }
 
+impl fmt::Display for GridRepeat {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            GridRepeat::Count(v) => write!(f, "{}", v),
+            GridRepeat::AutoFit => write!(f, "auto-fit"),
+            GridRepeat::AutoFill => write!(f, "auto-fill"),
+        }
+    }
+}
+
+impl fmt::Display for GridTrack {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            GridTrack::Breadth(v) => write!(f, "{}", v),
+            GridTrack::Flex(v) => write!(f, "{}fr", v),
+            GridTrack::MinMax(a, b) => write!(f, "minmax({}, {})", a, b),
+            GridTrack::Repeat(a, b) => write!(
+                f,
+                "repeat({}, {})",
+                a,
+                b.iter()
+                    .map(|v| v.to_string())
+                    .collect::<Vec<String>>()
+                    .join(" ")
+            ),
+        }
+    }
+}
+
 impl fmt::Display for Placement {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
@@ -176,6 +205,26 @@ macro_rules! entry_if {
     ($e:expr, $field:expr, $name:expr, $default:expr) => {{
         if $field != $default {
             $e.push(format!("{}: {}", $name, $field));
+        }
+    }};
+}
+
+macro_rules! entry_vec {
+    ($e:expr, $field:expr, $name:expr) => {{
+        if !$field.is_empty() {
+            let mut entry = String::new();
+            use std::fmt::Write;
+
+            write!(entry, "{}: ", $name).unwrap();
+
+            for (i, item) in $field.iter().enumerate() {
+                if i != 0 {
+                    entry.push(' ');
+                }
+                write!(entry, "{item}").unwrap();
+            }
+
+            $e.push(entry);
         }
     }};
 }
@@ -270,6 +319,13 @@ fn collect_style_entries(style: &Style) -> Vec<String> {
     entry_if!(entries, style.flex_direction, "flex-direction");
     entry_if!(entries, style.column_gap, "column-gap");
     entry_if!(entries, style.row_gap, "row-gap");
+
+    entry_vec!(
+        entries,
+        style.grid_template_columns,
+        "grid-template-columns"
+    );
+    entry_vec!(entries, style.grid_template_rows, "grid-template-rows");
 
     entries
 }
