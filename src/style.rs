@@ -533,12 +533,23 @@ pub enum GridTrack {
     Breadth(LengthOrAuto),
     /// A fraction of the remaining grid container space.
     Flex(f32),
+    /// A track clamped between a minimum and maximum breadth.
+    MinMax(Box<GridTrack>, Box<GridTrack>),
+    /// A repeated track list. Auto repeats are expanded from the available size.
+    Repeat(GridRepeat, Vec<GridTrack>),
 }
 
 impl Default for GridTrack {
     fn default() -> Self {
         Self::Breadth(LengthOrAuto::Auto)
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GridRepeat {
+    Count(usize),
+    AutoFit,
+    AutoFill,
 }
 
 /// Placement of a grid item on one axis.
@@ -626,8 +637,10 @@ pub struct Style {
 
     pub grid_template_columns: Vec<GridTrack>,
     pub grid_template_rows: Vec<GridTrack>,
+    pub grid_template_areas: Vec<Vec<String>>,
     pub grid_column: GridPlacement,
     pub grid_row: GridPlacement,
+    pub grid_area: Option<String>,
 }
 
 impl Style {
