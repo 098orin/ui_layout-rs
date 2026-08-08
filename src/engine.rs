@@ -597,9 +597,16 @@ impl LayoutEngine {
         let content_width_opt = if node.style.position.kind.is_out_of_flow() {
             content_width_opt
         } else {
-            content_width_opt.or(ctx
-                .available_width
-                .map(|v| (v - border.left - border.right - padding.left - padding.right).max(0.0)))
+            content_width_opt.or(ctx.available_width.map(|v| {
+                self.apply_size_constraints(
+                    v,
+                    &node.style.size,
+                    ctx,
+                    true,
+                    &node.style.box_sizing,
+                    border.left + border.right + padding.left + padding.right,
+                )
+            }))
         };
 
         self.layout_by_inner_display(
