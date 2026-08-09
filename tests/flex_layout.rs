@@ -1483,3 +1483,203 @@ fn nested_stress_alternating_directions() {
     assert_eq!(block_box(&root).border_box.x, 0.0);
     assert_eq!(block_box(&root).border_box.y, 0.0);
 }
+
+fn fixed_flex_child(width: f32, height: f32) -> LayoutNode {
+    LayoutNode::new(Style {
+        size: SizeStyle {
+            width: Length::Px(width).into(),
+            height: Length::Px(height).into(),
+            ..Default::default()
+        },
+        ..Default::default()
+    })
+}
+
+#[test]
+fn flex_wrap_creates_multiple_rows_with_cross_gap() {
+    let children = [
+        fixed_flex_child(60.0, 20.0),
+        fixed_flex_child(60.0, 20.0),
+        fixed_flex_child(60.0, 20.0),
+    ];
+    let mut root = LayoutNode::with_children(
+        Style {
+            display: Display {
+                outer: OuterDisplay::Block,
+                inner: InnerDisplay::Flex,
+            },
+            size: SizeStyle {
+                width: Length::Px(100.0).into(),
+                ..Default::default()
+            },
+            flex_wrap: FlexWrap::Wrap,
+            align_content: AlignContent::Start,
+            row_gap: Length::Px(10.0).into(),
+            ..Default::default()
+        },
+        children,
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    assert_eq!(block_box(node(&root, 0)).border_box.y, 0.0);
+    assert_eq!(block_box(node(&root, 1)).border_box.y, 30.0);
+    assert_eq!(block_box(node(&root, 2)).border_box.y, 60.0);
+    assert_eq!(block_box(&root).content_box.height, 80.0);
+}
+
+#[test]
+fn flex_grow_is_resolved_per_wrapped_line() {
+    let child = || {
+        LayoutNode::new(Style {
+            item_style: ItemStyle {
+                flex_grow: 1.0,
+                flex_basis: Length::Px(80.0).into(),
+                ..Default::default()
+            },
+            size: SizeStyle {
+                height: Length::Px(20.0).into(),
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+    };
+    let mut root = LayoutNode::with_children(
+        Style {
+            display: Display {
+                outer: OuterDisplay::Block,
+                inner: InnerDisplay::Flex,
+            },
+            size: SizeStyle {
+                width: Length::Px(200.0).into(),
+                ..Default::default()
+            },
+            flex_wrap: FlexWrap::Wrap,
+            align_content: AlignContent::Start,
+            ..Default::default()
+        },
+        [child(), child(), child()],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    assert_eq!(block_box(node(&root, 0)).content_box.width, 100.0);
+    assert_eq!(block_box(node(&root, 1)).content_box.width, 100.0);
+    assert_eq!(block_box(node(&root, 2)).content_box.width, 200.0);
+    assert_eq!(block_box(node(&root, 2)).border_box.y, 20.0);
+}
+
+#[test]
+fn align_content_centers_flex_lines() {
+    let mut root = LayoutNode::with_children(
+        Style {
+            display: Display {
+                outer: OuterDisplay::Block,
+                inner: InnerDisplay::Flex,
+            },
+            size: SizeStyle {
+                width: Length::Px(100.0).into(),
+                height: Length::Px(100.0).into(),
+                ..Default::default()
+            },
+            flex_wrap: FlexWrap::Wrap,
+            align_content: AlignContent::Center,
+            ..Default::default()
+        },
+        [fixed_flex_child(60.0, 20.0), fixed_flex_child(60.0, 20.0)],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    assert_eq!(block_box(node(&root, 0)).border_box.y, 30.0);
+    assert_eq!(block_box(node(&root, 1)).border_box.y, 50.0);
+}
+
+#[test]
+fn wrap_reverse_starts_lines_at_cross_end() {
+    let mut root = LayoutNode::with_children(
+        Style {
+            display: Display {
+                outer: OuterDisplay::Block,
+                inner: InnerDisplay::Flex,
+            },
+            size: SizeStyle {
+                width: Length::Px(100.0).into(),
+                height: Length::Px(100.0).into(),
+                ..Default::default()
+            },
+            flex_wrap: FlexWrap::WrapReverse,
+            align_content: AlignContent::Start,
+            ..Default::default()
+        },
+        [fixed_flex_child(60.0, 20.0), fixed_flex_child(60.0, 20.0)],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    assert_eq!(block_box(node(&root, 0)).border_box.y, 80.0);
+    assert_eq!(block_box(node(&root, 1)).border_box.y, 60.0);
+}
+
+#[test]
+fn flex_column_wrap_creates_multiple_columns() {
+    let mut root = LayoutNode::with_children(
+        Style {
+            display: Display {
+                outer: OuterDisplay::Block,
+                inner: InnerDisplay::Flex,
+            },
+            size: SizeStyle {
+                width: Length::Px(100.0).into(),
+                height: Length::Px(100.0).into(),
+                ..Default::default()
+            },
+            flex_direction: FlexDirection::Column,
+            flex_wrap: FlexWrap::Wrap,
+            align_content: AlignContent::Start,
+            column_gap: Length::Px(10.0).into(),
+            ..Default::default()
+        },
+        [fixed_flex_child(20.0, 60.0), fixed_flex_child(20.0, 60.0)],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    assert_eq!(block_box(node(&root, 0)).border_box.x, 0.0);
+    assert_eq!(block_box(node(&root, 1)).border_box.x, 30.0);
+}
+
+#[test]
+fn align_content_stretch_expands_lines_and_auto_cross_items() {
+    let child = || {
+        LayoutNode::new(Style {
+            size: SizeStyle {
+                width: Length::Px(60.0).into(),
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+    };
+    let mut root = LayoutNode::with_children(
+        Style {
+            display: Display {
+                outer: OuterDisplay::Block,
+                inner: InnerDisplay::Flex,
+            },
+            size: SizeStyle {
+                width: Length::Px(100.0).into(),
+                height: Length::Px(100.0).into(),
+                ..Default::default()
+            },
+            flex_wrap: FlexWrap::Wrap,
+            ..Default::default()
+        },
+        [child(), child()],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    assert_eq!(block_box(node(&root, 0)).content_box.height, 50.0);
+    assert_eq!(block_box(node(&root, 1)).content_box.height, 50.0);
+    assert_eq!(block_box(node(&root, 1)).border_box.y, 50.0);
+}

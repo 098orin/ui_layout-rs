@@ -1,8 +1,8 @@
 use crate::{
-    AlignItems, AutoSizeBehavior, BoxModel, BoxSizing, CustomObjectResult, FlexDirection,
-    FragmentNode, GridPlacement, GridRepeat, GridTrack, InlineBox, InnerDisplay, ItemFragment,
-    JustifyContent, LayoutBox, LayoutChild, LayoutNode, LengthOrAuto, LineSpan, OuterDisplay,
-    Placement, Rect, Spacing, Style,
+    AlignContent, AlignItems, AutoSizeBehavior, BoxModel, BoxSizing, CustomObjectResult,
+    FlexDirection, FlexWrap, FragmentNode, GridPlacement, GridRepeat, GridTrack, InlineBox,
+    InnerDisplay, ItemFragment, JustifyContent, LayoutBox, LayoutChild, LayoutNode, LengthOrAuto,
+    LineSpan, OuterDisplay, Placement, Rect, Spacing, Style,
 };
 
 const EPSILON: f32 = 0.001;
@@ -101,6 +101,7 @@ impl EdgeOption {
     }
 }
 
+#[derive(Clone)]
 pub enum LayoutItem {
     Node(usize),
     Fragments(std::ops::Range<usize>),
@@ -226,6 +227,7 @@ struct FlowState {
 
 struct FlexPlacementCtx {
     content_box: Rect,
+    line_cross_offset: f32,
     cursor_main: f32,
     auto_unit: f32,
     gap_between: f32,
@@ -426,6 +428,13 @@ impl Axis {
         match self {
             Axis::Horizontal => &style.column_gap,
             Axis::Vertical => &style.row_gap,
+        }
+    }
+
+    fn cross_gap<'a>(&self, style: &'a Style) -> &'a LengthOrAuto {
+        match self {
+            Axis::Horizontal => &style.row_gap,
+            Axis::Vertical => &style.column_gap,
         }
     }
 }
@@ -787,13 +796,7 @@ impl LayoutEngine {
 
         if !intrinsic_pass {
             self.place_grid_items(
-                node,
-                &slots,
-                &columns,
-                &rows,
-                column_gap,
-                row_gap,
-                &base_ctx,
+                node, &slots, &columns, &rows, column_gap, row_gap, &base_ctx,
             );
         }
 
@@ -864,8 +867,7 @@ impl LayoutEngine {
         base_ctx: &InternalLayoutContext,
     ) {
         for slot in slots {
-            let x = columns[..slot.column].iter().sum::<f32>()
-                + column_gap * slot.column as f32;
+            let x = columns[..slot.column].iter().sum::<f32>() + column_gap * slot.column as f32;
             let y = rows[..slot.row].iter().sum::<f32>() + row_gap * slot.row as f32;
             let width = columns[slot.column..slot.column + slot.column_span]
                 .iter()
@@ -1040,7 +1042,13 @@ impl LayoutEngine {
                     self.process_flow_node_item(node, i, ctx, &base_ctx_for_child, &mut state)
                 }
                 LayoutItem::Custom(i) => {
-                    match node.children[i].custom_child().unwrap().style().display.outer {
+                    match node.children[i]
+                        .custom_child()
+                        .unwrap()
+                        .style()
+                        .display
+                        .outer
+                    {
                         OuterDisplay::Inline => {
                             let mut ctx_for_child = crate::LayoutContext::from(&base_ctx_for_child);
                             ctx_for_child.start_pos = state.cursor.pos();
@@ -1615,8 +1623,8 @@ impl LayoutEngine {
             // parent assignment (flex) instead.
             let is_custom_leaf = node.style.display.outer == OuterDisplay::Block
                 && matches!(&node.children[..], [LayoutChild::Custom(_)]);
-            let shrink_to_fit = is_custom_leaf
-                && node.style.size.auto_behavior == AutoSizeBehavior::ShrinkToFit;
+            let shrink_to_fit =
+                is_custom_leaf && node.style.size.auto_behavior == AutoSizeBehavior::ShrinkToFit;
             let width_auto = matches!(node.style.size.width, LengthOrAuto::Auto);
             let height_auto = matches!(node.style.size.height, LengthOrAuto::Auto);
 
@@ -1633,18 +1641,16 @@ impl LayoutEngine {
             let bottom_collapses =
                 collapse_margins && border.bottom == 0.0 && padding.bottom == 0.0;
 
-            let content_height = if shrink_to_fit
-                && height_auto
-                && ctx.parent_assigned_border_height.is_none()
-            {
-                (children_height - pb_h).max(0.0)
-            } else {
-                content_height_opt.unwrap_or(if bottom_collapses {
-                    children_height - prev_child_margin
+            let content_height =
+                if shrink_to_fit && height_auto && ctx.parent_assigned_border_height.is_none() {
+                    (children_height - pb_h).max(0.0)
                 } else {
-                    children_height
-                })
-            };
+                    content_height_opt.unwrap_or(if bottom_collapses {
+                        children_height - prev_child_margin
+                    } else {
+                        children_height
+                    })
+                };
             let children_h = if bottom_collapses {
                 (children_height - prev_child_margin).max(0.0)
             } else {
@@ -1880,24 +1886,106 @@ impl LayoutEngine {
             .unwrap_or(0.0)
             .max(0.0);
 
-        // --------- Convert to FlexItem ----------
+        let mut states = vec![FlexItemState::default(); flex_items.len()];
+        self.init_flex_item_states(node, axis, base_ctx_for_children, &flex_items, &mut states);
+
+        let line_ranges = collect_flex_line_ranges(
+            &states
+                .iter()
+                .map(flex_state_outer_main_size)
+                .collect::<Vec<_>>(),
+            gap,
+            cbm,
+            node.style.flex_wrap,
+        );
+        let cross_gap = axis
+            .cross_gap(&node.style)
+            .resolve_with(base_ctx_for_children.containing_block_cross(axis), vw, vh)
+            .unwrap_or(0.0)
+            .max(0.0);
+
+        let mut resolved_lines = Vec::with_capacity(line_ranges.len());
+        let mut max_main: f32 = 0.0;
+        let mut total_cross: f32 = 0.0;
+
+        for range in line_ranges {
+            let items = &flex_items[range.clone()];
+            let mut line_states = states[range].to_vec();
+            self.resolve_flex_line(node, items, &mut line_states, gap, cbm);
+            let line_cross = if node.style.flex_wrap == FlexWrap::NoWrap {
+                base_ctx_for_children.containing_block_cross(axis)
+            } else {
+                None
+            };
+            let (main, cross) = self.finalize_flex_children_layout(
+                node,
+                axis,
+                base_ctx_for_children,
+                intrinsic_pass,
+                items,
+                line_states.clone(),
+                line_cross,
+            );
+            max_main = max_main.max(main);
+            total_cross += cross;
+            resolved_lines.push((items.to_vec(), line_states, cross));
+        }
+
+        total_cross += cross_gap * resolved_lines.len().saturating_sub(1) as f32;
+
+        if node.style.flex_wrap != FlexWrap::NoWrap
+            && node.style.align_content == AlignContent::Stretch
+            && let Some(container_cross) = base_ctx_for_children.containing_block_cross(axis)
+        {
+            let extra =
+                (container_cross - total_cross).max(0.0) / resolved_lines.len().max(1) as f32;
+            if extra > EPSILON {
+                total_cross = cross_gap * resolved_lines.len().saturating_sub(1) as f32;
+                for (items, states, cross) in &mut resolved_lines {
+                    *cross += extra;
+                    let (main, final_cross) = self.finalize_flex_children_layout(
+                        node,
+                        axis,
+                        base_ctx_for_children,
+                        intrinsic_pass,
+                        items,
+                        states.clone(),
+                        Some(*cross),
+                    );
+                    max_main = max_main.max(main);
+                    *cross = final_cross.max(*cross);
+                    total_cross += *cross;
+                }
+            }
+        }
+
+        (max_main, total_cross)
+    }
+
+    fn resolve_flex_line(
+        &self,
+        node: &LayoutNode,
+        flex_items: &[LayoutItem],
+        states: &mut [FlexItemState],
+        gap: f32,
+        containing_main: Option<f32>,
+    ) {
         let item_len = flex_items.len();
+        let mut total_grow = states
+            .iter()
+            .filter(|state| !state.frozen_grow)
+            .map(|state| state.grow)
+            .sum();
+        let mut remaining = compute_flex_remaining(containing_main, states, gap, item_len);
 
-        let mut states = vec![FlexItemState::default(); item_len];
-        let mut total_grow =
-            self.init_flex_item_states(node, axis, base_ctx_for_children, &flex_items, &mut states);
-
-        let mut remaining = compute_flex_remaining(cbm, &states, gap, item_len);
-
-        // ---------- redistribute loop ----------
         loop {
             if remaining > EPSILON {
                 if total_grow <= 0.0 {
                     break;
                 }
                 self.flex_grow_redistribution(
-                    &mut states,
-                    &flex_items,
+                    states,
+                    flex_items,
                     &mut remaining,
                     item_len,
                     &mut total_grow,
@@ -1908,13 +1996,7 @@ impl LayoutEngine {
                 }
             } else if remaining < -EPSILON {
                 let old_remaining = remaining;
-                self.flex_shrink_redistribution(
-                    &mut states,
-                    &flex_items,
-                    &mut remaining,
-                    item_len,
-                    node,
-                );
+                self.flex_shrink_redistribution(states, flex_items, &mut remaining, item_len, node);
                 if (old_remaining - remaining).abs() < EPSILON {
                     break;
                 }
@@ -1922,16 +2004,6 @@ impl LayoutEngine {
                 break;
             }
         }
-
-        // ---------- final layout ----------
-        self.finalize_flex_children_layout(
-            node,
-            axis,
-            base_ctx_for_children,
-            intrinsic_pass,
-            &flex_items,
-            states,
-        )
     }
 
     fn flex_children_main_total(
@@ -1997,10 +2069,73 @@ impl LayoutEngine {
             .sum()
     }
 
-    fn count_main_axis_auto_margins(&self, node: &LayoutNode, axis: Axis) -> usize {
+    fn flex_children_cross_max(
+        &self,
+        node: &mut LayoutNode,
+        axis: Axis,
+        ctx: &InternalLayoutContext,
+        items: &[LayoutItem],
+    ) -> f32 {
+        let vw = self.viewport_width;
+        let vh = self.viewport_height;
+        items.iter().fold(0.0_f32, |maximum, item| {
+            let size = match item {
+                LayoutItem::Node(index) => {
+                    let child = node.children[*index].node().unwrap();
+                    let tuple = (child.layout_box.width_box(), child.layout_box.height_box());
+                    let margin = self
+                        .resolve_margin(&child.style.spacing, ctx)
+                        .unwrap_or_default();
+                    let margin_cross = match axis {
+                        Axis::Horizontal => margin.top + margin.bottom,
+                        Axis::Vertical => margin.left + margin.right,
+                    };
+                    axis.tuple_cross(tuple) + margin_cross
+                }
+                LayoutItem::Fragments(range) => {
+                    let line_height = resolved_fragment_line_height(
+                        &node.children,
+                        range.clone(),
+                        node.style.line_height.resolve_with(None, vw, vh),
+                    );
+                    let line_count = node.children[range.clone()]
+                        .iter()
+                        .filter(|child| {
+                            child
+                                .fragment()
+                                .is_some_and(|fragment| fragment.node.is_line_break())
+                        })
+                        .count()
+                        + 1;
+                    match axis {
+                        Axis::Horizontal => line_height * line_count as f32,
+                        Axis::Vertical => node.children[range.clone()]
+                            .iter()
+                            .map(|child| child.fragment().unwrap().node.width())
+                            .sum(),
+                    }
+                }
+                LayoutItem::Custom(index) => {
+                    let object = node.children[*index].custom_child().unwrap();
+                    let measured = object.layouter().measure(&crate::LayoutContext::from(ctx));
+                    axis.tuple_cross((measured.width, measured.height))
+                }
+            };
+            maximum.max(size)
+        })
+    }
+
+    fn count_main_axis_auto_margins(
+        &self,
+        node: &LayoutNode,
+        axis: Axis,
+        items: &[LayoutItem],
+    ) -> usize {
         let mut count = 0usize;
-        for child in &node.children {
-            if let crate::LayoutChild::Node(n) = child {
+        for item in items {
+            if let LayoutItem::Node(index) = item
+                && let crate::LayoutChild::Node(n) = &node.children[*index]
+            {
                 if n.style.position.kind.is_out_of_flow() {
                     continue;
                 }
@@ -2119,8 +2254,10 @@ impl LayoutEngine {
         };
 
         let child_cross_pos = match axis {
-            Axis::Horizontal => placement.content_box.y + cross_offset,
-            Axis::Vertical => placement.content_box.x + cross_offset,
+            Axis::Horizontal => {
+                placement.content_box.y + placement.line_cross_offset + cross_offset
+            }
+            Axis::Vertical => placement.content_box.x + placement.line_cross_offset + cross_offset,
         };
 
         let child_origin = match axis {
@@ -2197,8 +2334,10 @@ impl LayoutEngine {
             resolve_align_position(node.style.align_items, item_cross_size, available_cross);
 
         let child_cross_pos = match axis {
-            Axis::Horizontal => placement.content_box.y + cross_offset,
-            Axis::Vertical => placement.content_box.x + cross_offset,
+            Axis::Horizontal => {
+                placement.content_box.y + placement.line_cross_offset + cross_offset
+            }
+            Axis::Vertical => placement.content_box.x + placement.line_cross_offset + cross_offset,
         };
 
         let line_ctx = match axis {
@@ -2270,8 +2409,10 @@ impl LayoutEngine {
             resolve_align_position(node.style.align_items, item_cross_size, available_cross);
 
         let item_cross_pos = match axis {
-            Axis::Horizontal => placement.content_box.y + cross_offset,
-            Axis::Vertical => placement.content_box.x + cross_offset,
+            Axis::Horizontal => {
+                placement.content_box.y + placement.line_cross_offset + cross_offset
+            }
+            Axis::Vertical => placement.content_box.x + placement.line_cross_offset + cross_offset,
         };
 
         let (x, y) = match axis {
@@ -2326,67 +2467,137 @@ impl LayoutEngine {
             .filter(|item| item_participates_in_normal_flow(&node.children, item))
             .collect();
 
-        let children_main_total = self.flex_children_main_total(node, axis, ctx, &items);
-
-        let gaps_total = if items.len() > 1 {
-            gap * (items.len() as f32 - 1.0)
-        } else {
-            0.0
-        };
-
-        let remaining_space = axis.rect_main(&content_box) - children_main_total - gaps_total;
-
-        let auto_margin_count = self.count_main_axis_auto_margins(node, axis);
-
-        let has_auto_margins = auto_margin_count > 0;
-        let remaining_space_for_auto = if has_auto_margins {
-            remaining_space.max(0.0)
-        } else {
-            remaining_space
-        };
-        let auto_unit = if has_auto_margins && auto_margin_count > 0 {
-            remaining_space_for_auto / (auto_margin_count as f32)
-        } else {
-            0.0
-        };
-
-        let (start_offset, gap_between) = if has_auto_margins {
-            (0.0, 0.0)
-        } else {
-            resolve_justify_content(node.style.justify_content, remaining_space, items.len())
-        };
-
-        let reversed = Axis::is_reversed(&node.style.flex_direction);
-        let use_reversed_alg =
-            reversed && !matches!(node.style.justify_content, JustifyContent::End);
-        let cursor_main = if use_reversed_alg {
-            axis.rect_main(&content_box) - start_offset
-        } else if reversed {
-            0.0
-        } else {
-            start_offset
-        };
-
-        let mut placement = FlexPlacementCtx {
-            content_box,
-            cursor_main,
-            auto_unit,
-            gap_between,
+        let mut outer_main_sizes = Vec::with_capacity(items.len());
+        for item in &items {
+            outer_main_sizes.push(self.flex_children_main_total(
+                node,
+                axis,
+                ctx,
+                std::slice::from_ref(item),
+            ));
+        }
+        let line_ranges = collect_flex_line_ranges(
+            &outer_main_sizes,
             gap,
-            reversed: use_reversed_alg,
+            Some(axis.rect_main(&content_box)),
+            node.style.flex_wrap,
+        );
+        let cross_gap = axis
+            .cross_gap(&node.style)
+            .resolve_with(
+                Some(axis.rect_cross(&content_box)),
+                self.viewport_width,
+                self.viewport_height,
+            )
+            .unwrap_or(0.0)
+            .max(0.0);
+        let mut line_cross_sizes: Vec<f32> = line_ranges
+            .iter()
+            .map(|range| self.flex_children_cross_max(node, axis, ctx, &items[range.clone()]))
+            .collect();
+
+        if node.style.flex_wrap == FlexWrap::NoWrap {
+            line_cross_sizes[0] = axis.rect_cross(&content_box);
+        }
+
+        let cross_gaps_total = cross_gap * line_ranges.len().saturating_sub(1) as f32;
+        let remaining_cross =
+            axis.rect_cross(&content_box) - line_cross_sizes.iter().sum::<f32>() - cross_gaps_total;
+        let (cross_start, cross_between, cross_stretch) =
+            resolve_align_content(node.style.align_content, remaining_cross, line_ranges.len());
+        if cross_stretch > 0.0 {
+            for size in &mut line_cross_sizes {
+                *size += cross_stretch;
+            }
+        }
+
+        let reversed_main = Axis::is_reversed(&node.style.flex_direction);
+        let mut cross_cursor = if node.style.flex_wrap == FlexWrap::WrapReverse {
+            axis.rect_cross(&content_box) - cross_start
+        } else {
+            cross_start
         };
 
-        for item in items {
-            match item {
-                LayoutItem::Node(index) => {
-                    self.position_flex_node_child(node, axis, ctx, index, &mut placement)
+        for (line_index, range) in line_ranges.into_iter().enumerate() {
+            let line_items = &items[range];
+            let line_cross = line_cross_sizes[line_index];
+            let line_cross_pos = if node.style.flex_wrap == FlexWrap::WrapReverse {
+                cross_cursor -= line_cross;
+                cross_cursor
+            } else {
+                cross_cursor
+            };
+            let line_box = match axis {
+                Axis::Horizontal => Rect {
+                    x: content_box.x,
+                    y: content_box.y,
+                    width: content_box.width,
+                    height: line_cross,
+                },
+                Axis::Vertical => Rect {
+                    x: content_box.x,
+                    y: content_box.y,
+                    width: line_cross,
+                    height: content_box.height,
+                },
+            };
+
+            let children_main_total = self.flex_children_main_total(node, axis, ctx, line_items);
+            let gaps_total = gap * line_items.len().saturating_sub(1) as f32;
+            let remaining_space = axis.rect_main(&line_box) - children_main_total - gaps_total;
+            let auto_margin_count = self.count_main_axis_auto_margins(node, axis, line_items);
+            let has_auto_margins = auto_margin_count > 0;
+            let auto_unit = if has_auto_margins {
+                remaining_space.max(0.0) / auto_margin_count as f32
+            } else {
+                0.0
+            };
+            let (start_offset, gap_between) = if has_auto_margins {
+                (0.0, 0.0)
+            } else {
+                resolve_justify_content(
+                    node.style.justify_content,
+                    remaining_space,
+                    line_items.len(),
+                )
+            };
+            let use_reversed_alg =
+                reversed_main && !matches!(node.style.justify_content, JustifyContent::End);
+            let cursor_main = if use_reversed_alg {
+                axis.rect_main(&line_box) - start_offset
+            } else if reversed_main {
+                0.0
+            } else {
+                start_offset
+            };
+            let mut placement = FlexPlacementCtx {
+                content_box: line_box,
+                line_cross_offset: line_cross_pos,
+                cursor_main,
+                auto_unit,
+                gap_between,
+                gap,
+                reversed: use_reversed_alg,
+            };
+
+            for item in line_items.iter().cloned() {
+                match item {
+                    LayoutItem::Node(index) => {
+                        self.position_flex_node_child(node, axis, ctx, index, &mut placement)
+                    }
+                    LayoutItem::Fragments(range) => {
+                        self.position_flex_fragments(node, axis, range, &mut placement)
+                    }
+                    LayoutItem::Custom(index) => {
+                        self.position_flex_custom(node, axis, ctx, index, &mut placement)
+                    }
                 }
-                LayoutItem::Fragments(range) => {
-                    self.position_flex_fragments(node, axis, range, &mut placement)
-                }
-                LayoutItem::Custom(index) => {
-                    self.position_flex_custom(node, axis, ctx, index, &mut placement)
-                }
+            }
+
+            if node.style.flex_wrap == FlexWrap::WrapReverse {
+                cross_cursor -= cross_gap + cross_between;
+            } else {
+                cross_cursor += line_cross + cross_gap + cross_between;
             }
         }
     }
@@ -2763,8 +2974,8 @@ impl LayoutEngine {
         intrinsic_pass: bool,
         flex_items: &[LayoutItem],
         states: Vec<FlexItemState>,
+        line_cross_size: Option<f32>,
     ) -> (f32, f32) {
-        let cbc = base_ctx_for_children.containing_block_cross(axis);
         let vw = self.viewport_width;
         let vh = self.viewport_height;
         let gap = axis
@@ -2781,8 +2992,14 @@ impl LayoutEngine {
                 LayoutItem::Node(index) => {
                     let child = node.children.get_mut(*index).unwrap().node_mut().unwrap();
 
-                    let stretched_cross =
-                        self.compute_stretched_cross(child, axis, cbc, vw, vh, &node.style);
+                    let stretched_cross = self.compute_stretched_cross(
+                        child,
+                        axis,
+                        line_cross_size,
+                        vw,
+                        vh,
+                        &node.style,
+                    );
 
                     let (parent_assigned_border_width, parent_assigned_border_height) = {
                         let main_bargin_box = state.main_size
@@ -2838,11 +3055,18 @@ impl LayoutEngine {
                     max_cross = max_cross.max(axis.tuple_cross((fragment_width, fragment_height)));
                 }
                 LayoutItem::Custom(index) => {
-                    let object = node.children.get_mut(*index).unwrap().custom_child().unwrap();
+                    let object = node
+                        .children
+                        .get_mut(*index)
+                        .unwrap()
+                        .custom_child()
+                        .unwrap();
                     if object.style().display.outer == OuterDisplay::None {
                         continue;
                     }
-                    let measured = object.layouter().measure(&crate::LayoutContext::from(base_ctx_for_children));
+                    let measured = object
+                        .layouter()
+                        .measure(&crate::LayoutContext::from(base_ctx_for_children));
                     let tuple = (measured.width, measured.height);
                     total_border_main += axis.tuple_main(tuple);
                     max_cross = max_cross.max(axis.tuple_cross(tuple));
@@ -3186,6 +3410,53 @@ impl LayoutEngine {
 }
 
 // ==========================================
+
+fn flex_state_outer_main_size(state: &FlexItemState) -> f32 {
+    state.main_size
+        + state.main_padding.0
+        + state.main_padding.1
+        + state.main_border.0
+        + state.main_border.1
+        + state.main_margin.0
+        + state.main_margin.1
+}
+
+fn collect_flex_line_ranges(
+    outer_main_sizes: &[f32],
+    gap: f32,
+    available_main: Option<f32>,
+    flex_wrap: FlexWrap,
+) -> Vec<std::ops::Range<usize>> {
+    if outer_main_sizes.is_empty() {
+        return Vec::new();
+    }
+    let Some(available_main) = available_main else {
+        return vec![0..outer_main_sizes.len()];
+    };
+    if flex_wrap == FlexWrap::NoWrap {
+        return vec![0..outer_main_sizes.len()];
+    }
+
+    let mut lines = Vec::new();
+    let mut start = 0;
+    let mut used = 0.0;
+    for (index, size) in outer_main_sizes.iter().copied().enumerate() {
+        let candidate = if index == start {
+            size
+        } else {
+            used + gap + size
+        };
+        if index > start && candidate > available_main + EPSILON {
+            lines.push(start..index);
+            start = index;
+            used = size;
+        } else {
+            used = candidate;
+        }
+    }
+    lines.push(start..outer_main_sizes.len());
+    lines
+}
 
 fn compute_flex_remaining(
     cbm: Option<f32>,
@@ -3841,6 +4112,36 @@ fn resolve_justify_content(
     }
 }
 
+fn resolve_align_content(
+    align: AlignContent,
+    remaining_space: f32,
+    lines: usize,
+) -> (f32, f32, f32) {
+    match align {
+        AlignContent::Start => (0.0, 0.0, 0.0),
+        AlignContent::Center => (remaining_space / 2.0, 0.0, 0.0),
+        AlignContent::End => (remaining_space, 0.0, 0.0),
+        AlignContent::SpaceBetween if lines > 1 && remaining_space > 0.0 => {
+            (0.0, remaining_space / (lines - 1) as f32, 0.0)
+        }
+        AlignContent::SpaceAround if lines > 0 && remaining_space > 0.0 => {
+            let between = remaining_space / lines as f32;
+            (between / 2.0, between, 0.0)
+        }
+        AlignContent::SpaceEvenly if lines > 0 && remaining_space > 0.0 => {
+            let between = remaining_space / (lines + 1) as f32;
+            (between, between, 0.0)
+        }
+        AlignContent::Stretch if lines > 0 && remaining_space > 0.0 => {
+            (0.0, 0.0, remaining_space / lines as f32)
+        }
+        AlignContent::SpaceBetween
+        | AlignContent::SpaceAround
+        | AlignContent::SpaceEvenly
+        | AlignContent::Stretch => (0.0, 0.0, 0.0),
+    }
+}
+
 fn resolve_align_position(align: AlignItems, child_size: f32, available: f32) -> f32 {
     match align {
         AlignItems::Start => 0.0,
@@ -4063,117 +4364,105 @@ pub fn resolve_custom_box_size(
         aspect_ratio.is_some_and(|r| r > 0.0) && (!width_specified || !height_specified);
 
     if preserves_ratio {
-        if let Some(max_w) =
-            style
-                .size
-                .max_width
-                .resolve_with(containing_block_width, viewport_width, viewport_height)
-            && width > max_w
+        if let Some(max_w) = style.size.max_width.resolve_with(
+            containing_block_width,
+            viewport_width,
+            viewport_height,
+        ) && width > max_w
         {
             width = max_w;
             height = width / aspect_ratio.unwrap();
-            if let Some(min_h) =
-                style
-                    .size
-                    .min_height
-                    .resolve_with(containing_block_height, viewport_width, viewport_height)
-                && height < min_h
+            if let Some(min_h) = style.size.min_height.resolve_with(
+                containing_block_height,
+                viewport_width,
+                viewport_height,
+            ) && height < min_h
             {
                 height = min_h;
                 width = height * aspect_ratio.unwrap();
             }
         }
-        if let Some(max_h) =
-            style
-                .size
-                .max_height
-                .resolve_with(containing_block_height, viewport_width, viewport_height)
-            && height > max_h
+        if let Some(max_h) = style.size.max_height.resolve_with(
+            containing_block_height,
+            viewport_width,
+            viewport_height,
+        ) && height > max_h
         {
             height = max_h;
             width = height * aspect_ratio.unwrap();
-            if let Some(min_w) =
-                style
-                    .size
-                    .min_width
-                    .resolve_with(containing_block_width, viewport_width, viewport_height)
-                && width < min_w
+            if let Some(min_w) = style.size.min_width.resolve_with(
+                containing_block_width,
+                viewport_width,
+                viewport_height,
+            ) && width < min_w
             {
                 width = min_w;
                 height = width / aspect_ratio.unwrap();
             }
         }
-        if let Some(min_w) =
-            style
-                .size
-                .min_width
-                .resolve_with(containing_block_width, viewport_width, viewport_height)
-            && width < min_w
+        if let Some(min_w) = style.size.min_width.resolve_with(
+            containing_block_width,
+            viewport_width,
+            viewport_height,
+        ) && width < min_w
         {
             width = min_w;
             height = width / aspect_ratio.unwrap();
-            if let Some(max_h) =
-                style
-                    .size
-                    .max_height
-                    .resolve_with(containing_block_height, viewport_width, viewport_height)
-                && height > max_h
+            if let Some(max_h) = style.size.max_height.resolve_with(
+                containing_block_height,
+                viewport_width,
+                viewport_height,
+            ) && height > max_h
             {
                 height = max_h;
                 width = height * aspect_ratio.unwrap();
             }
         }
-        if let Some(min_h) =
-            style
-                .size
-                .min_height
-                .resolve_with(containing_block_height, viewport_width, viewport_height)
-            && height < min_h
+        if let Some(min_h) = style.size.min_height.resolve_with(
+            containing_block_height,
+            viewport_width,
+            viewport_height,
+        ) && height < min_h
         {
             height = min_h;
             width = height * aspect_ratio.unwrap();
-            if let Some(max_w) =
-                style
-                    .size
-                    .max_width
-                    .resolve_with(containing_block_width, viewport_width, viewport_height)
-                && width > max_w
+            if let Some(max_w) = style.size.max_width.resolve_with(
+                containing_block_width,
+                viewport_width,
+                viewport_height,
+            ) && width > max_w
             {
                 width = max_w;
                 height = width / aspect_ratio.unwrap();
             }
         }
     } else {
-        if let Some(min_w) =
-            style
-                .size
-                .min_width
-                .resolve_with(containing_block_width, viewport_width, viewport_height)
-        {
+        if let Some(min_w) = style.size.min_width.resolve_with(
+            containing_block_width,
+            viewport_width,
+            viewport_height,
+        ) {
             width = width.max(min_w);
         }
-        if let Some(max_w) =
-            style
-                .size
-                .max_width
-                .resolve_with(containing_block_width, viewport_width, viewport_height)
-        {
+        if let Some(max_w) = style.size.max_width.resolve_with(
+            containing_block_width,
+            viewport_width,
+            viewport_height,
+        ) {
             width = width.min(max_w);
         }
-        if let Some(min_h) =
-            style
-                .size
-                .min_height
-                .resolve_with(containing_block_height, viewport_width, viewport_height)
-        {
+        if let Some(min_h) = style.size.min_height.resolve_with(
+            containing_block_height,
+            viewport_width,
+            viewport_height,
+        ) {
             height = height.max(min_h);
         }
-        if let Some(max_h) =
-            style
-                .size
-                .max_height
-                .resolve_with(containing_block_height, viewport_width, viewport_height)
-        {
+        if let Some(max_h) = style.size.max_height.resolve_with(
+            containing_block_height,
+            viewport_width,
+            viewport_height,
+        ) {
             height = height.min(max_h);
         }
     }
