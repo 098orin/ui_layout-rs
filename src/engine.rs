@@ -599,8 +599,14 @@ impl LayoutEngine {
         } else {
             content_width_opt.or(ctx.available_width.map(|v| {
                 let padding_border_edge = border.left + border.right + padding.left + padding.right;
+                let value = if node.style.box_sizing == BoxSizing::ContentBox {
+                    v - padding_border_edge
+                } else {
+                    v
+                };
+
                 self.apply_size_constraints(
-                    v - padding_border_edge,
+                    value,
                     &node.style.size,
                     ctx,
                     true,
