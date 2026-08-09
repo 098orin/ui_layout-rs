@@ -205,6 +205,14 @@ impl LayoutBox {
         }
     }
 
+    pub(crate) fn set_sticky_inset(&mut self, edge: Edge) {
+        match self {
+            LayoutBox::None => {}
+            LayoutBox::BlockBox(b) => b.sticky_inset = Some(edge),
+            LayoutBox::InlineBox(inline) => inline.box_model.sticky_inset = Some(edge),
+        }
+    }
+
     /// Returns the maximum width among all boxes via [`LineSpan::width`] or[`BoxModel::width`].
     /// For [`LayoutBox::InlineBox`], width is calculated via [`LineSpan::width`]
     pub fn width_box(&self) -> f32 {

@@ -2,7 +2,7 @@ use crate::{
     AlignContent, AlignItems, AutoSizeBehavior, BoxModel, BoxSizing, CustomObjectResult, Edge,
     FlexDirection, FlexWrap, FragmentNode, GridPlacement, GridRepeat, GridTrack, InlineBox,
     InnerDisplay, ItemFragment, JustifyContent, LayoutBox, LayoutChild, LayoutNode, LengthOrAuto,
-    LineSpan, OuterDisplay, Placement, Rect, Spacing, Style,
+    LineSpan, OuterDisplay, Placement, Position, Rect, Spacing, Style,
 };
 
 const EPSILON: f32 = 0.001;
@@ -2646,7 +2646,7 @@ impl LayoutEngine {
         let initial_border = initial_box.border_box;
         let border_size = initial_border.size();
 
-        let offset_basis = if node.style.position.kind == crate::Position::Fixed {
+        let offset_basis = if node.style.position.kind == Position::Fixed {
             (self.viewport_width, self.viewport_height)
         } else {
             (containing_block.width, containing_block.height)
@@ -2671,45 +2671,60 @@ impl LayoutEngine {
         let top = resolve_y(&node.style.position.top);
         let bottom = resolve_y(&node.style.position.bottom);
 
-        let (dx, dy) = match node.style.position.kind {
-            crate::Position::Static => (0.0, 0.0),
-            crate::Position::Relative => (
-                left.unwrap_or_else(|| -right.unwrap_or_default()),
-                top.unwrap_or_else(|| -bottom.unwrap_or_default()),
-            ),
-            crate::Position::Absolute | crate::Position::Fixed => {
-                let target = if node.style.position.kind == crate::Position::Fixed {
-                    Rect {
-                        x: 0.0,
-                        y: 0.0,
-                        width: self.viewport_width,
-                        height: self.viewport_height,
-                    }
-                } else {
-                    containing_block
-                };
-                let target_x = if let Some(left) = left {
-                    target.x + left
-                } else if let Some(right) = right {
-                    target.right() - right - border_size.0
-                } else {
-                    parent_content_origin.0 + initial_border.x
-                };
-                let target_y = if let Some(top) = top {
-                    target.y + top
-                } else if let Some(bottom) = bottom {
-                    target.bottom() - bottom - border_size.1
-                } else {
-                    parent_content_origin.1 + initial_border.y
-                };
-                (
-                    target_x - parent_content_origin.0 - initial_border.x,
-                    target_y - parent_content_origin.1 - initial_border.y,
-                )
-            }
-        };
+        if node.style.position.kind == Position::Sticky {
+            let left = left.unwrap_or_default();
+            let right = right.unwrap_or_default();
+            let top = top.unwrap_or_default();
+            let bottom = bottom.unwrap_or_default();
 
-        node.layout_box.shift(dx, dy);
+            node.layout_box.set_sticky_inset(Edge {
+                left,
+                top,
+                right,
+                bottom,
+            });
+        } else {
+            let (dx, dy) = match node.style.position.kind {
+                Position::Static => (0.0, 0.0),
+                Position::Relative => (
+                    left.unwrap_or_else(|| -right.unwrap_or_default()),
+                    top.unwrap_or_else(|| -bottom.unwrap_or_default()),
+                ),
+                Position::Absolute | Position::Fixed => {
+                    let target = if node.style.position.kind == Position::Fixed {
+                        Rect {
+                            x: 0.0,
+                            y: 0.0,
+                            width: self.viewport_width,
+                            height: self.viewport_height,
+                        }
+                    } else {
+                        containing_block
+                    };
+                    let target_x = if let Some(left) = left {
+                        target.x + left
+                    } else if let Some(right) = right {
+                        target.right() - right - border_size.0
+                    } else {
+                        parent_content_origin.0 + initial_border.x
+                    };
+                    let target_y = if let Some(top) = top {
+                        target.y + top
+                    } else if let Some(bottom) = bottom {
+                        target.bottom() - bottom - border_size.1
+                    } else {
+                        parent_content_origin.1 + initial_border.y
+                    };
+                    (
+                        target_x - parent_content_origin.0 - initial_border.x,
+                        target_y - parent_content_origin.1 - initial_border.y,
+                    )
+                }
+                Position::Sticky => unreachable!(),
+            };
+
+            node.layout_box.shift(dx, dy);
+        }
 
         let Some(positioned_box) = node.layout_box.iter().next() else {
             return;
@@ -2723,7 +2738,7 @@ impl LayoutEngine {
             border_origin.0 + positioned_box.content_box.x - border.x,
             border_origin.1 + positioned_box.content_box.y - border.y,
         );
-        let child_containing_block = if node.style.position.kind == crate::Position::Static {
+        let child_containing_block = if node.style.position.kind == Position::Static {
             containing_block
         } else {
             Rect {
