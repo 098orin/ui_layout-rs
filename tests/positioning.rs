@@ -176,3 +176,63 @@ fn fixed_box_uses_viewport() {
     assert_eq!(block_box(node(&root, 0)).border_box.x, 240.0);
     assert_eq!(block_box(node(&root, 0)).border_box.y, 140.0);
 }
+
+#[test]
+fn absolute_auto_width_shrink_wraps_content() {
+    let absolute = LayoutNode::with_children(
+        Style {
+            position: PositionStyle {
+                kind: Position::Absolute,
+                top: Length::Px(10.0).into(),
+                left: Length::Px(15.0).into(),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        [LayoutNode::new(Style {
+            size: size(40.0, 20.0),
+            ..Default::default()
+        })],
+    );
+    let mut root = LayoutNode::with_children(Style::default(), [absolute]);
+
+    LayoutEngine::layout(&mut root, 300.0, 200.0);
+
+    let absolute_box = block_box(node(&root, 0));
+    assert_eq!(absolute_box.border_box.x, 15.0);
+    assert_eq!(absolute_box.border_box.y, 10.0);
+    assert_eq!(absolute_box.border_box.width, 40.0);
+    assert_eq!(absolute_box.border_box.height, 20.0);
+}
+
+#[test]
+fn fixed_auto_width_shrink_wraps_content() {
+    let fixed = LayoutNode::with_children(
+        Style {
+            position: PositionStyle {
+                kind: Position::Fixed,
+                right: Length::Px(20.0).into(),
+                bottom: Length::Px(20.0).into(),
+                ..Default::default()
+            },
+            spacing: Spacing {
+                padding_left: Length::Px(20.0),
+                padding_right: Length::Px(20.0),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        [LayoutNode::new(Style {
+            size: size(50.0, 30.0),
+            ..Default::default()
+        })],
+    );
+    let mut root = LayoutNode::with_children(Style::default(), [fixed]);
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    let fixed_box = block_box(node(&root, 0));
+    assert_eq!(fixed_box.border_box.width, 90.0);
+    assert_eq!(fixed_box.border_box.x, 690.0);
+    assert_eq!(fixed_box.border_box.y, 550.0);
+}

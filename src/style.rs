@@ -655,8 +655,10 @@ pub struct Style {
 
     pub flex_direction: FlexDirection,
     pub flex_wrap: FlexWrap,
+
     pub column_gap: LengthOrAuto,
     pub row_gap: LengthOrAuto,
+
     pub grid_template_columns: Vec<GridTrack>,
     pub grid_template_rows: Vec<GridTrack>,
     pub grid_template_areas: Vec<Vec<String>>,

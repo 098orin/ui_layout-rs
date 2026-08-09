@@ -147,7 +147,10 @@ fn max_height_clamp_preserves_aspect_ratio_when_both_auto() {
         ..Default::default()
     };
     let (w, h) = resolve(&style, 1183.0, 683.0, Some(1183.0 / 683.0));
-    assert!((h - 300.0).abs() < 0.01, "height should clamp to 300, got {h}");
+    assert!(
+        (h - 300.0).abs() < 0.01,
+        "height should clamp to 300, got {h}"
+    );
     assert!(
         (w - 300.0 * (1183.0 / 683.0)).abs() < 0.01,
         "width should derive from the clamped height, got {w}"

@@ -599,9 +599,25 @@ impl LayoutEngine {
             };
         }
 
-        let content_width_opt = content_width_opt.or(ctx
-            .available_width
-            .map(|v| (v - border.left - border.right - padding.left - padding.right).max(0.0)));
+        // In-flow block boxes with an `auto` width stretch to the available
+        // width. Out-of-flow (absolute/fixed) boxes shrink-to-fit instead,
+        // so keep `auto` as `None` to let the inner display shrink-wrap
+        // around its content.
+        let content_width_opt = if node.style.position.kind.is_out_of_flow() {
+            content_width_opt
+        } else {
+            content_width_opt.or(ctx.available_width.map(|v| {
+                let padding_border_edge = border.left + border.right + padding.left + padding.right;
+                self.apply_size_constraints(
+                    v - padding_border_edge,
+                    &node.style.size,
+                    ctx,
+                    true,
+                    &node.style.box_sizing,
+                    padding_border_edge,
+                )
+            }))
+        };
 
         self.layout_by_inner_display(
             node,
@@ -1543,7 +1559,7 @@ impl LayoutEngine {
                         &node.style.size,
                         ctx,
                         true,
-                        Some(&node.style.box_sizing),
+                        &node.style.box_sizing,
                         pb_w,
                     ),
                     self.apply_size_constraints(
@@ -1551,7 +1567,7 @@ impl LayoutEngine {
                         &node.style.size,
                         ctx,
                         false,
-                        Some(&node.style.box_sizing),
+                        &node.style.box_sizing,
                         pb_h,
                     ),
                 )
@@ -1662,7 +1678,7 @@ impl LayoutEngine {
                 &node.style.size,
                 ctx,
                 true,
-                Some(&node.style.box_sizing),
+                &node.style.box_sizing,
                 pb_w,
             );
             let content_height = self.apply_size_constraints(
@@ -1670,7 +1686,7 @@ impl LayoutEngine {
                 &node.style.size,
                 ctx,
                 false,
-                Some(&node.style.box_sizing),
+                &node.style.box_sizing,
                 pb_h,
             );
 
@@ -1757,7 +1773,7 @@ impl LayoutEngine {
             &node.style.size,
             ctx,
             true,
-            Some(&node.style.box_sizing),
+            &node.style.box_sizing,
             flex_pb_w,
         );
 
@@ -1766,7 +1782,7 @@ impl LayoutEngine {
             &node.style.size,
             ctx,
             false,
-            Some(&node.style.box_sizing),
+            &node.style.box_sizing,
             flex_pb_h,
         );
 
@@ -3226,9 +3242,6 @@ impl LayoutEngine {
     }
 
     /// ((content_width_opt, content_height_opt), border, padding)
-    ///
-    /// TODO:
-    /// - Handle min/max with box-sizing correctly.
     fn resolve_base_content_size_and_spacing(
         &self,
         size_style: &crate::SizeStyle,
@@ -3266,7 +3279,7 @@ impl LayoutEngine {
                     size_style,
                     ctx,
                     true,
-                    Some(box_sizing),
+                    box_sizing,
                     padding.left + padding.right + border.left + border.right,
                 )
             });
@@ -3295,7 +3308,7 @@ impl LayoutEngine {
                     size_style,
                     ctx,
                     false,
-                    Some(box_sizing),
+                    box_sizing,
                     padding.top + padding.bottom + border.top + border.bottom,
                 )
             });
@@ -3310,7 +3323,7 @@ impl LayoutEngine {
         size_style: &crate::SizeStyle,
         ctx: &InternalLayoutContext,
         is_width: bool,
-        box_sizing: Option<&BoxSizing>,
+        box_sizing: &BoxSizing,
         padding_border_edge: f32,
     ) -> f32 {
         let containing_size = if is_width {
@@ -3328,7 +3341,7 @@ impl LayoutEngine {
         );
 
         let (min_constraint, max_constraint) = match box_sizing {
-            Some(BoxSizing::BorderBox) => (
+            BoxSizing::BorderBox => (
                 min_constraint.map(|m| (m - padding_border_edge).max(0.0)),
                 max_constraint.map(|m| (m - padding_border_edge).max(0.0)),
             ),

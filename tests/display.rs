@@ -127,6 +127,36 @@ fn display_length_and_enum_variants() {
 }
 
 #[test]
+fn display_node_with_position_properties() {
+    let mut node = LayoutNode::new(Style::default());
+    node.style.position.kind = Position::Fixed;
+    node.style.position.top = LengthOrAuto::Length(Length::Px(10.0));
+    node.style.position.right = LengthOrAuto::Length(Length::Px(20.0));
+    assert_eq!(
+        format!("{}", node),
+        "LayoutNode [position: fixed, top: 10px, right: 20px]\n"
+    );
+}
+
+#[test]
+fn display_style_position() {
+    let style = Style {
+        position: PositionStyle {
+            kind: Position::Absolute,
+            bottom: LengthOrAuto::Length(Length::Percent(5.0)),
+            ..Default::default()
+        },
+        ..Style::default()
+    };
+    assert_eq!(format!("{}", style), "position: absolute, bottom: 5%");
+
+    assert_eq!(format!("{}", Position::Static), "static");
+    assert_eq!(format!("{}", Position::Relative), "relative");
+    assert_eq!(format!("{}", Position::Absolute), "absolute");
+    assert_eq!(format!("{}", Position::Fixed), "fixed");
+}
+
+#[test]
 fn display_placement() {
     let p = Placement {
         offset: (42.5, 10.0),
