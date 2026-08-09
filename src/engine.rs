@@ -1136,9 +1136,13 @@ impl LayoutEngine {
         state: &mut FlowState,
     ) {
         let child_node = match &mut node.children[i] {
-            LayoutChild::Node(n) => n,
+            LayoutChild::Node(node) => node,
             _ => unreachable!(),
         };
+
+        let child_display = child_node.style.display.outer;
+        let child_is_block = child_display == OuterDisplay::Block;
+        let child_is_inline = child_display == OuterDisplay::Inline;
 
         if child_node.style.position.kind.is_out_of_flow() {
             let _ = self.layout_node(
@@ -1156,13 +1160,16 @@ impl LayoutEngine {
             available_width: state
                 .content_width_opt
                 .or(ctx.available_width)
-                .map(|v| v - child_margin.left.unwrap_or(0.0) - child_margin.right.unwrap_or(0.0)),
+                .map(|width| {
+                    width
+                        - child_margin.left.unwrap_or_default()
+                        - child_margin.right.unwrap_or_default()
+                }),
             ..*base_ctx_for_child
         };
 
         let line_ctx_for_child = state.cursor.line_ctx();
 
-        let child_is_block = child_node.style.display.outer == OuterDisplay::Block;
         let layout_line_ctx = if child_is_block {
             EMPTY_LINE_CONTEXT
         } else {
@@ -1185,14 +1192,6 @@ impl LayoutEngine {
             line_ctx_for_child.end_pos
         };
 
-        if child_is_block {
-            state
-                .cursor
-                .set_pos(0.0, child_position_y + updated_line_ctx.end_pos.1);
-        } else {
-            state.cursor.update_from(&updated_line_ctx);
-        }
-
         let EdgeOption {
             left: ml_opt,
             top,
@@ -1210,6 +1209,8 @@ impl LayoutEngine {
 
         child_node.layout_box.shift(ml, 0.0);
 
+        let mut block_margin_top = 0.0;
+
         if child_is_block {
             let top_collapses = state.collapse_margins
                 && !state.accum.first_block_child_processed
@@ -1225,27 +1226,36 @@ impl LayoutEngine {
                     // store margin for potential collapse with parent.
                     state.accum.first_child_margin = effective_top;
                 } else {
-                    // Subsequent child: collapse with previous sibling's bottom margin.
-                    let margin_top = state.accum.prev_child_margin.max(effective_top);
-                    child_node.layout_box.shift(0.0, margin_top);
-                    state.cursor.shift_y(margin_top);
+                    // Collapse the previous sibling's bottom margin with this child's top margin.
+                    block_margin_top = state.accum.prev_child_margin.max(effective_top);
+
+                    child_node.layout_box.shift(0.0, block_margin_top);
+                    state.cursor.shift_y(block_margin_top);
                 }
             } else {
-                // FlowRoot: margins are additive, never collapse.
-                let margin_top = state.accum.prev_child_margin + effective_top;
-                child_node.layout_box.shift(0.0, margin_top);
-                state.cursor.shift_y(margin_top);
+                // Margins do not collapse inside a flow root.
+                block_margin_top = state.accum.prev_child_margin + effective_top;
+
+                child_node.layout_box.shift(0.0, block_margin_top);
+                state.cursor.shift_y(block_margin_top);
             }
 
             state.accum.prev_child_margin = effective_bottom;
             state.accum.first_block_child_processed = true;
+
+            state.cursor.set_pos(
+                0.0,
+                child_position_y + updated_line_ctx.end_pos.1 + block_margin_top,
+            );
         } else {
             // Inline-level margins consume inline space on both sides.
+            state.cursor.update_from(&updated_line_ctx);
+
             state.cursor.x += ml + mr;
             state.cursor.current_x += ml + mr;
         }
 
-        if child_node.style.display.outer == OuterDisplay::Inline {
+        if child_is_inline {
             child_node.layout_box.shift(child_position_x, 0.0);
         } else {
             child_node
@@ -1253,9 +1263,7 @@ impl LayoutEngine {
                 .shift(child_position_x, child_position_y);
         }
 
-        if node.style.display.outer == OuterDisplay::Inline
-            && child_node.style.display.outer == OuterDisplay::Inline
-        {
+        if node.style.display.outer == OuterDisplay::Inline && child_is_inline {
             collect_inline_spans_from_child(
                 child_node,
                 line_ctx_for_child,
@@ -1263,7 +1271,7 @@ impl LayoutEngine {
             );
         }
 
-        if child_node.style.display.outer == OuterDisplay::Inline {
+        if child_is_inline {
             for line_box in child_node.layout_box.iter() {
                 state.accum.max_inline_line_height = state
                     .accum
@@ -1275,6 +1283,7 @@ impl LayoutEngine {
         let (child_right, child_bottom) = compute_child_layout_extent(child_node);
 
         state.accum.children_width = state.accum.children_width.max(child_right);
+
         let inline_extent = compute_inline_extent(
             child_node,
             child_is_block,
@@ -1283,13 +1292,14 @@ impl LayoutEngine {
             state.accum.prev_child_margin,
             state.accum.max_inline_line_height,
         );
+
         state.accum.children_height = state.accum.children_height.max(inline_extent);
 
-        if child_node.style.display.outer == OuterDisplay::Inline {
-            state.accum.pending_advance = child_node.layout_box.height()
+        state.accum.pending_advance = if child_is_inline {
+            child_node.layout_box.height()
         } else {
-            state.accum.pending_advance = 0.0;
-        }
+            0.0
+        };
     }
 
     fn process_flow_custom_item(
