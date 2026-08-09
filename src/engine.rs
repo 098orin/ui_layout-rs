@@ -1069,7 +1069,7 @@ impl LayoutEngine {
                             let mut ctx_for_child = crate::LayoutContext::from(&base_ctx_for_child);
                             ctx_for_child.start_pos = state.cursor.pos();
                             ctx_for_child.available_inline_size =
-                                outbox_width - state.cursor.current_x;
+                                (outbox_width - state.cursor.x).max(0.0);
                             ctx_for_child.line_height = line_height;
                             self.process_flow_custom_item(
                                 node,

@@ -789,3 +789,36 @@ fn flow_single_object_children_box_tracks_object_size() {
     assert!(b.children_box.width <= b.content_box.width);
     assert!(b.children_box.height >= 20.0);
 }
+
+#[test]
+fn custom_text_after_linebreak_receives_full_line_width() {
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                height: LengthOrAuto::Auto,
+                ..Default::default()
+            },
+            line_height: Length::Px(20.0),
+            ..Default::default()
+        },
+        [
+            custom_inline(FixedObject {
+                width: 180.0,
+                height: 20.0,
+            }),
+            LayoutChild::from(ItemFragment::LineBreak),
+            custom_inline(TextRun {
+                total_width: 100.0,
+                height: 20.0,
+            }),
+        ],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    let result = root.children[2].custom_result().unwrap();
+    assert_eq!(result.spans.len(), 1);
+    assert_eq!(result.spans[0].line_pos, (0.0, 20.0));
+    assert_eq!(result.spans[0].width(), 100.0);
+}
