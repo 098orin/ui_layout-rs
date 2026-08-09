@@ -820,5 +820,6 @@ fn custom_text_after_linebreak_receives_full_line_width() {
     let result = root.children[2].custom_result().unwrap();
     assert_eq!(result.spans.len(), 1);
     assert_eq!(result.spans[0].line_pos, (0.0, 20.0));
+    assert_eq!(result.spans[0].line_index, 1);
     assert_eq!(result.spans[0].width(), 100.0);
 }

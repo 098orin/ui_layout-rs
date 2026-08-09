@@ -181,10 +181,6 @@ impl FlowCursor {
         self.current_x = ctx.current_x;
     }
 
-    fn advance_line_index(&mut self, n: usize) {
-        self.line_index += n;
-    }
-
     fn set_pos(&mut self, x: f32, y: f32) {
         self.x = x;
         self.y = y;
@@ -1115,7 +1111,7 @@ impl LayoutEngine {
 
         let line_ctx_for_child = state.cursor.line_ctx();
 
-        let (line_spans, updated_line_ctx) = Self::flow_fragments(
+        let (line_spans, updated_line_ctx, updated_line_index) = Self::flow_fragments(
             &mut fragment_node_buffer,
             line_ctx_for_child,
             state.cursor.line_index,
@@ -1140,9 +1136,7 @@ impl LayoutEngine {
         }
 
         state.cursor.update_from(&updated_line_ctx);
-        state
-            .cursor
-            .advance_line_index(line_spans.len().saturating_sub(1));
+        state.cursor.line_index = updated_line_index;
 
         for span in line_spans {
             push_or_merge_line_span(&mut state.accum.line_span_buf, span);
@@ -1366,7 +1360,11 @@ impl LayoutEngine {
 
                     (vec![span], bm)
                 } else {
-                    (inline.line_spans, inline.box_model)
+                    let mut line_spans = inline.line_spans;
+                    for span in &mut line_spans {
+                        span.line_index += state.cursor.line_index;
+                    }
+                    (line_spans, inline.box_model)
                 }
             }
             LayoutBox::BlockBox(mut bm) => {
@@ -3141,7 +3139,7 @@ impl LayoutEngine {
         line_index: usize,
         line_height: f32,
         outbox_width: f32,
-    ) -> (Vec<LineSpan>, LineContext) {
+    ) -> (Vec<LineSpan>, LineContext, usize) {
         let mut cursor_x = line_ctx.end_pos.0;
         let mut cursor_y = line_ctx.end_pos.1;
 
@@ -3238,6 +3236,7 @@ impl LayoutEngine {
                 margin_start: 0.0,
                 margin_end: 0.0,
             },
+            line_index,
         )
     }
 
@@ -3995,7 +3994,7 @@ fn flow_fragment_range(
         .filter_map(|child| child.fragment_mut())
         .collect();
 
-    let (line_spans, line_ctx) = LayoutEngine::flow_fragments(
+    let (line_spans, line_ctx, _) = LayoutEngine::flow_fragments(
         &mut fragment_node_buffer,
         line_ctx,
         line_index,
