@@ -40,6 +40,7 @@ impl fmt::Display for Position {
             Position::Relative => write!(f, "relative"),
             Position::Absolute => write!(f, "absolute"),
             Position::Fixed => write!(f, "fixed"),
+            Position::Sticky => write!(f, "sticky"),
         }
     }
 }

@@ -7,7 +7,7 @@ fn display_default_node() {
 
     let mut node2 = LayoutNode::new(Style::default());
     node2.layout_box = LayoutBox::BlockBox(BoxModel {
-        sticky_position: None,
+        sticky_inset: None,
         border_box: Rect {
             x: 10.0,
             y: 20.0,
@@ -175,7 +175,7 @@ fn display_alternate_with_style_and_box() {
     node.style.display = Display::parse("flex").unwrap();
     node.style.flex_direction = FlexDirection::Row;
     node.layout_box = LayoutBox::BlockBox(BoxModel {
-        sticky_position: None,
+        sticky_inset: None,
         border_box: Rect {
             x: 0.0,
             y: 0.0,
@@ -210,7 +210,7 @@ fn display_alternate_inline_box() {
     let mut node = LayoutNode::new(Style::default());
     node.layout_box = LayoutBox::InlineBox(InlineBox {
         box_model: BoxModel {
-            sticky_position: None,
+            sticky_inset: None,
             border_box: Rect {
                 x: 5.0,
                 y: 10.0,
@@ -461,7 +461,7 @@ fn display_layout_box_variants() {
     assert_eq!(format!("{:#}", none), "none");
 
     let b = LayoutBox::BlockBox(BoxModel {
-        sticky_position: None,
+        sticky_inset: None,
         border_box: Rect {
             x: 10.0,
             y: 20.0,
@@ -495,7 +495,7 @@ fn display_layout_box_variants() {
 fn display_inline_box_full_variant() {
     let inline = LayoutBox::InlineBox(InlineBox {
         box_model: BoxModel {
-            sticky_position: None,
+            sticky_inset: None,
             border_box: Rect {
                 x: 5.0,
                 y: 10.0,
@@ -535,7 +535,7 @@ fn display_inline_box_full_variant() {
 #[test]
 fn owned_layout_box_into_iter_block() {
     let block = LayoutBox::BlockBox(BoxModel {
-        sticky_position: None,
+        sticky_inset: None,
         border_box: rect(0.0, 0.0, 100.0, 50.0),
         padding_box: rect(0.0, 0.0, 100.0, 50.0),
         content_box: rect(0.0, 0.0, 100.0, 50.0),
@@ -557,7 +557,7 @@ fn owned_layout_box_into_iter_none() {
 fn owned_layout_box_into_iter_empty_inline() {
     let inline = LayoutBox::InlineBox(InlineBox {
         box_model: BoxModel {
-            sticky_position: None,
+            sticky_inset: None,
             border_box: rect(0.0, 0.0, 50.0, 20.0),
             padding_box: rect(0.0, 0.0, 50.0, 20.0),
             content_box: rect(0.0, 0.0, 50.0, 20.0),

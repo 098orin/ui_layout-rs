@@ -8,6 +8,14 @@ pub struct Rect {
     pub height: f32,
 }
 
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Edge {
+    pub left: f32,
+    pub top: f32,
+    pub right: f32,
+    pub bottom: f32,
+}
+
 /// Represents the layout box model of an element.
 ///
 /// Each field is expressed in absolute coordinates relative to the
@@ -15,7 +23,7 @@ pub struct Rect {
 #[derive(Debug, Clone, Default)]
 pub struct BoxModel {
     /// x, y cordination for position: sticky.
-    pub sticky_position: Option<(f32, f32)>,
+    pub sticky_inset: Option<Edge>,
     /// The outermost box including border.
     pub border_box: Rect,
     /// The box inside the border, including padding.
@@ -157,7 +165,7 @@ impl Rect {
 impl From<Rect> for BoxModel {
     fn from(rect: Rect) -> Self {
         Self {
-            sticky_position: None,
+            sticky_inset: None,
             border_box: rect,
             padding_box: rect,
             content_box: rect,

@@ -1,5 +1,5 @@
 use crate::{
-    AlignContent, AlignItems, AutoSizeBehavior, BoxModel, BoxSizing, CustomObjectResult,
+    AlignContent, AlignItems, AutoSizeBehavior, BoxModel, BoxSizing, CustomObjectResult, Edge,
     FlexDirection, FlexWrap, FragmentNode, GridPlacement, GridRepeat, GridTrack, InlineBox,
     InnerDisplay, ItemFragment, JustifyContent, LayoutBox, LayoutChild, LayoutNode, LengthOrAuto,
     LineSpan, OuterDisplay, Placement, Rect, Spacing, Style,
@@ -75,19 +75,11 @@ impl LayoutMetrics {
 //=====================
 
 #[derive(Clone, Copy, Default)]
-struct Edge {
-    left: f32,
-    top: f32,
-    right: f32,
-    bottom: f32,
-}
-
-#[derive(Clone, Copy, Default)]
-pub struct EdgeOption {
-    pub left: Option<f32>,
-    pub top: Option<f32>,
-    pub right: Option<f32>,
-    pub bottom: Option<f32>,
+struct EdgeOption {
+    left: Option<f32>,
+    top: Option<f32>,
+    right: Option<f32>,
+    bottom: Option<f32>,
 }
 
 impl EdgeOption {
@@ -4087,7 +4079,7 @@ fn create_box_model(
     };
 
     BoxModel {
-        sticky_position: None,
+        sticky_inset: None,
         content_box,
         padding_box,
         border_box,
