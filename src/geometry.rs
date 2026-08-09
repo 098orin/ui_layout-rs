@@ -23,7 +23,7 @@ pub struct Edge {
 #[derive(Debug, Clone, Default)]
 pub struct BoxModel {
     /// x, y cordination for position: sticky.
-    pub sticky_inset: Option<Edge>,
+    pub sticky_edges: Option<Edge>,
     /// The outermost box including border.
     pub border_box: Rect,
     /// The box inside the border, including padding.
@@ -165,7 +165,7 @@ impl Rect {
 impl From<Rect> for BoxModel {
     fn from(rect: Rect) -> Self {
         Self {
-            sticky_inset: None,
+            sticky_edges: None,
             border_box: rect,
             padding_box: rect,
             content_box: rect,
@@ -205,11 +205,11 @@ impl LayoutBox {
         }
     }
 
-    pub(crate) fn set_sticky_inset(&mut self, edge: Edge) {
+    pub(crate) fn set_sticky_edges(&mut self, edge: Edge) {
         match self {
             LayoutBox::None => {}
-            LayoutBox::BlockBox(b) => b.sticky_inset = Some(edge),
-            LayoutBox::InlineBox(inline) => inline.box_model.sticky_inset = Some(edge),
+            LayoutBox::BlockBox(b) => b.sticky_edges = Some(edge),
+            LayoutBox::InlineBox(inline) => inline.box_model.sticky_edges = Some(edge),
         }
     }
 

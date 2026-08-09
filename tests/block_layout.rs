@@ -790,7 +790,7 @@ fn parent_own_margin_collapses_with_child_margin() {
 #[test]
 fn box_model_width_height_accessors() {
     let bm = BoxModel {
-        sticky_inset: None,
+        sticky_edges: None,
         border_box: Rect {
             x: 5.0,
             y: 10.0,

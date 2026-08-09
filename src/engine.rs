@@ -2677,7 +2677,7 @@ impl LayoutEngine {
             let top = top.unwrap_or_default();
             let bottom = bottom.unwrap_or_default();
 
-            node.layout_box.set_sticky_inset(Edge {
+            node.layout_box.set_sticky_edges(Edge {
                 left,
                 top,
                 right,
@@ -4094,7 +4094,7 @@ fn create_box_model(
     };
 
     BoxModel {
-        sticky_inset: None,
+        sticky_edges: None,
         content_box,
         padding_box,
         border_box,
