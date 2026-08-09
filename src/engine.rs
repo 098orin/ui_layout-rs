@@ -1,8 +1,8 @@
 use crate::{
     AlignContent, AlignItems, AutoSizeBehavior, BoxModel, BoxSizing, CustomObjectResult, Edge,
-    FlexDirection, FlexWrap, FragmentNode, GridPlacement, GridRepeat, GridTrack, InlineBox,
-    InnerDisplay, ItemFragment, JustifyContent, LayoutBox, LayoutChild, LayoutNode, LengthOrAuto,
-    LineSpan, OuterDisplay, Placement, Position, Rect, Spacing, Style,
+    EdgeOption, FlexDirection, FlexWrap, FragmentNode, GridPlacement, GridRepeat, GridTrack,
+    InlineBox, InnerDisplay, ItemFragment, JustifyContent, LayoutBox, LayoutChild, LayoutNode,
+    LengthOrAuto, LineSpan, OuterDisplay, Placement, Position, Rect, Spacing, Style,
 };
 
 const EPSILON: f32 = 0.001;
@@ -73,25 +73,6 @@ impl LayoutMetrics {
 //=====================
 // Main code
 //=====================
-
-#[derive(Clone, Copy, Default)]
-struct EdgeOption {
-    left: Option<f32>,
-    top: Option<f32>,
-    right: Option<f32>,
-    bottom: Option<f32>,
-}
-
-impl EdgeOption {
-    fn unwrap_or_default(self) -> Edge {
-        Edge {
-            left: self.left.unwrap_or_default(),
-            top: self.top.unwrap_or_default(),
-            right: self.right.unwrap_or_default(),
-            bottom: self.bottom.unwrap_or_default(),
-        }
-    }
-}
 
 #[derive(Clone)]
 pub enum LayoutItem {
@@ -2672,12 +2653,12 @@ impl LayoutEngine {
         let bottom = resolve_y(&node.style.position.bottom);
 
         if node.style.position.kind == Position::Sticky {
-            let left = left.unwrap_or_default();
-            let right = right.unwrap_or_default();
-            let top = top.unwrap_or_default();
-            let bottom = bottom.unwrap_or_default();
+            let left = left;
+            let right = right;
+            let top = top;
+            let bottom = bottom;
 
-            node.layout_box.set_sticky_edges(Edge {
+            node.layout_box.set_sticky_edges(EdgeOption {
                 left,
                 top,
                 right,

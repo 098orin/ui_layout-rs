@@ -9,11 +9,30 @@ pub struct Rect {
 }
 
 #[derive(Debug, Clone, Copy, Default)]
-pub struct Edge {
+pub(crate) struct Edge {
     pub left: f32,
     pub top: f32,
     pub right: f32,
     pub bottom: f32,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct EdgeOption {
+    pub left: Option<f32>,
+    pub top: Option<f32>,
+    pub right: Option<f32>,
+    pub bottom: Option<f32>,
+}
+
+impl EdgeOption {
+    pub(crate) fn unwrap_or_default(self) -> Edge {
+        Edge {
+            left: self.left.unwrap_or_default(),
+            top: self.top.unwrap_or_default(),
+            right: self.right.unwrap_or_default(),
+            bottom: self.bottom.unwrap_or_default(),
+        }
+    }
 }
 
 /// Represents the layout box model of an element.
@@ -23,7 +42,7 @@ pub struct Edge {
 #[derive(Debug, Clone, Default)]
 pub struct BoxModel {
     /// x, y cordination for position: sticky.
-    pub sticky_edges: Option<Edge>,
+    pub sticky_edges: Option<EdgeOption>,
     /// The outermost box including border.
     pub border_box: Rect,
     /// The box inside the border, including padding.
@@ -205,7 +224,7 @@ impl LayoutBox {
         }
     }
 
-    pub(crate) fn set_sticky_edges(&mut self, edge: Edge) {
+    pub(crate) fn set_sticky_edges(&mut self, edge: EdgeOption) {
         match self {
             LayoutBox::None => {}
             LayoutBox::BlockBox(b) => b.sticky_edges = Some(edge),
