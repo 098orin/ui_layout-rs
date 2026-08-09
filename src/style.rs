@@ -302,6 +302,15 @@ pub enum FlexDirection {
     ColumnReverse,
 }
 
+/// Controls whether flex items are forced onto one line or may wrap.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum FlexWrap {
+    #[default]
+    NoWrap,
+    Wrap,
+    WrapReverse,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Length {
     Px(f32),
@@ -526,6 +535,19 @@ pub enum AlignItems {
     Stretch,
 }
 
+/// Distributes flex lines along the cross axis of a multi-line container.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum AlignContent {
+    Start,
+    Center,
+    End,
+    SpaceBetween,
+    SpaceAround,
+    SpaceEvenly,
+    #[default]
+    Stretch,
+}
+
 /// A single explicit or implicit CSS Grid track.
 #[derive(Debug, Clone, PartialEq)]
 pub enum GridTrack {
@@ -629,8 +651,10 @@ pub struct Style {
 
     pub justify_content: JustifyContent,
     pub align_items: AlignItems,
+    pub align_content: AlignContent,
 
     pub flex_direction: FlexDirection,
+    pub flex_wrap: FlexWrap,
 
     pub column_gap: LengthOrAuto,
     pub row_gap: LengthOrAuto,

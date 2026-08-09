@@ -93,6 +93,16 @@ impl fmt::Display for FlexDirection {
     }
 }
 
+impl fmt::Display for FlexWrap {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            FlexWrap::NoWrap => write!(f, "nowrap"),
+            FlexWrap::Wrap => write!(f, "wrap"),
+            FlexWrap::WrapReverse => write!(f, "wrap-reverse"),
+        }
+    }
+}
+
 impl fmt::Display for JustifyContent {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -113,6 +123,20 @@ impl fmt::Display for AlignItems {
             AlignItems::Center => write!(f, "center"),
             AlignItems::End => write!(f, "end"),
             AlignItems::Stretch => write!(f, "stretch"),
+        }
+    }
+}
+
+impl fmt::Display for AlignContent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            AlignContent::Start => write!(f, "start"),
+            AlignContent::Center => write!(f, "center"),
+            AlignContent::End => write!(f, "end"),
+            AlignContent::SpaceBetween => write!(f, "space-between"),
+            AlignContent::SpaceAround => write!(f, "space-around"),
+            AlignContent::SpaceEvenly => write!(f, "space-evenly"),
+            AlignContent::Stretch => write!(f, "stretch"),
         }
     }
 }
@@ -316,7 +340,9 @@ fn collect_style_entries(style: &Style) -> Vec<String> {
     entry_if!(entries, style.line_height, "line-height");
     entry_if!(entries, style.justify_content, "justify-content");
     entry_if!(entries, style.align_items, "align-items");
+    entry_if!(entries, style.align_content, "align-content");
     entry_if!(entries, style.flex_direction, "flex-direction");
+    entry_if!(entries, style.flex_wrap, "flex-wrap");
     entry_if!(entries, style.column_gap, "column-gap");
     entry_if!(entries, style.row_gap, "row-gap");
 
