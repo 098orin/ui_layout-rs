@@ -3645,12 +3645,11 @@ fn grid_cells_available(
 ) -> bool {
     (row..row + row_span).all(|r| {
         (column..column + column_span).all(|c| {
-            occupied
+            !occupied
                 .get(r)
                 .and_then(|columns| columns.get(c))
                 .copied()
                 .unwrap_or(false)
-                == false
         })
     })
 }
