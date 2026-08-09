@@ -126,15 +126,11 @@ This implementation follows CSS3 specifications with current focus on:
 
 See [CHANGELOG.md](CHANGELOG.md) for a detailed list of changes.
 
-- Version: **0.12.1**
+- Version: **[Unreleased]**
 - API is evolving but now includes full Flexbox-like alignment, gaps, inline layout, and extensibility via traits
 
 Future versions may add:
 
-- `grid`
-- Flex wrap support (`flex-wrap: wrap | nowrap | wrap-reverse`)
-- Additional flex sizing rules (fr units, etc.)
-- Absolute / fixed positioning
 - Correct flex-basis priority over width/height in flex item sizing
 
 ## License
