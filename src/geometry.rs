@@ -14,6 +14,8 @@ pub struct Rect {
 /// `border_box` origin.
 #[derive(Debug, Clone, Default)]
 pub struct BoxModel {
+    /// x, y cordination for position: sticky.
+    pub sticky_position: Option<(f32, f32)>,
     /// The outermost box including border.
     pub border_box: Rect,
     /// The box inside the border, including padding.
@@ -155,6 +157,7 @@ impl Rect {
 impl From<Rect> for BoxModel {
     fn from(rect: Rect) -> Self {
         Self {
+            sticky_position: None,
             border_box: rect,
             padding_box: rect,
             content_box: rect,

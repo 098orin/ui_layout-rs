@@ -4087,6 +4087,7 @@ fn create_box_model(
     };
 
     BoxModel {
+        sticky_position: None,
         content_box,
         padding_box,
         border_box,

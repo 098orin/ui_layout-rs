@@ -2,6 +2,35 @@ mod common;
 use common::*;
 use ui_layout::*;
 
+pub fn mock_inline_box() -> LayoutBox {
+    LayoutBox::InlineBox(InlineBox {
+        box_model: BoxModel {
+            sticky_position: None,
+            border_box: rect(0.0, 0.0, 114.0, 20.0),
+            padding_box: rect(2.0, 0.0, 110.0, 20.0),
+            content_box: rect(6.0, 0.0, 100.0, 20.0),
+            children_box: rect(6.0, 0.0, 100.0, 20.0),
+        },
+        line_spans: vec![
+            LineSpan {
+                x_range: 0.0..40.0,
+                line_pos: (6.0, 0.0),
+                line_index: 0,
+            },
+            LineSpan {
+                x_range: 40.0..70.0,
+                line_pos: (0.0, 20.0),
+                line_index: 1,
+            },
+            LineSpan {
+                x_range: 70.0..100.0,
+                line_pos: (0.0, 40.0),
+                line_index: 2,
+            },
+        ],
+    })
+}
+
 #[test]
 fn inline_margins_advance_the_following_inline_sibling() {
     let first = LayoutNode::with_children(
@@ -1030,6 +1059,7 @@ fn layout_box_width_height_variants() {
     assert_eq!(none.height(), 0.0);
 
     let block = LayoutBox::BlockBox(BoxModel {
+        sticky_position: None,
         border_box: rect(0.0, 0.0, 100.0, 50.0),
         padding_box: rect(0.0, 0.0, 100.0, 50.0),
         content_box: rect(0.0, 0.0, 100.0, 50.0),
@@ -1055,6 +1085,7 @@ fn layout_box_is_empty_and_len() {
     assert_eq!(LayoutBox::None.len(), 0);
 
     let block = LayoutBox::BlockBox(BoxModel {
+        sticky_position: None,
         border_box: rect(0.0, 0.0, 100.0, 50.0),
         padding_box: rect(0.0, 0.0, 100.0, 50.0),
         content_box: rect(0.0, 0.0, 100.0, 50.0),
@@ -1069,6 +1100,7 @@ fn layout_box_is_empty_and_len() {
 
     let inline_empty = LayoutBox::InlineBox(InlineBox {
         box_model: BoxModel {
+            sticky_position: None,
             border_box: rect(0.0, 0.0, 50.0, 20.0),
             padding_box: rect(0.0, 0.0, 50.0, 20.0),
             content_box: rect(0.0, 0.0, 50.0, 20.0),
@@ -1519,6 +1551,7 @@ fn none_and_block_iterators_report_len_and_end_correctly() {
     assert!(none_iter.next().is_none());
 
     let block = LayoutBox::BlockBox(BoxModel {
+        sticky_position: None,
         border_box: rect(1.0, 2.0, 30.0, 40.0),
         padding_box: rect(1.0, 2.0, 30.0, 40.0),
         content_box: rect(1.0, 2.0, 30.0, 40.0),

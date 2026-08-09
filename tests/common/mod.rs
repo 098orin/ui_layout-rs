@@ -102,31 +102,3 @@ pub fn custom_none(obj: impl CustomLayouter + 'static) -> LayoutChild {
 pub fn approx_eq(a: f32, b: f32) -> bool {
     (a - b).abs() < 0.01
 }
-
-pub fn mock_inline_box() -> LayoutBox {
-    LayoutBox::InlineBox(InlineBox {
-        box_model: BoxModel {
-            border_box: rect(0.0, 0.0, 114.0, 20.0),
-            padding_box: rect(2.0, 0.0, 110.0, 20.0),
-            content_box: rect(6.0, 0.0, 100.0, 20.0),
-            children_box: rect(6.0, 0.0, 100.0, 20.0),
-        },
-        line_spans: vec![
-            LineSpan {
-                x_range: 0.0..40.0,
-                line_pos: (6.0, 0.0),
-                line_index: 0,
-            },
-            LineSpan {
-                x_range: 40.0..70.0,
-                line_pos: (0.0, 20.0),
-                line_index: 1,
-            },
-            LineSpan {
-                x_range: 70.0..100.0,
-                line_pos: (0.0, 40.0),
-                line_index: 2,
-            },
-        ],
-    })
-}
