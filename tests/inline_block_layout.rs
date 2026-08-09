@@ -177,6 +177,7 @@ fn sits_inline_in_text_flow() {
     // Should be an InlineBox positioned after the fragment
     let boxes: Vec<BoxModel> = ib.layout_box.iter().collect();
     assert_eq!(boxes.len(), 1);
+    assert_eq!(boxes[0].border_box.y, 0.0);
     assert_eq!(boxes[0].border_box.x, 40.0);
     assert_eq!(boxes[0].border_box.height, 30.0);
 }
