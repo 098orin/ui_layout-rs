@@ -254,4 +254,8 @@ fn mulpiple_inline_in_a_grid_container() {
 
     assert_eq!(inline_box_model(node(&root, 0)).border_box.x, 0.0);
     assert_eq!(inline_box_model(node(&root, 1)).border_box.x, 150.0);
+
+    let boxes: Vec<BoxModel> = node(&root, 1).layout_box.iter().collect();
+    assert_eq!(boxes.len(), 1);
+    assert_eq!(boxes[0].border_box.x, 150.0);
 }
