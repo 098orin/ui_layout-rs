@@ -228,3 +228,30 @@ fn grid_children_are_relative_to_padded_content_box() {
     assert_eq!(block_box(node(&root, 0)).border_box.width, 145.0);
     assert_eq!(block_box(node(&root, 1)).border_box.x, 155.0);
 }
+
+#[test]
+fn mulpiple_inline_in_a_grid_container() {
+    let first = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline").unwrap(),
+            ..Default::default()
+        },
+        [fragment(30.0, 10.0)],
+    );
+    let second = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline").unwrap(),
+            ..Default::default()
+        },
+        [fragment(20.0, 10.0)],
+    );
+    let mut root = LayoutNode::with_children(
+        grid_container(300.0, vec![GridTrack::Flex(1.0), GridTrack::Flex(1.0)]),
+        [first, second],
+    );
+
+    LayoutEngine::layout(&mut root, 200.0, 100.0);
+
+    assert_eq!(inline_box_model(node(&root, 0)).border_box.x, 0.0);
+    assert_eq!(inline_box_model(node(&root, 1)).border_box.x, 150.0);
+}
