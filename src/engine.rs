@@ -1844,7 +1844,7 @@ impl LayoutEngine {
         };
 
         if !intrinsic_pass {
-            self.flow_flex_children(node, axis, ctx);
+            self.position_flex_children(node, axis, ctx);
         }
 
         LineContext {
@@ -1979,7 +1979,7 @@ impl LayoutEngine {
             .filter(|state| !state.frozen_grow)
             .map(|state| state.grow)
             .sum();
-        let mut remaining = compute_flex_remaining(containing_main, states, gap, item_len);
+        let mut remaining = flex_remaining(containing_main, states, gap, item_len);
 
         loop {
             if remaining > EPSILON {
@@ -2448,7 +2448,12 @@ impl LayoutEngine {
     }
 
     /// Set child positions.
-    fn flow_flex_children(&self, node: &mut LayoutNode, axis: Axis, ctx: &InternalLayoutContext) {
+    fn position_flex_children(
+        &self,
+        node: &mut LayoutNode,
+        axis: Axis,
+        ctx: &InternalLayoutContext,
+    ) {
         if node.children.is_empty() {
             return;
         }
@@ -3480,12 +3485,7 @@ fn collect_flex_line_ranges(
     lines
 }
 
-fn compute_flex_remaining(
-    cbm: Option<f32>,
-    states: &[FlexItemState],
-    gap: f32,
-    item_len: usize,
-) -> f32 {
+fn flex_remaining(cbm: Option<f32>, states: &[FlexItemState], gap: f32, item_len: usize) -> f32 {
     let total_base_main: f32 = states.iter().map(|i| i.main_size).sum();
     let total_main_padding: f32 = states
         .iter()
