@@ -64,6 +64,12 @@ pub struct InlineBox {
     pub line_spans: Vec<LineSpan>,
 }
 
+impl InlineBox {
+    pub(crate) fn shift(&mut self, dx: f32, dy: f32) {
+        self.box_model.shift(dx, dy);
+    }
+}
+
 /// A span of an inline box on a single line.
 #[derive(Debug, Clone)]
 pub struct LineSpan {
@@ -218,9 +224,7 @@ impl LayoutBox {
         match self {
             LayoutBox::None => {}
             LayoutBox::BlockBox(b) => b.shift(dx, dy),
-            LayoutBox::InlineBox(inline) => {
-                inline.box_model.shift(dx, dy);
-            }
+            LayoutBox::InlineBox(inline) => inline.shift(dx, dy),
         }
     }
 

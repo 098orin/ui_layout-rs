@@ -1249,7 +1249,7 @@ impl LayoutEngine {
             );
         } else {
             // Inline-level margins consume inline space on both sides.
-            state.cursor.update_from(&updated_line_ctx);
+            state.cursor.update_from(&dbg!(updated_line_ctx));
 
             state.cursor.x += ml + mr;
             state.cursor.current_x += ml + mr;

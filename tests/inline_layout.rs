@@ -32,6 +32,39 @@ pub fn mock_inline_box() -> LayoutBox {
 }
 
 #[test]
+fn multiple_inline_flow() {
+    let first = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline").unwrap(),
+            ..Default::default()
+        },
+        [fragment(30.0, 10.0)],
+    );
+    let second = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline").unwrap(),
+            ..Default::default()
+        },
+        [fragment(20.0, 10.0)],
+    );
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: Length::Px(200.0).into(),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        [first, second],
+    );
+
+    LayoutEngine::layout(&mut root, 200.0, 100.0);
+
+    assert_eq!(inline_box_model(node(&root, 0)).border_box.x, 0.0);
+    assert_eq!(inline_box_model(node(&root, 1)).border_box.x, 30.0);
+}
+
+#[test]
 fn inline_margins_advance_the_following_inline_sibling() {
     let first = LayoutNode::with_children(
         Style {
