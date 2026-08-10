@@ -2270,7 +2270,9 @@ impl LayoutEngine {
 
         let relative_x = child_origin.0 - placement.content_box.x;
         let relative_y = child_origin.1 - placement.content_box.y;
-        child_node.layout_box.shift_with_spans(relative_x, relative_y);
+        child_node
+            .layout_box
+            .shift_with_spans(relative_x, relative_y);
 
         if placement.reversed {
             placement.cursor_main -= margin_start + placement.gap + placement.gap_between;
@@ -2469,6 +2471,10 @@ impl LayoutEngine {
         let items: Vec<_> = LayoutItems::new(&node.children)
             .filter(|item| item_participates_in_normal_flow(&node.children, item))
             .collect();
+
+        if items.is_empty() {
+            return;
+        }
 
         let mut outer_main_sizes = Vec::with_capacity(items.len());
         for item in &items {
