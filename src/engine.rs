@@ -883,7 +883,7 @@ impl LayoutEngine {
                         ..*base_ctx
                     };
                     let _ = self.layout_node(child, &child_ctx, EMPTY_LINE_CONTEXT, false);
-                    child.layout_box.shift(x, y);
+                    child.layout_box.shift_with_spans(x, y);
                 }
                 LayoutItem::Fragments(range) => {
                     let line_height = resolved_fragment_line_height(
@@ -2270,7 +2270,7 @@ impl LayoutEngine {
 
         let relative_x = child_origin.0 - placement.content_box.x;
         let relative_y = child_origin.1 - placement.content_box.y;
-        child_node.layout_box.shift(relative_x, relative_y);
+        child_node.layout_box.shift_with_spans(relative_x, relative_y);
 
         if placement.reversed {
             placement.cursor_main -= margin_start + placement.gap + placement.gap_between;

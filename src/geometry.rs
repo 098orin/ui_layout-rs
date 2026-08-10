@@ -65,8 +65,24 @@ pub struct InlineBox {
 }
 
 impl InlineBox {
+    /// Translates only the box model.
+    ///
+    /// Used in flow layout where the line spans are already positioned
+    /// during layout via the propagated `LineContext`.
     pub(crate) fn shift(&mut self, dx: f32, dy: f32) {
         self.box_model.shift(dx, dy);
+    }
+
+    /// Translates the box model together with every line span.
+    ///
+    /// Used when a container moves an inline box atomically after it was
+    /// laid out with an empty `LineContext` (e.g. grid/flex item placement).
+    pub(crate) fn shift_with_spans(&mut self, dx: f32, dy: f32) {
+        self.box_model.shift(dx, dy);
+        for span in &mut self.line_spans {
+            span.line_pos.0 += dx;
+            span.line_pos.1 += dy;
+        }
     }
 }
 
@@ -225,6 +241,14 @@ impl LayoutBox {
             LayoutBox::None => {}
             LayoutBox::BlockBox(b) => b.shift(dx, dy),
             LayoutBox::InlineBox(inline) => inline.shift(dx, dy),
+        }
+    }
+
+    pub(crate) fn shift_with_spans(&mut self, dx: f32, dy: f32) {
+        match self {
+            LayoutBox::None => {}
+            LayoutBox::BlockBox(b) => b.shift(dx, dy),
+            LayoutBox::InlineBox(inline) => inline.shift_with_spans(dx, dy),
         }
     }
 

@@ -1683,3 +1683,44 @@ fn align_content_stretch_expands_lines_and_auto_cross_items() {
     assert_eq!(block_box(node(&root, 1)).content_box.height, 50.0);
     assert_eq!(block_box(node(&root, 1)).border_box.y, 50.0);
 }
+
+// --- Inline children placement ---
+
+#[test]
+fn inline_children_in_flex_row_move_line_spans_with_their_box() {
+    let first = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline").unwrap(),
+            ..Default::default()
+        },
+        [fragment(30.0, 10.0)],
+    );
+    let second = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline").unwrap(),
+            ..Default::default()
+        },
+        [fragment(20.0, 10.0)],
+    );
+    let mut root = LayoutNode::with_children(
+        flex_container(300.0, 50.0, FlexDirection::Row),
+        [first, second],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    assert_eq!(inline_box_model(node(&root, 0)).border_box.x, 0.0);
+    assert_eq!(inline_box_model(node(&root, 1)).border_box.x, 30.0);
+
+    let boxes: Vec<BoxModel> = node(&root, 1).layout_box.iter().collect();
+    assert_eq!(boxes.len(), 1);
+    assert_eq!(boxes[0].border_box.x, 30.0);
+
+    match &node(&root, 1).layout_box {
+        LayoutBox::InlineBox(inline) => {
+            assert_eq!(inline.line_spans.len(), 1);
+            assert_eq!(inline.line_spans[0].line_pos, (30.0, 0.0));
+        }
+        _ => panic!("expected inline box"),
+    }
+}

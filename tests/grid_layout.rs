@@ -258,4 +258,12 @@ fn mulpiple_inline_in_a_grid_container() {
     let boxes: Vec<BoxModel> = node(&root, 1).layout_box.iter().collect();
     assert_eq!(boxes.len(), 1);
     assert_eq!(boxes[0].border_box.x, 150.0);
+
+    match &node(&root, 1).layout_box {
+        LayoutBox::InlineBox(inline) => {
+            assert_eq!(inline.line_spans.len(), 1);
+            assert_eq!(inline.line_spans[0].line_pos, (150.0, 0.0));
+        }
+        _ => panic!("expected inline box"),
+    }
 }
