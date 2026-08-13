@@ -3614,21 +3614,29 @@ fn grid_item_placements(node: &LayoutNode, item: &LayoutItem) -> (GridPlacement,
 }
 
 fn named_grid_area(areas: &[Vec<String>], name: &str) -> Option<(GridPlacement, GridPlacement)> {
-    let mut min_column = usize::MAX;
-    let mut max_column = 0;
-    let mut min_row = usize::MAX;
-    let mut max_row = 0;
+    let mut min_column: Option<usize> = None;
+    let mut max_column: Option<usize> = None;
+    let mut min_row: Option<usize> = None;
+    let mut max_row: Option<usize> = None;
+
     for (row, names) in areas.iter().enumerate() {
         for (column, area) in names.iter().enumerate() {
             if area == name {
-                min_column = min_column.min(column);
-                max_column = max_column.max(column);
-                min_row = min_row.min(row);
-                max_row = max_row.max(row);
+                min_column = min_column.min(Some(column));
+                max_column = max_column.max(Some(column));
+                min_row = min_row.min(Some(row));
+                max_row = max_row.max(Some(row));
             }
         }
     }
-    (min_column != usize::MAX).then_some((
+
+    let (Some(min_column), Some(max_column), Some(min_row), Some(max_row)) =
+        (min_column, max_column, min_row, max_row)
+    else {
+        return None;
+    };
+
+    Some((
         GridPlacement {
             start: Some(min_column + 1),
             span: max_column - min_column + 1,
