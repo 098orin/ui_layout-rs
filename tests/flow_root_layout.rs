@@ -36,15 +36,17 @@ fn display_formatting() {
 
 #[test]
 fn outer_is_block() {
-    let mut root = LayoutNode::with_children(flow_root_style(), vec![new_child(30.0)]);
+    let mut root = LayoutNode::with_children(flow_root_style(), vec![new_child(30.0, 0.0)]);
     LayoutEngine::layout(&mut root, 800.0, 600.0);
     assert_eq!(block_box(&root).content_box.width, 200.0);
 }
 
 #[test]
 fn basic_block_children() {
-    let mut root =
-        LayoutNode::with_children(flow_root_style(), vec![new_child(30.0), new_child(40.0)]);
+    let mut root = LayoutNode::with_children(
+        flow_root_style(),
+        vec![new_child(30.0, 0.0), new_child(40.0, 0.0)],
+    );
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
     let b = block_box(&root);
@@ -333,7 +335,7 @@ fn nested_isolates_margin_collapse() {
             },
             ..Default::default()
         },
-        vec![new_child(20.0), inner, new_child(20.0)],
+        vec![new_child(20.0, 0.0), inner, new_child(20.0, 0.0)],
     );
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
@@ -434,7 +436,7 @@ fn with_padding_and_border() {
             },
             ..Default::default()
         },
-        vec![new_child(30.0), new_child(40.0)],
+        vec![new_child(30.0, 0.0), new_child(40.0, 0.0)],
     );
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);

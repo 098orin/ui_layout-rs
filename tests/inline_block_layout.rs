@@ -35,8 +35,10 @@ fn display_formatting() {
 
 #[test]
 fn basic_block_children() {
-    let inline_block =
-        LayoutNode::with_children(inline_block_style(), vec![new_child(30.0), new_child(40.0)]);
+    let inline_block = LayoutNode::with_children(
+        inline_block_style(),
+        vec![new_child(30.0, 0.0), new_child(40.0, 0.0)],
+    );
 
     let mut root = LayoutNode::with_children(
         Style {
@@ -55,6 +57,51 @@ fn basic_block_children() {
     let ib = inline_box_model(node(&root, 0));
     // Children stack vertically: 30 + 40 = 70
     assert_eq!(ib.content_box.height, 70.0);
+}
+
+#[test]
+fn multi_inline_block_with_block_children() {
+    let first_inline_block = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline-block").unwrap(),
+            ..Default::default()
+        },
+        vec![new_child(30.0, 200.0), new_child(40.0, 0.0)],
+    );
+
+    let second_inline_block = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline-block").unwrap(),
+            ..Default::default()
+        },
+        vec![new_child(30.0, 200.0), new_child(40.0, 0.0)],
+    );
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(800.0)),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        vec![first_inline_block, second_inline_block],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    // The inline-block should be an InlineBox
+    let fib = inline_box_model(node(&root, 0));
+    let sib = inline_box_model(node(&root, 1));
+    // Children stack vertically: 30 + 40 = 70
+    assert_eq!(fib.content_box.height, 70.0);
+    assert_eq!(sib.content_box.height, 70.0);
+    assert_eq!(fib.content_box.width, 200.0);
+    assert_eq!(sib.content_box.width, 200.0);
+    assert_eq!(fib.content_box.x, 0.0);
+    assert_eq!(sib.content_box.x, 200.0);
+    assert_eq!(fib.content_box.y, 0.0);
+    assert_eq!(sib.content_box.y, 0.0);
 }
 
 // --- No margin collapsing (flow-root behavior) ---
@@ -152,7 +199,7 @@ fn sits_inline_in_text_flow() {
             line_height: Length::Px(20.0),
             ..Default::default()
         },
-        vec![new_child(30.0)],
+        vec![new_child(30.0, 0.0)],
     );
 
     let frag_before = fragment(40.0, 10.0);
@@ -195,7 +242,7 @@ fn respects_explicit_width() {
             },
             ..Default::default()
         },
-        vec![new_child(30.0)],
+        vec![new_child(30.0, 0.0)],
     );
 
     let mut root = LayoutNode::with_children(
@@ -266,7 +313,7 @@ fn padding_and_border_applied() {
             },
             ..Default::default()
         },
-        vec![new_child(30.0)],
+        vec![new_child(30.0, 0.0)],
     );
 
     let mut root = LayoutNode::with_children(
@@ -298,7 +345,7 @@ fn multiple_inline_blocks_flow_inline() {
             line_height: Length::Px(20.0),
             ..Default::default()
         },
-        vec![new_child(30.0)],
+        vec![new_child(30.0, 0.0)],
     );
 
     let ib2 = LayoutNode::with_children(
@@ -307,7 +354,7 @@ fn multiple_inline_blocks_flow_inline() {
             line_height: Length::Px(20.0),
             ..Default::default()
         },
-        vec![new_child(25.0)],
+        vec![new_child(25.0, 0.0)],
     );
 
     let mut root = LayoutNode::with_children(

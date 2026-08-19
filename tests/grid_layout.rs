@@ -21,7 +21,7 @@ fn grid_container(width: f32, columns: Vec<GridTrack>) -> Style {
 fn fraction_tracks_share_remaining_width() {
     let mut style = grid_container(310.0, vec![GridTrack::Flex(1.0), GridTrack::Flex(2.0)]);
     style.column_gap = LengthOrAuto::Length(Length::Px(10.0));
-    let mut root = LayoutNode::with_children(style, [new_child(40.0), new_child(20.0)]);
+    let mut root = LayoutNode::with_children(style, [new_child_auto(40.0), new_child_auto(20.0)]);
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
@@ -41,8 +41,14 @@ fn auto_placement_fills_rows_in_source_order() {
         GridTrack::Breadth(LengthOrAuto::Length(Length::Px(30.0))),
         GridTrack::Breadth(LengthOrAuto::Length(Length::Px(40.0))),
     ];
-    let mut root =
-        LayoutNode::with_children(style, [new_child(10.0), new_child(10.0), new_child(10.0)]);
+    let mut root = LayoutNode::with_children(
+        style,
+        [
+            new_child(10.0, 0.0),
+            new_child(10.0, 0.0),
+            new_child(10.0, 0.0),
+        ],
+    );
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
@@ -100,7 +106,7 @@ fn auto_track_uses_item_intrinsic_width() {
         },
         ..Default::default()
     });
-    let mut root = LayoutNode::with_children(style, [fixed, new_child(20.0)]);
+    let mut root = LayoutNode::with_children(style, [fixed, new_child_auto(20.0)]);
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
@@ -118,8 +124,14 @@ fn fixed_repeat_expands_track_pattern() {
             vec![GridTrack::Flex(1.0)],
         )],
     );
-    let mut root =
-        LayoutNode::with_children(style, [new_child(10.0), new_child(10.0), new_child(10.0)]);
+    let mut root = LayoutNode::with_children(
+        style,
+        [
+            new_child(10.0, 0.0),
+            new_child(10.0, 0.0),
+            new_child(10.0, 0.0),
+        ],
+    );
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
@@ -141,8 +153,14 @@ fn auto_fit_minmax_collapses_empty_tracks() {
         )],
     );
     style.column_gap = LengthOrAuto::Length(Length::Px(10.0));
-    let mut root =
-        LayoutNode::with_children(style, [new_child(10.0), new_child(10.0), new_child(10.0)]);
+    let mut root = LayoutNode::with_children(
+        style,
+        [
+            new_child_auto(10.0),
+            new_child_auto(10.0),
+            new_child_auto(10.0),
+        ],
+    );
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
@@ -214,7 +232,7 @@ fn grid_children_are_relative_to_padded_content_box() {
         border_bottom: Length::Px(2.0),
         ..Default::default()
     };
-    let mut root = LayoutNode::with_children(style, [new_child(20.0), new_child(20.0)]);
+    let mut root = LayoutNode::with_children(style, [new_child_auto(20.0), new_child_auto(20.0)]);
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 

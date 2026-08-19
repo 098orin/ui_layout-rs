@@ -23,7 +23,18 @@ pub fn fragment(width: f32, height: f32) -> ItemFragment {
     ItemFragment::Fragment(Fragment { width, height })
 }
 
-pub fn new_child(height: f32) -> LayoutNode {
+pub fn new_child(height: f32, width: f32) -> LayoutNode {
+    LayoutNode::new(Style {
+        size: SizeStyle {
+            width: LengthOrAuto::Length(Length::Px(width)),
+            height: LengthOrAuto::Length(Length::Px(height)),
+            ..Default::default()
+        },
+        ..Default::default()
+    })
+}
+
+pub fn new_child_auto(height: f32) -> LayoutNode {
     LayoutNode::new(Style {
         size: SizeStyle {
             height: LengthOrAuto::Length(Length::Px(height)),

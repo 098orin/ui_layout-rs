@@ -84,7 +84,7 @@ fn block_auto_height_from_children() {
             },
             ..Default::default()
         },
-        [new_child(40.0)],
+        [new_child(40.0, 0.0)],
     );
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
@@ -104,7 +104,11 @@ fn auto_height_with_multiple_children() {
             },
             ..Default::default()
         },
-        [new_child(30.0), new_child(50.0), new_child(20.0)],
+        [
+            new_child(30.0, 0.0),
+            new_child(50.0, 0.0),
+            new_child(20.0, 0.0),
+        ],
     );
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
