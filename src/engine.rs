@@ -3622,10 +3622,10 @@ fn named_grid_area(areas: &[Vec<String>], name: &str) -> Option<(GridPlacement, 
     for (row, names) in areas.iter().enumerate() {
         for (column, area) in names.iter().enumerate() {
             if area == name {
-                min_column = min_column.min(Some(column));
-                max_column = max_column.max(Some(column));
-                min_row = min_row.min(Some(row));
-                max_row = max_row.max(Some(row));
+                min_column = Some(min_column.map_or(column, |v| v.min(column)));
+                max_column = Some(max_column.map_or(column, |v| v.max(column)));
+                min_row = Some(min_row.map_or(row, |v| v.min(row)));
+                max_row = Some(max_row.map_or(row, |v| v.max(row)));
             }
         }
     }
