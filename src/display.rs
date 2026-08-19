@@ -206,10 +206,20 @@ impl fmt::Display for LayoutBox {
             LayoutBox::InlineBox(inline) => {
                 let w = self.width_box();
                 let h = self.height_box();
+                let line_pos_str = inline
+                    .line_spans
+                    .iter()
+                    .map(|s| format!("({},{})", s.line_pos.0, s.line_pos.1))
+                    .collect::<Vec<_>>()
+                    .join(", ");
                 write!(
                     f,
-                    "inline({}x{} @{},{})",
-                    w, h, inline.box_model.border_box.x, inline.box_model.border_box.y
+                    "inline({}x{} @{},{} [{}])",
+                    w,
+                    h,
+                    inline.box_model.border_box.x,
+                    inline.box_model.border_box.y,
+                    line_pos_str
                 )
             }
         }
