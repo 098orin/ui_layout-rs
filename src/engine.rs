@@ -74,10 +74,10 @@ impl LayoutMetrics {
 // Main code
 //=====================
 
-#[derive(Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum LayoutItem {
     Node(usize),
-    Fragments(std::ops::Range<usize>),
+    Fragments(usize, usize),
     Custom(usize),
 }
 
@@ -679,14 +679,18 @@ impl LayoutEngine {
         };
         self.layout_out_of_flow_node_children(node, &base_ctx, intrinsic_pass);
 
-        let items: Vec<_> = LayoutItems::new(&node.children)
-            .filter(|item| item_participates_in_normal_flow(&node.children, item))
-            .collect();
+        let mut items = std::mem::take(&mut node.items_buf);
+        items.clear();
+        items.extend(
+            LayoutItems::new(&node.children)
+                .filter(|item| item_participates_in_normal_flow(&node.children, item)),
+        );
+        let item_count = items.len();
         let columns = expand_grid_tracks(
             &node.style.grid_template_columns,
             available_width,
             column_gap,
-            items.len(),
+            item_count,
             self.viewport_width,
             self.viewport_height,
         );
@@ -694,7 +698,7 @@ impl LayoutEngine {
             &node.style.grid_template_rows,
             content_height_opt,
             row_gap,
-            items.len(),
+            item_count,
             self.viewport_width,
             self.viewport_height,
         );
@@ -705,7 +709,8 @@ impl LayoutEngine {
             .map(Vec::len)
             .max()
             .unwrap_or(0);
-        let mut slots = build_grid_slots(node, items, columns.len().max(area_column_count));
+        let mut slots = build_grid_slots(node, &items, columns.len().max(area_column_count));
+        node.items_buf = items;
 
         for slot in &mut slots {
             let (width, height) =
@@ -808,13 +813,14 @@ impl LayoutEngine {
         ctx: &InternalLayoutContext,
         intrinsic_pass: bool,
     ) -> (f32, f32) {
-        match item {
+        match *item {
             LayoutItem::Node(index) => {
-                let child = node.children[*index].node_mut().unwrap();
+                let child = node.children[index].node_mut().unwrap();
                 let _ = self.layout_node(child, ctx, EMPTY_LINE_CONTEXT, intrinsic_pass);
                 (child.layout_box.width_box(), child.layout_box.height_box())
             }
-            LayoutItem::Fragments(range) => {
+            LayoutItem::Fragments(start, end) => {
+                let range = start..end;
                 let line_height = resolved_fragment_line_height(
                     &node.children,
                     range.clone(),
@@ -835,7 +841,7 @@ impl LayoutEngine {
                 (width, height)
             }
             LayoutItem::Custom(index) => {
-                let object = node.children[*index].custom_child().unwrap();
+                let object = node.children[index].custom_child().unwrap();
                 let measured = object.layouter().measure(&crate::LayoutContext::from(ctx));
                 (measured.width, measured.height)
             }
@@ -863,9 +869,9 @@ impl LayoutEngine {
             let height = rows[slot.row..slot.row + slot.row_span].iter().sum::<f32>()
                 + row_gap * slot.row_span.saturating_sub(1) as f32;
 
-            match &slot.item {
+            match slot.item {
                 LayoutItem::Node(index) => {
-                    let child = node.children[*index].node_mut().unwrap();
+                    let child = node.children[index].node_mut().unwrap();
                     let assigned_width =
                         matches!(child.style.size.width, LengthOrAuto::Auto).then_some(width);
                     let assigned_height =
@@ -881,7 +887,8 @@ impl LayoutEngine {
                     let _ = self.layout_node(child, &child_ctx, EMPTY_LINE_CONTEXT, false);
                     child.layout_box.shift_with_spans(x, y);
                 }
-                LayoutItem::Fragments(range) => {
+                LayoutItem::Fragments(start, end) => {
+                    let range = start..end;
                     let line_height = resolved_fragment_line_height(
                         &node.children,
                         range.clone(),
@@ -906,7 +913,7 @@ impl LayoutEngine {
                     );
                 }
                 LayoutItem::Custom(index) => {
-                    let object = node.children[*index].custom_child_mut().unwrap();
+                    let object = node.children[index].custom_child_mut().unwrap();
                     let measured = object
                         .layouter()
                         .measure(&crate::LayoutContext::from(base_ctx));
@@ -1014,17 +1021,20 @@ impl LayoutEngine {
             collapse_margins: node.style.display.inner == InnerDisplay::Flow,
         };
 
-        let items: Vec<_> = LayoutItems::new(&node.children).collect();
-
-        for item in items {
+        let mut items = std::mem::take(&mut node.items_buf);
+        items.extend(LayoutItems::new(&node.children));
+        for item in items.drain(..) {
             match item {
-                LayoutItem::Fragments(range) => self.process_flow_fragment_item(
-                    node,
-                    range,
-                    outbox_width,
-                    line_height,
-                    &mut state,
-                ),
+                LayoutItem::Fragments(start, end) => {
+                    let range = start..end;
+                    self.process_flow_fragment_item(
+                        node,
+                        range,
+                        outbox_width,
+                        line_height,
+                        &mut state,
+                    )
+                }
                 LayoutItem::Node(i) => {
                     self.process_flow_node_item(node, i, ctx, &base_ctx_for_child, &mut state)
                 }
@@ -1064,6 +1074,7 @@ impl LayoutEngine {
                 }
             }
         }
+        node.items_buf = items;
 
         self.finalize_flow_box(node, ctx, content_width_opt, content_height_opt, state)
     }
@@ -1903,10 +1914,14 @@ impl LayoutEngine {
     ) -> (f32, f32) {
         self.layout_out_of_flow_node_children(node, base_ctx_for_children, intrinsic_pass);
 
-        let flex_items: Vec<_> = LayoutItems::new(&node.children)
-            .filter(|item| item_participates_in_normal_flow(&node.children, item))
-            .collect();
+        let mut flex_items = std::mem::take(&mut node.items_buf);
+        flex_items.clear();
+        flex_items.extend(
+            LayoutItems::new(&node.children)
+                .filter(|item| item_participates_in_normal_flow(&node.children, item)),
+        );
         if flex_items.is_empty() {
+            node.items_buf = flex_items;
             return (0.0, 0.0);
         }
 
@@ -1993,6 +2008,7 @@ impl LayoutEngine {
             }
         }
 
+        node.items_buf = flex_items;
         (max_main, total_cross)
     }
 
@@ -2051,9 +2067,9 @@ impl LayoutEngine {
         let vh = self.viewport_height;
         items
             .iter()
-            .map(|item| match item {
+            .map(|item| match *item {
                 LayoutItem::Node(index) => {
-                    let child = node.children[*index].node().unwrap();
+                    let child = node.children[index].node().unwrap();
                     let tuple = (child.layout_box.width_box(), child.layout_box.height_box());
                     let margin = self
                         .resolve_margin(&child.style.spacing, ctx)
@@ -2061,31 +2077,34 @@ impl LayoutEngine {
                     let margin_main = axis.edge_main(&margin);
                     axis.tuple_main(tuple) + margin_main.0 + margin_main.1
                 }
-                LayoutItem::Fragments(range) => match axis {
-                    Axis::Horizontal => node.children[range.clone()]
-                        .iter()
-                        .map(|f| f.fragment().unwrap().node.width())
-                        .sum(),
-                    Axis::Vertical => {
-                        let line_height = resolved_fragment_line_height(
-                            &node.children,
-                            range.clone(),
-                            node.style.line_height.resolve_with(None, vw, vh),
-                        );
-                        let line_count = node.children[range.clone()]
+                LayoutItem::Fragments(start, end) => {
+                    let range = start..end;
+                    match axis {
+                        Axis::Horizontal => node.children[range.clone()]
                             .iter()
-                            .filter(|f| {
-                                f.fragment()
-                                    .map(|fragment| fragment.node.is_line_break())
-                                    .unwrap_or(false)
-                            })
-                            .count()
-                            + 1;
-                        line_height * line_count as f32
+                            .map(|f| f.fragment().unwrap().node.width())
+                            .sum(),
+                        Axis::Vertical => {
+                            let line_height = resolved_fragment_line_height(
+                                &node.children,
+                                range.clone(),
+                                node.style.line_height.resolve_with(None, vw, vh),
+                            );
+                            let line_count = node.children[range.clone()]
+                                .iter()
+                                .filter(|f| {
+                                    f.fragment()
+                                        .map(|fragment| fragment.node.is_line_break())
+                                        .unwrap_or(false)
+                                })
+                                .count()
+                                + 1;
+                            line_height * line_count as f32
+                        }
                     }
-                },
+                }
                 LayoutItem::Custom(index) => {
-                    if let LayoutChild::Custom(child) = &mut node.children[*index] {
+                    if let LayoutChild::Custom(child) = &mut node.children[index] {
                         if child.style().display.outer == OuterDisplay::None {
                             0.0
                         } else {
@@ -2113,9 +2132,9 @@ impl LayoutEngine {
         let vw = self.viewport_width;
         let vh = self.viewport_height;
         items.iter().fold(0.0_f32, |maximum, item| {
-            let size = match item {
+            let size = match *item {
                 LayoutItem::Node(index) => {
-                    let child = node.children[*index].node().unwrap();
+                    let child = node.children[index].node().unwrap();
                     let tuple = (child.layout_box.width_box(), child.layout_box.height_box());
                     let margin = self
                         .resolve_margin(&child.style.spacing, ctx)
@@ -2126,7 +2145,8 @@ impl LayoutEngine {
                     };
                     axis.tuple_cross(tuple) + margin_cross
                 }
-                LayoutItem::Fragments(range) => {
+                LayoutItem::Fragments(start, end) => {
+                    let range = start..end;
                     let line_height = resolved_fragment_line_height(
                         &node.children,
                         range.clone(),
@@ -2145,12 +2165,12 @@ impl LayoutEngine {
                         Axis::Horizontal => line_height * line_count as f32,
                         Axis::Vertical => node.children[range.clone()]
                             .iter()
-                            .map(|child| child.fragment().unwrap().node.width())
+                            .map(|f| f.fragment().unwrap().node.width())
                             .sum(),
                     }
                 }
                 LayoutItem::Custom(index) => {
-                    let object = node.children[*index].custom_child().unwrap();
+                    let object = node.children[index].custom_child().unwrap();
                     let measured = object.layouter().measure(&crate::LayoutContext::from(ctx));
                     axis.tuple_cross((measured.width, measured.height))
                 }
@@ -2504,11 +2524,15 @@ impl LayoutEngine {
             .unwrap_or(0.0)
             .max(0.0);
 
-        let items: Vec<_> = LayoutItems::new(&node.children)
-            .filter(|item| item_participates_in_normal_flow(&node.children, item))
-            .collect();
+        let mut items = std::mem::take(&mut node.items_buf);
+        items.clear();
+        items.extend(
+            LayoutItems::new(&node.children)
+                .filter(|item| item_participates_in_normal_flow(&node.children, item)),
+        );
 
         if items.is_empty() {
+            node.items_buf = items;
             return;
         }
 
@@ -2630,7 +2654,8 @@ impl LayoutEngine {
                     LayoutItem::Node(index) => {
                         self.position_flex_node_child(node, axis, ctx, index, &mut placement)
                     }
-                    LayoutItem::Fragments(range) => {
+                    LayoutItem::Fragments(start, end) => {
+                        let range = start..end;
                         self.position_flex_fragments(node, axis, range, &mut placement)
                     }
                     LayoutItem::Custom(index) => {
@@ -2645,6 +2670,8 @@ impl LayoutEngine {
                 cross_cursor += line_cross + cross_gap + cross_between;
             }
         }
+
+        node.items_buf = items;
     }
 
     fn layout_out_of_flow_node_children(
@@ -2803,10 +2830,10 @@ impl LayoutEngine {
         let mut total_grow = 0.0;
 
         for (item, state) in flex_items.iter().zip(states.iter_mut()) {
-            match item {
+            match *item {
                 LayoutItem::Node(index) => {
                     let ctx = base_ctx_for_children;
-                    let node = node.children.get_mut(*index).unwrap().node_mut().unwrap();
+                    let node = node.children.get_mut(index).unwrap().node_mut().unwrap();
 
                     let padding = self.resolve_padding(&node.style.spacing, ctx);
                     state.main_padding = axis.edge_main(&padding);
@@ -2883,7 +2910,8 @@ impl LayoutEngine {
                     state.grow = node.style.item_style.flex_grow;
                     state.shrink = node.style.item_style.flex_shrink;
                 }
-                LayoutItem::Fragments(range) => {
+                LayoutItem::Fragments(start, end) => {
+                    let range = start..end;
                     let line_height = resolved_fragment_line_height(
                         &node.children,
                         range.clone(),
@@ -2904,7 +2932,7 @@ impl LayoutEngine {
                     };
                 }
                 LayoutItem::Custom(index) => {
-                    if let LayoutChild::Custom(child) = &mut node.children[*index] {
+                    if let LayoutChild::Custom(child) = &mut node.children[index] {
                         if child.style().display.outer == OuterDisplay::None {
                             state.main_size = 0.0;
                         } else {
@@ -3048,9 +3076,9 @@ impl LayoutEngine {
         let mut max_cross: f32 = 0.0;
 
         for (item, state) in flex_items.iter().zip(states) {
-            match item {
+            match *item {
                 LayoutItem::Node(index) => {
-                    let child = node.children.get_mut(*index).unwrap().node_mut().unwrap();
+                    let child = node.children.get_mut(index).unwrap().node_mut().unwrap();
 
                     let stretched_cross = self.compute_stretched_cross(
                         child,
@@ -3096,7 +3124,8 @@ impl LayoutEngine {
                         axis.tuple_main(tuple) + main_margin_start + main_margin_end;
                     max_cross = max_cross.max(axis.tuple_cross(tuple) + cross_margin);
                 }
-                LayoutItem::Fragments(range) => {
+                LayoutItem::Fragments(start, end) => {
+                    let range = start..end;
                     let line_height = resolved_fragment_line_height(
                         &node.children,
                         range.clone(),
@@ -3117,7 +3146,7 @@ impl LayoutEngine {
                 LayoutItem::Custom(index) => {
                     let object = node
                         .children
-                        .get_mut(*index)
+                        .get_mut(index)
                         .unwrap()
                         .custom_child()
                         .unwrap();
@@ -3539,11 +3568,11 @@ fn flex_remaining(cbm: Option<f32>, states: &[FlexItemState], gap: f32, item_len
 
 fn build_grid_slots(
     node: &LayoutNode,
-    items: Vec<LayoutItem>,
+    items: &[LayoutItem],
     explicit_column_count: usize,
 ) -> Vec<GridItemSlot> {
     let mut column_count = explicit_column_count.max(1);
-    for item in &items {
+    for item in items {
         let (column, _) = grid_item_placements(node, item);
         if let Some(start) = column.start {
             column_count = column_count.max(start.saturating_sub(1) + column.span.max(1));
@@ -3553,7 +3582,7 @@ fn build_grid_slots(
     let mut occupied: Vec<Vec<bool>> = Vec::new();
     let mut cursor = 0usize;
     let mut slots = Vec::with_capacity(items.len());
-    for item in items {
+    for &item in items {
         let (column, row) = grid_item_placements(node, &item);
         let column_span = column.span.max(1).min(column_count);
         let row_span = row.span.max(1);
@@ -3631,7 +3660,7 @@ fn grid_item_placements(node: &LayoutNode, item: &LayoutItem) -> (GridPlacement,
         LayoutItem::Custom(index) => node.children[*index]
             .custom_child()
             .map(|child| child.style()),
-        LayoutItem::Fragments(_) => None,
+        LayoutItem::Fragments(..) => None,
     };
     let Some(style) = style else {
         return Default::default();
@@ -3968,7 +3997,7 @@ fn item_participates_in_normal_flow(children: &[LayoutChild], item: &LayoutItem)
             .position
             .kind
             .is_out_of_flow(),
-        LayoutItem::Fragments(_) | LayoutItem::Custom(_) => true,
+        LayoutItem::Fragments(..) | LayoutItem::Custom(_) => true,
     }
 }
 
@@ -4005,7 +4034,7 @@ impl<'a> Iterator for LayoutItems<'a> {
                     end += 1;
                 }
                 self.index = end;
-                Some(LayoutItem::Fragments(start..end))
+                Some(LayoutItem::Fragments(start, end))
             }
             LayoutChild::Custom(_) => {
                 self.index = i + 1;

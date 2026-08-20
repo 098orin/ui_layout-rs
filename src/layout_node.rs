@@ -1,4 +1,4 @@
-use crate::{EMPTY_LINE_CONTEXT, LayoutBox, LayoutChild, LineContext, Style};
+use crate::{EMPTY_LINE_CONTEXT, LayoutBox, LayoutChild, LayoutItem, LineContext, Style};
 
 /// (key, (layout_box, LineContext))
 type LayoutCache = (u32, (LayoutBox, LineContext));
@@ -14,6 +14,10 @@ pub struct LayoutNode {
 
     // --- cache ---
     pub(crate) layout_box_cache: LayoutCache,
+
+    /// Reusable scratch buffer for layout item iteration.
+    /// Avoids per-layout-pass heap allocations by preserving capacity across calls.
+    pub(crate) items_buf: Vec<LayoutItem>,
 }
 
 impl LayoutNode {
@@ -23,6 +27,7 @@ impl LayoutNode {
             children: Vec::new(),
             layout_box: LayoutBox::default(),
             layout_box_cache: (0, (LayoutBox::default(), EMPTY_LINE_CONTEXT)),
+            items_buf: Vec::new(),
         }
     }
 
@@ -39,6 +44,7 @@ impl LayoutNode {
             children,
             layout_box: LayoutBox::default(),
             layout_box_cache: (0, (LayoutBox::default(), EMPTY_LINE_CONTEXT)),
+            items_buf: Vec::new(),
         }
     }
 }
