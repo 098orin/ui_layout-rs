@@ -250,7 +250,7 @@ fn display_alternate_inline_box() {
         ],
     });
     let s = format!("{:#}", node);
-    assert_eq!(s, "LayoutNode inline(100x60 @5,10)\n");
+    assert_eq!(s, "LayoutNode inline(100x60 @5,10 [(5,10), (5,40)])\n");
 }
 
 // --- LengthOrAuto ---
@@ -527,7 +527,7 @@ fn display_inline_box_full_variant() {
             line_index: 0,
         }],
     });
-    assert_eq!(format!("{}", inline), "inline(100x30 @5,10)");
+    assert_eq!(format!("{}", inline), "inline(100x30 @5,10 [(5,10)])");
 }
 
 // --- Owned LayoutBox into_iter ---

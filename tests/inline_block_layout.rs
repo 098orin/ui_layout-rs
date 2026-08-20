@@ -526,5 +526,8 @@ fn inline_block_respects_explicit_width_with_nested_inline_child() {
 
     assert_eq!(ib.content_box.width, 50.0);
     assert_eq!(outer_node.layout_box.width_box(), 50.0);
-    assert_eq!(format!("{}", outer_node.layout_box), "inline(50x50 @0,0)");
+    assert_eq!(
+        format!("{}", outer_node.layout_box),
+        "inline(50x50 @0,0 [(0,0)])"
+    );
 }
