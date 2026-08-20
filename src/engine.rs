@@ -577,11 +577,7 @@ impl LayoutEngine {
         } else {
             content_width_opt.or(ctx.available_width.map(|v| {
                 let padding_border_edge = border.left + border.right + padding.left + padding.right;
-                let value = if node.style.box_sizing == BoxSizing::ContentBox {
-                    v - padding_border_edge
-                } else {
-                    v
-                };
+                let value = v - padding_border_edge;
 
                 self.apply_size_constraints(
                     value,
@@ -1677,7 +1673,7 @@ impl LayoutEngine {
                 pb_h,
             );
 
-            let box_model = create_box_model(
+            let mut box_model = create_box_model(
                 content_width,
                 content_height,
                 children_width,
@@ -1685,6 +1681,41 @@ impl LayoutEngine {
                 padding,
                 border,
             );
+
+            // When box-sizing is border-box and padding+border exceeds the
+            // specified size, the border box must equal the specified size
+            // (content is clamped to 0 and padding/border are compressed).
+            if node.style.box_sizing == BoxSizing::BorderBox {
+                if let Some(specified_w) = node.style.size.width.resolve_with(
+                    ctx.containing_block_width,
+                    self.viewport_width,
+                    self.viewport_height,
+                ) {
+                    if box_model.border_box.width > specified_w {
+                        let excess = box_model.border_box.width - specified_w;
+                        box_model.border_box.width = specified_w;
+                        box_model.padding_box.width =
+                            (box_model.padding_box.width - excess).max(0.0);
+                        box_model.content_box.width =
+                            (box_model.content_box.width - excess).max(0.0);
+                    }
+                }
+                if let Some(specified_h) = node.style.size.height.resolve_with(
+                    ctx.containing_block_height,
+                    self.viewport_width,
+                    self.viewport_height,
+                ) {
+                    if box_model.border_box.height > specified_h {
+                        let excess = box_model.border_box.height - specified_h;
+                        box_model.border_box.height = specified_h;
+                        box_model.padding_box.height =
+                            (box_model.padding_box.height - excess).max(0.0);
+                        box_model.content_box.height =
+                            (box_model.content_box.height - excess).max(0.0);
+                    }
+                }
+            }
+
             let block_height = box_model.border_box.height;
 
             node.layout_box = LayoutBox::BlockBox(box_model);
