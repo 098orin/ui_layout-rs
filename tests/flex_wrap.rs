@@ -73,8 +73,8 @@ fn flex_wrap_border_box_basis() {
 
         assert_eq!(child.border_box.width, 120.0);
         assert_eq!(child.border_box.height, 80.0);
-        assert_eq!(child.border_box.x, 4.0 + i as f32 * 120.0);
-        assert_eq!(child.border_box.y, 4.0);
+        assert_eq!(child.border_box.x, i as f32 * 120.0);
+        assert_eq!(child.border_box.y, 0.0);
 
         // 120 - 10 - 10 - 10 - 10 = 80
         assert_eq!(child.content_box.width, 80.0);
@@ -87,8 +87,8 @@ fn flex_wrap_border_box_basis() {
 
     assert_eq!(fifth.border_box.width, 120.0);
     assert_eq!(fifth.border_box.height, 80.0);
-    assert_eq!(fifth.border_box.x, 4.0);
-    assert_eq!(fifth.border_box.y, 84.0);
+    assert_eq!(fifth.border_box.x, 0.0);
+    assert_eq!(fifth.border_box.y, 80.0);
 
     assert_eq!(fifth.content_box.width, 80.0);
     assert_eq!(fifth.content_box.height, 40.0);
