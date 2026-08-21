@@ -2853,6 +2853,10 @@ impl LayoutEngine {
 
                     let base_content_main = match basis {
                         Some(v) => {
+                            // With an indefinite main-axis containing size, measure the item's content
+                            // before flexing and use the larger of flex-basis and content size.
+                            // This prevents nested growing flex items from collapsing below their
+                            // content's required size.
                             if cbm.is_none() && node.style.item_style.flex_grow > 0.0 {
                                 let _ = self.layout_node(
                                     node,
