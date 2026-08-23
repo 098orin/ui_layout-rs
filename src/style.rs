@@ -586,20 +586,25 @@ pub enum GridRepeat {
 }
 
 /// Placement of a grid item on one axis.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct GridPlacement {
     /// One-based start line, or `None` for automatic placement.
     pub start: Option<usize>,
-    /// Number of tracks occupied by the item.
-    pub span: usize,
+    /// How the end of the placement is specified.
+    pub end: GridPlacementEnd,
 }
 
-impl Default for GridPlacement {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GridPlacementEnd {
+    /// Span a number of tracks.
+    Span(usize),
+    /// End at a one-based grid line.
+    Line(usize),
+}
+
+impl Default for GridPlacementEnd {
     fn default() -> Self {
-        Self {
-            start: None,
-            span: 1,
-        }
+        Self::Span(1)
     }
 }
 

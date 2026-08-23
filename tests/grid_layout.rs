@@ -73,11 +73,11 @@ fn explicit_item_can_span_tracks() {
     let child = LayoutNode::new(Style {
         grid_column: GridPlacement {
             start: Some(2),
-            span: 2,
+            end: GridPlacementEnd::Span(2),
         },
         grid_row: GridPlacement {
             start: Some(1),
-            span: 1,
+            end: GridPlacementEnd::Span(1),
         },
         size: SizeStyle {
             height: LengthOrAuto::Length(Length::Px(25.0)),

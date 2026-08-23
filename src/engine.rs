@@ -1,8 +1,9 @@
 use crate::{
     AlignContent, AlignItems, AutoSizeBehavior, BoxModel, BoxSizing, CustomObjectResult, Edge,
-    EdgeOption, FlexDirection, FlexWrap, FragmentNode, GridPlacement, GridRepeat, GridTrack,
-    InlineBox, InnerDisplay, ItemFragment, JustifyContent, JustifyItems, LayoutBox, LayoutChild,
-    LayoutNode, LengthOrAuto, LineSpan, OuterDisplay, Placement, Position, Rect, Spacing, Style,
+    EdgeOption, FlexDirection, FlexWrap, FragmentNode, GridPlacement, GridPlacementEnd, GridRepeat,
+    GridTrack, InlineBox, InnerDisplay, ItemFragment, JustifyContent, JustifyItems, LayoutBox,
+    LayoutChild, LayoutNode, LengthOrAuto, LineSpan, OuterDisplay, Placement, Position, Rect,
+    Spacing, Style,
 };
 
 const EPSILON: f32 = 0.001;
@@ -3608,7 +3609,7 @@ fn build_grid_slots(
     for item in items {
         let (column, _) = grid_item_placements(node, item);
         if let Some(start) = column.start {
-            column_count = column_count.max(start.saturating_sub(1) + column.span.max(1));
+            column_count = column_count.max(start.saturating_sub(1) + grid_placement_span(column));
         }
     }
 
@@ -3617,8 +3618,8 @@ fn build_grid_slots(
     let mut slots = Vec::with_capacity(items.len());
     for &item in items {
         let (column, row) = grid_item_placements(node, &item);
-        let column_span = column.span.max(1).min(column_count);
-        let row_span = row.span.max(1);
+        let column_span = grid_placement_span(column).min(column_count);
+        let row_span = grid_placement_span(row);
         let explicit_column = column.start.map(|line| line.saturating_sub(1));
         let explicit_row = row.start.map(|line| line.saturating_sub(1));
 
@@ -3687,6 +3688,14 @@ fn build_grid_slots(
     slots
 }
 
+fn grid_placement_span(placement: GridPlacement) -> usize {
+    match (placement.start, placement.end) {
+        (_, GridPlacementEnd::Span(span)) => span.max(1),
+        (Some(start), GridPlacementEnd::Line(end)) => end.saturating_sub(start).max(1),
+        (None, GridPlacementEnd::Line(_)) => 1,
+    }
+}
+
 fn grid_item_placements(node: &LayoutNode, item: &LayoutItem) -> (GridPlacement, GridPlacement) {
     let style = match item {
         LayoutItem::Node(index) => node.children[*index].node().map(|child| &child.style),
@@ -3732,11 +3741,11 @@ fn named_grid_area(areas: &[Vec<String>], name: &str) -> Option<(GridPlacement, 
     Some((
         GridPlacement {
             start: Some(min_column + 1),
-            span: max_column - min_column + 1,
+            end: GridPlacementEnd::Line(max_column + 2),
         },
         GridPlacement {
             start: Some(min_row + 1),
-            span: max_row - min_row + 1,
+            end: GridPlacementEnd::Line(max_row + 2),
         },
     ))
 }
