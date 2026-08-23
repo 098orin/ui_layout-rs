@@ -362,7 +362,9 @@ fn collect_style_entries(style: &Style) -> Vec<String> {
 
     entry_if!(entries, style.line_height, "line-height");
     entry_if!(entries, style.justify_content, "justify-content");
+    entry_if!(entries, style.justify_items, "justify-items");
     entry_if!(entries, style.align_content, "align-content");
+    entry_if!(entries, style.align_items, "align-items");
     entry_if!(entries, style.flex_direction, "flex-direction");
     entry_if!(entries, style.flex_wrap, "flex-wrap");
     entry_if!(entries, style.column_gap, "column-gap");
