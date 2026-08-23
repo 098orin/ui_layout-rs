@@ -878,12 +878,18 @@ impl LayoutEngine {
                         .item_style
                         .justify_self
                         .unwrap_or(node.style.justify_items);
+                    let align = child
+                        .style
+                        .item_style
+                        .align_self
+                        .unwrap_or(node.style.align_items);
 
                     let assigned_width = (matches!(justify, JustifyItems::Stretch)
                         && matches!(child.style.size.width, LengthOrAuto::Auto))
                     .then_some(width);
-                    let assigned_height =
-                        matches!(child.style.size.height, LengthOrAuto::Auto).then_some(height);
+                    let assigned_height = (matches!(align, AlignItems::Stretch)
+                        && matches!(child.style.size.height, LengthOrAuto::Auto))
+                    .then_some(height);
                     let child_ctx = InternalLayoutContext {
                         containing_block_width: Some(width),
                         containing_block_height: Some(height),
@@ -895,9 +901,13 @@ impl LayoutEngine {
                     let _ = self.layout_node(child, &child_ctx, EMPTY_LINE_CONTEXT, false);
 
                     let child_width = child.layout_box.width_box();
+                    let child_height = child.layout_box.height_box();
                     let offset_x = resolve_justify_position(justify, child_width, width);
+                    let offset_y = resolve_align_position(align, child_height, height);
 
-                    child.layout_box.shift_with_spans(x + offset_x, y);
+                    child
+                        .layout_box
+                        .shift_with_spans(x + offset_x, y + offset_y);
                 }
                 LayoutItem::Fragments(start, end) => {
                     let range = start..end;
