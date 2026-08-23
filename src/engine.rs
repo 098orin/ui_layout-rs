@@ -1,8 +1,8 @@
 use crate::{
     AlignContent, AlignItems, AutoSizeBehavior, BoxModel, BoxSizing, CustomObjectResult, Edge,
     EdgeOption, FlexDirection, FlexWrap, FragmentNode, GridPlacement, GridRepeat, GridTrack,
-    InlineBox, InnerDisplay, ItemFragment, JustifyContent, LayoutBox, LayoutChild, LayoutNode,
-    LengthOrAuto, LineSpan, OuterDisplay, Placement, Position, Rect, Spacing, Style,
+    InlineBox, InnerDisplay, ItemFragment, JustifyContent, JustifyItems, LayoutBox, LayoutChild,
+    LayoutNode, LengthOrAuto, LineSpan, OuterDisplay, Placement, Position, Rect, Spacing, Style,
 };
 
 const EPSILON: f32 = 0.001;
@@ -872,8 +872,16 @@ impl LayoutEngine {
             match slot.item {
                 LayoutItem::Node(index) => {
                     let child = node.children[index].node_mut().unwrap();
-                    let assigned_width =
-                        matches!(child.style.size.width, LengthOrAuto::Auto).then_some(width);
+
+                    let justify = child
+                        .style
+                        .item_style
+                        .justify_self
+                        .unwrap_or(node.style.justify_items);
+
+                    let assigned_width = (matches!(justify, JustifyItems::Stretch)
+                        && matches!(child.style.size.width, LengthOrAuto::Auto))
+                    .then_some(width);
                     let assigned_height =
                         matches!(child.style.size.height, LengthOrAuto::Auto).then_some(height);
                     let child_ctx = InternalLayoutContext {
@@ -885,7 +893,11 @@ impl LayoutEngine {
                         ..*base_ctx
                     };
                     let _ = self.layout_node(child, &child_ctx, EMPTY_LINE_CONTEXT, false);
-                    child.layout_box.shift_with_spans(x, y);
+
+                    let child_width = child.layout_box.width_box();
+                    let offset_x = resolve_justify_position(justify, child_width, width);
+
+                    child.layout_box.shift_with_spans(x + offset_x, y);
                 }
                 LayoutItem::Fragments(start, end) => {
                     let range = start..end;
@@ -4249,6 +4261,15 @@ fn resolve_align_position(align: AlignItems, child_size: f32, available: f32) ->
         AlignItems::Center => ((available - child_size) / 2.0).max(0.0),
         AlignItems::End => (available - child_size).max(0.0),
         AlignItems::Stretch => 0.0,
+    }
+}
+
+fn resolve_justify_position(justify: JustifyItems, child_size: f32, available: f32) -> f32 {
+    match justify {
+        JustifyItems::Start => 0.0,
+        JustifyItems::Center => ((available - child_size) / 2.0).max(0.0),
+        JustifyItems::End => (available - child_size).max(0.0),
+        JustifyItems::Stretch => 0.0,
     }
 }
 

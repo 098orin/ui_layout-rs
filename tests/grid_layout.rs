@@ -285,3 +285,133 @@ fn mulpiple_inline_in_a_grid_container() {
         _ => panic!("expected inline box"),
     }
 }
+
+#[test]
+fn justify_items_stretch_fills_grid_area() {
+    let mut style = grid_container(
+        200.0,
+        vec![GridTrack::Breadth(LengthOrAuto::Length(Length::Px(100.0)))],
+    );
+    style.justify_items = JustifyItems::Stretch;
+
+    let mut root = LayoutNode::with_children(style, [new_child_auto(20.0)]);
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    assert_eq!(
+        block_box(node(&root, 0)).border_box,
+        rect(0.0, 0.0, 100.0, 20.0)
+    );
+}
+
+#[test]
+fn justify_items_start_keeps_item_at_start_of_grid_area() {
+    let mut style = grid_container(
+        200.0,
+        vec![GridTrack::Breadth(LengthOrAuto::Length(Length::Px(100.0)))],
+    );
+    style.justify_items = JustifyItems::Start;
+
+    let mut root = LayoutNode::with_children(style, [new_child(30.0, 20.0)]);
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    assert_eq!(
+        block_box(node(&root, 0)).border_box,
+        rect(0.0, 0.0, 20.0, 30.0)
+    );
+}
+
+#[test]
+fn justify_items_center_centers_item_in_grid_area() {
+    let mut style = grid_container(
+        200.0,
+        vec![GridTrack::Breadth(LengthOrAuto::Length(Length::Px(100.0)))],
+    );
+    style.justify_items = JustifyItems::Center;
+
+    let mut root = LayoutNode::with_children(style, [new_child(30.0, 20.0)]);
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    assert_eq!(
+        block_box(node(&root, 0)).border_box,
+        rect(40.0, 0.0, 20.0, 30.0)
+    );
+}
+
+#[test]
+fn justify_items_end_places_item_at_end_of_grid_area() {
+    let mut style = grid_container(
+        200.0,
+        vec![GridTrack::Breadth(LengthOrAuto::Length(Length::Px(100.0)))],
+    );
+    style.justify_items = JustifyItems::End;
+
+    let mut root = LayoutNode::with_children(style, [new_child(30.0, 20.0)]);
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    assert_eq!(
+        block_box(node(&root, 0)).border_box,
+        rect(80.0, 0.0, 20.0, 30.0)
+    );
+}
+
+#[test]
+fn justify_self_overrides_justify_items() {
+    let mut style = grid_container(
+        200.0,
+        vec![GridTrack::Breadth(LengthOrAuto::Length(Length::Px(100.0)))],
+    );
+    style.justify_items = JustifyItems::Center;
+
+    let child = LayoutNode::new(Style {
+        item_style: ItemStyle {
+            justify_self: Some(JustifyItems::End),
+            ..Default::default()
+        },
+        size: SizeStyle {
+            width: LengthOrAuto::Length(Length::Px(30.0)),
+            height: LengthOrAuto::Length(Length::Px(20.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let mut root = LayoutNode::with_children(style, [child]);
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    assert_eq!(
+        block_box(node(&root, 0)).border_box,
+        rect(70.0, 0.0, 30.0, 20.0)
+    );
+}
+
+#[test]
+fn justify_items_stretch_does_not_override_fixed_width() {
+    let mut style = grid_container(
+        200.0,
+        vec![GridTrack::Breadth(LengthOrAuto::Length(Length::Px(100.0)))],
+    );
+    style.justify_items = JustifyItems::Stretch;
+
+    let child = LayoutNode::new(Style {
+        size: SizeStyle {
+            width: LengthOrAuto::Length(Length::Px(30.0)),
+            height: LengthOrAuto::Length(Length::Px(20.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let mut root = LayoutNode::with_children(style, [child]);
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    assert_eq!(
+        block_box(node(&root, 0)).border_box,
+        rect(0.0, 0.0, 30.0, 20.0)
+    );
+}

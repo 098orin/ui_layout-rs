@@ -429,6 +429,7 @@ pub struct ItemStyle {
     pub flex_shrink: f32,
     pub flex_basis: LengthOrAuto,
     pub align_self: Option<AlignItems>,
+    pub justify_self: Option<JustifyItems>,
 }
 
 impl Default for ItemStyle {
@@ -438,6 +439,7 @@ impl Default for ItemStyle {
             flex_shrink: 1.0,
             flex_basis: LengthOrAuto::Auto,
             align_self: None,
+            justify_self: None,
         }
     }
 }
@@ -528,6 +530,15 @@ pub enum JustifyContent {
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum AlignItems {
+    Start,
+    Center,
+    End,
+    #[default]
+    Stretch,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum JustifyItems {
     Start,
     Center,
     End,
@@ -650,6 +661,7 @@ pub struct Style {
 
     pub line_height: Length,
 
+    pub justify_items: JustifyItems,
     pub justify_content: JustifyContent,
     pub align_items: AlignItems,
     pub align_content: AlignContent,

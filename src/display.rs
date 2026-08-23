@@ -104,6 +104,17 @@ impl fmt::Display for FlexWrap {
     }
 }
 
+impl fmt::Display for JustifyItems {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            JustifyItems::Start => write!(f, "start"),
+            JustifyItems::Center => write!(f, "center"),
+            JustifyItems::End => write!(f, "end"),
+            JustifyItems::Stretch => write!(f, "stretch"),
+        }
+    }
+}
+
 impl fmt::Display for JustifyContent {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -333,6 +344,7 @@ fn collect_style_entries(style: &Style) -> Vec<String> {
     entry_if!(entries, style.item_style.flex_grow, "flex-grow");
     entry_if!(entries, style.item_style.flex_shrink, "flex-shrink", 1.0);
     entry_if!(entries, style.item_style.flex_basis, "flex-basis");
+    entry_some!(entries, style.item_style.justify_self, "justify-self");
     entry_some!(entries, style.item_style.align_self, "align-self");
 
     entry_if!(entries, style.size.width, "width");
@@ -350,7 +362,6 @@ fn collect_style_entries(style: &Style) -> Vec<String> {
 
     entry_if!(entries, style.line_height, "line-height");
     entry_if!(entries, style.justify_content, "justify-content");
-    entry_if!(entries, style.align_items, "align-items");
     entry_if!(entries, style.align_content, "align-content");
     entry_if!(entries, style.flex_direction, "flex-direction");
     entry_if!(entries, style.flex_wrap, "flex-wrap");
