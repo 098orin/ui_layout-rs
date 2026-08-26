@@ -111,6 +111,54 @@ fn explicit_item_can_span_tracks() {
 }
 
 #[test]
+fn align_items_center_in_implicit_row() {
+    let mut style = grid_container(200.0, vec![GridTrack::Flex(1.0)]);
+    style.size.height = LengthOrAuto::Length(Length::Px(200.0));
+    style.align_items = AlignItems::Center;
+
+    let mut root = LayoutNode::with_children(style, [new_child(50.0, 50.0)]);
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    assert_eq!(
+        block_box(node(&root, 0)).border_box,
+        rect(0.0, 75.0, 50.0, 50.0)
+    );
+}
+
+#[test]
+fn align_items_end_in_implicit_row() {
+    let mut style = grid_container(200.0, vec![GridTrack::Flex(1.0)]);
+    style.size.height = LengthOrAuto::Length(Length::Px(200.0));
+    style.align_items = AlignItems::End;
+
+    let mut root = LayoutNode::with_children(style, [new_child(50.0, 50.0)]);
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    assert_eq!(
+        block_box(node(&root, 0)).border_box,
+        rect(0.0, 150.0, 50.0, 50.0)
+    );
+}
+
+#[test]
+fn align_items_center_in_implicit_column() {
+    let mut style = grid_container_row(200.0, vec![GridTrack::Flex(1.0)]);
+    style.size.width = LengthOrAuto::Length(Length::Px(200.0));
+    style.align_items = AlignItems::Center;
+
+    let mut root = LayoutNode::with_children(style, [new_child(50.0, 50.0)]);
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    assert_eq!(
+        block_box(node(&root, 0)).border_box,
+        rect(0.0, 75.0, 50.0, 50.0)
+    );
+}
+
+#[test]
 fn auto_track_uses_item_intrinsic_width() {
     let style = grid_container(250.0, vec![GridTrack::default(), GridTrack::Flex(1.0)]);
     let fixed = LayoutNode::new(Style {
