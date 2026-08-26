@@ -755,6 +755,7 @@ impl LayoutEngine {
             available_width,
             column_gap,
             &column_intrinsic,
+            None,
             self.viewport_width,
             self.viewport_height,
         );
@@ -764,6 +765,7 @@ impl LayoutEngine {
             content_height_opt,
             row_gap,
             &row_intrinsic,
+            content_height_opt,
             self.viewport_width,
             self.viewport_height,
         );
@@ -3874,23 +3876,33 @@ fn resolve_grid_tracks(
     available: Option<f32>,
     gap: f32,
     intrinsic: &[f32],
+    implicit_fallback: Option<f32>,
     viewport_width: f32,
     viewport_height: f32,
 ) -> Vec<f32> {
     let mut sizes = vec![0.0; count];
     let mut flex_total = 0.0;
     for index in 0..count {
+        let is_implicit = index >= explicit.len();
         match explicit.get(index).cloned().unwrap_or_default() {
             GridTrack::Breadth(breadth) => {
                 sizes[index] = breadth
                     .resolve_with(available, viewport_width, viewport_height)
-                    .unwrap_or(intrinsic[index])
+                    .unwrap_or(if is_implicit {
+                        implicit_fallback.unwrap_or(intrinsic[index])
+                    } else {
+                        intrinsic[index]
+                    })
                     .max(0.0);
             }
             GridTrack::Flex(factor) => {
                 flex_total += factor.max(0.0);
                 if available.is_none() {
-                    sizes[index] = intrinsic[index];
+                    sizes[index] = if is_implicit {
+                        implicit_fallback.unwrap_or(intrinsic[index])
+                    } else {
+                        intrinsic[index]
+                    };
                 }
             }
             GridTrack::MinMax(minimum, maximum) => {
@@ -3899,7 +3911,11 @@ fn resolve_grid_tracks(
                 let factor = grid_track_flex_factor(&maximum);
                 flex_total += factor;
                 sizes[index] = minimum.max(if available.is_none() {
-                    intrinsic[index]
+                    if is_implicit {
+                        implicit_fallback.unwrap_or(intrinsic[index])
+                    } else {
+                        intrinsic[index]
+                    }
                 } else {
                     0.0
                 });
@@ -3907,8 +3923,18 @@ fn resolve_grid_tracks(
                     sizes[index] = match maximum.as_ref() {
                         GridTrack::Breadth(breadth) => breadth
                             .resolve_with(available, viewport_width, viewport_height)
-                            .unwrap_or(intrinsic[index]),
-                        _ => intrinsic[index],
+                            .unwrap_or(if is_implicit {
+                                implicit_fallback.unwrap_or(intrinsic[index])
+                            } else {
+                                intrinsic[index]
+                            }),
+                        _ => {
+                            if is_implicit {
+                                implicit_fallback.unwrap_or(intrinsic[index])
+                            } else {
+                                intrinsic[index]
+                            }
+                        }
                     }
                     .max(minimum);
                 }
