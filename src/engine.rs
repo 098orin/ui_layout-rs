@@ -4329,15 +4329,15 @@ fn resolve_flow_margin_auto(
         let child_width = child_node.layout_box.width_box();
         match (ml_opt, mr_opt, content_width_opt) {
             (None, None, Some(cw)) => {
-                let auto = (cw - child_width) / 2.0;
+                let auto = ((cw - child_width) / 2.0).max(0.0);
                 (auto, auto)
             }
             (None, Some(mr), Some(cw)) => {
-                let auto = cw - child_width - mr;
+                let auto = (cw - child_width - mr).max(0.0);
                 (auto, mr)
             }
             (Some(ml), None, Some(cw)) => {
-                let auto = cw - child_width - ml;
+                let auto = (cw - child_width - ml).max(0.0);
                 (ml, auto)
             }
             _ => (ml_opt.unwrap_or(0.0), mr_opt.unwrap_or(0.0)),
