@@ -17,6 +17,21 @@ fn grid_container(width: f32, columns: Vec<GridTrack>) -> Style {
     }
 }
 
+fn grid_container_row(height: f32, rows: Vec<GridTrack>) -> Style {
+    Style {
+        display: Display {
+            outer: OuterDisplay::Block,
+            inner: InnerDisplay::Grid,
+        },
+        size: SizeStyle {
+            height: LengthOrAuto::Length(Length::Px(height)),
+            ..Default::default()
+        },
+        grid_template_rows: rows,
+        ..Default::default()
+    }
+}
+
 #[test]
 fn fraction_tracks_share_remaining_width() {
     let mut style = grid_container(310.0, vec![GridTrack::Flex(1.0), GridTrack::Flex(2.0)]);
@@ -396,6 +411,100 @@ fn justify_items_stretch_does_not_override_fixed_width() {
         vec![GridTrack::Breadth(LengthOrAuto::Length(Length::Px(100.0)))],
     );
     style.justify_items = JustifyItems::Stretch;
+
+    let child = LayoutNode::new(Style {
+        size: SizeStyle {
+            width: LengthOrAuto::Length(Length::Px(30.0)),
+            height: LengthOrAuto::Length(Length::Px(20.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let mut root = LayoutNode::with_children(style, [child]);
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    assert_eq!(
+        block_box(node(&root, 0)).border_box,
+        rect(0.0, 0.0, 30.0, 20.0)
+    );
+}
+
+#[test]
+fn align_items_end_places_item_at_end_of_grid_area() {
+    let mut style = grid_container_row(
+        200.0,
+        vec![GridTrack::Breadth(LengthOrAuto::Length(Length::Px(100.0)))],
+    );
+    style.align_items = AlignItems::End;
+
+    let mut root = LayoutNode::with_children(style, [new_child(30.0, 20.0)]);
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    assert_eq!(
+        block_box(node(&root, 0)).border_box,
+        rect(0.0, 70.0, 20.0, 30.0)
+    );
+}
+
+#[test]
+fn align_items_end_places_item_at_center_of_grid_area() {
+    let mut style = grid_container_row(
+        200.0,
+        vec![GridTrack::Breadth(LengthOrAuto::Length(Length::Px(100.0)))],
+    );
+    style.align_items = AlignItems::Center;
+
+    let mut root = LayoutNode::with_children(style, [new_child(30.0, 20.0)]);
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    assert_eq!(
+        block_box(node(&root, 0)).border_box,
+        rect(0.0, 35.0, 20.0, 30.0)
+    );
+}
+
+#[test]
+fn align_self_overrides_align_items() {
+    let mut style = grid_container_row(
+        200.0,
+        vec![GridTrack::Breadth(LengthOrAuto::Length(Length::Px(100.0)))],
+    );
+    style.align_items = AlignItems::Center;
+
+    let child = LayoutNode::new(Style {
+        item_style: ItemStyle {
+            align_self: Some(AlignItems::End),
+            ..Default::default()
+        },
+        size: SizeStyle {
+            width: LengthOrAuto::Length(Length::Px(30.0)),
+            height: LengthOrAuto::Length(Length::Px(20.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let mut root = LayoutNode::with_children(style, [child]);
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    assert_eq!(
+        block_box(node(&root, 0)).border_box,
+        rect(0.0, 80.0, 30.0, 20.0)
+    );
+}
+
+#[test]
+fn align_items_stretch_does_not_override_fixed_height() {
+    let mut style = grid_container_row(
+        200.0,
+        vec![GridTrack::Breadth(LengthOrAuto::Length(Length::Px(100.0)))],
+    );
+    style.align_items = AlignItems::Stretch;
 
     let child = LayoutNode::new(Style {
         size: SizeStyle {
