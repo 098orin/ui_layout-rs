@@ -650,11 +650,10 @@ impl LayoutEngine {
         intrinsic_pass: bool,
     ) -> LineContext {
         let (content_width_opt, content_height_opt) = content_size_opt;
-        let available_width = content_width_opt.or(ctx.available_width);
         let column_gap = node
             .style
             .column_gap
-            .resolve_with(available_width, self.viewport_width, self.viewport_height)
+            .resolve_with(content_width_opt, self.viewport_width, self.viewport_height)
             .unwrap_or(0.0)
             .max(0.0);
         let row_gap = node
@@ -669,9 +668,9 @@ impl LayoutEngine {
             .max(0.0);
 
         let base_ctx = InternalLayoutContext {
-            containing_block_width: available_width,
+            containing_block_width: content_width_opt,
             containing_block_height: content_height_opt,
-            available_width,
+            available_width: content_width_opt,
             parent_assigned_border_width: None,
             parent_assigned_border_height: None,
             viewport_width: ctx.viewport_width,
@@ -689,7 +688,7 @@ impl LayoutEngine {
         let item_count = items.len();
         let columns = expand_grid_tracks(
             &node.style.grid_template_columns,
-            available_width,
+            content_width_opt,
             column_gap,
             item_count,
             self.viewport_width,
@@ -752,7 +751,7 @@ impl LayoutEngine {
         let columns = resolve_grid_tracks(
             &columns,
             column_count,
-            available_width,
+            content_width_opt,
             column_gap,
             &column_intrinsic,
             None,
@@ -770,19 +769,37 @@ impl LayoutEngine {
             self.viewport_height,
         );
 
+        let padding = self.resolve_padding(&node.style.spacing, ctx);
+        let border = self.resolve_border(&node.style.spacing, ctx);
+
         let children_width =
             columns.iter().sum::<f32>() + column_gap * column_count.saturating_sub(1) as f32;
         let children_height =
             rows.iter().sum::<f32>() + row_gap * row_count.saturating_sub(1) as f32;
-        let width = content_width_opt
-            .or(available_width)
-            .unwrap_or(children_width);
-        let height = content_height_opt.unwrap_or(children_height);
-        let padding = self.resolve_padding(&node.style.spacing, ctx);
-        let border = self.resolve_border(&node.style.spacing, ctx);
+
+        let width_before_constraints = content_width_opt.unwrap_or(children_width);
+        let height_before_constraints = content_height_opt.unwrap_or(children_height);
+        let final_width = self.apply_size_constraints(
+            width_before_constraints,
+            &node.style.size,
+            ctx,
+            true,
+            &node.style.box_sizing,
+            padding.left + padding.right + border.left + border.right,
+        );
+
+        let final_height = self.apply_size_constraints(
+            height_before_constraints,
+            &node.style.size,
+            ctx,
+            false,
+            &node.style.box_sizing,
+            padding.top + padding.bottom + border.top + border.bottom,
+        );
+
         node.layout_box = LayoutBox::BlockBox(create_box_model(
-            width,
-            height,
+            final_width,
+            final_height,
             children_width,
             children_height,
             padding,
