@@ -3628,7 +3628,12 @@ fn build_grid_slots(
     for item in items {
         let (column, _) = grid_item_placements(node, item);
         if let Some(start) = column.start {
-            column_count = column_count.max(start.saturating_sub(1) + grid_placement_span(column));
+            let span = grid_placement_span(column);
+            let end = start.saturating_sub(1).saturating_add(span);
+
+            if end <= MAX_GRID_TRACKS {
+                column_count = column_count.max(end);
+            }
         }
     }
 
