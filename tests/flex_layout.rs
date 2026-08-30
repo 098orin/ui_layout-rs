@@ -1724,3 +1724,260 @@ fn inline_children_in_flex_row_move_line_spans_with_their_box() {
         _ => panic!("expected inline box"),
     }
 }
+
+// ---------------------------------------------------------------------------
+// Post-layout correction tests
+// ---------------------------------------------------------------------------
+
+/// Auto-width flex item in a row flex container should shrink-wrap to its
+/// children's margin-box width.
+#[test]
+fn flex_row_auto_width_item_shrink_wraps_to_child_margin_box() {
+    let child = LayoutNode::new(Style {
+        size: SizeStyle {
+            width: LengthOrAuto::Length(Length::Px(40.0)),
+            height: LengthOrAuto::Length(Length::Px(20.0)),
+            ..Default::default()
+        },
+        spacing: Spacing {
+            margin_right: LengthOrAuto::Length(Length::Px(10.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    // auto-width item: should expand to child's margin-box width (40 + 10 = 50)
+    let item = LayoutNode::with_children(
+        Style {
+            display: Display {
+                outer: OuterDisplay::Block,
+                inner: InnerDisplay::Flow,
+            },
+            ..Default::default()
+        },
+        [child],
+    );
+
+    let fixed_sibling = new_child(20.0, 30.0);
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            display: Display {
+                outer: OuterDisplay::Block,
+                inner: InnerDisplay::Flex,
+            },
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(300.0)),
+                height: LengthOrAuto::Length(Length::Px(50.0)),
+                ..Default::default()
+            },
+            flex_direction: FlexDirection::Row,
+            ..Default::default()
+        },
+        [item, fixed_sibling],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    let item_box = block_box(node(&root, 0));
+    assert_eq!(
+        item_box.border_box.width, 50.0,
+        "auto-width flex item should shrink-wrap to child margin-box width"
+    );
+}
+
+/// After auto-width expansion, flex items on the same line must be
+/// repositioned so they do not overlap.
+#[test]
+fn flex_row_reposition_after_auto_width_expansion() {
+    let item1 = LayoutNode::with_children(
+        Style {
+            display: Display {
+                outer: OuterDisplay::Block,
+                inner: InnerDisplay::Flow,
+            },
+            ..Default::default()
+        },
+        [new_child(10.0, 80.0)], // auto width → will expand to 80
+    );
+    let item2 = new_child(10.0, 40.0); // fixed width 40
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            display: Display {
+                outer: OuterDisplay::Block,
+                inner: InnerDisplay::Flex,
+            },
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(300.0)),
+                height: LengthOrAuto::Length(Length::Px(30.0)),
+                ..Default::default()
+            },
+            flex_direction: FlexDirection::Row,
+            ..Default::default()
+        },
+        [item1, item2],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    let box1 = block_box(node(&root, 0));
+    let box2 = block_box(node(&root, 1));
+
+    assert_eq!(box1.border_box.width, 80.0, "item1 should expand");
+    assert_eq!(box2.border_box.x, 80.0, "item2 must not overlap item1");
+}
+
+/// An auto-width flex container should expand to the widest child's
+/// margin-box width.
+#[test]
+fn flex_row_auto_width_container_expands_to_widest_child() {
+    let wide_child = new_child(10.0, 120.0);
+    let narrow_child = new_child(10.0, 40.0);
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            display: Display {
+                outer: OuterDisplay::Block,
+                inner: InnerDisplay::Flex,
+            },
+            size: SizeStyle {
+                height: LengthOrAuto::Length(Length::Px(30.0)),
+                ..Default::default()
+            },
+            flex_direction: FlexDirection::Row,
+            ..Default::default()
+        },
+        [wide_child, narrow_child],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    // The auto-width container should be at least as wide as the widest child.
+    let container_box = block_box(&root);
+    assert!(
+        container_box.border_box.width >= 120.0,
+        "auto-width flex container should expand to widest child, got {}",
+        container_box.border_box.width
+    );
+}
+
+/// An auto-height flex container should account for child bottom margins.
+#[test]
+fn flex_row_auto_height_accounts_for_child_bottom_margins() {
+    let child1 = new_child(10.0, 40.0);
+    let child2 = LayoutNode::new(Style {
+        size: SizeStyle {
+            width: LengthOrAuto::Length(Length::Px(40.0)),
+            height: LengthOrAuto::Length(Length::Px(30.0)),
+            ..Default::default()
+        },
+        spacing: Spacing {
+            margin_bottom: LengthOrAuto::Length(Length::Px(15.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            display: Display {
+                outer: OuterDisplay::Block,
+                inner: InnerDisplay::Flex,
+            },
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                ..Default::default()
+            },
+            flex_direction: FlexDirection::Row,
+            ..Default::default()
+        },
+        [child1, child2],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    let container_height = block_box(&root).border_box.height;
+    // Tallest child is 30, plus 15 bottom margin = 45
+    assert!(
+        container_height >= 45.0,
+        "auto-height flex container should account for child bottom margins, got {}",
+        container_height
+    );
+}
+
+/// enforce_fixed_layout_height: a block with min-height must be at least
+/// that tall even when content is shorter.
+#[test]
+fn block_min_height_enforced_by_post_layout() {
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                min_height: LengthOrAuto::Length(Length::Px(200.0)),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        [new_child(10.0, 50.0)], // short child
+    );
+
+    LayoutEngine::layout(&mut root, 300.0, 400.0);
+
+    assert_eq!(
+        block_box(&root).border_box.height,
+        200.0,
+        "min-height should be enforced"
+    );
+}
+
+/// enforce_fixed_layout_height: a bottom-anchored out-of-flow element must
+/// shift upward when the layout box grows to meet min-height.
+#[test]
+fn bottom_anchored_out_of_flow_shifts_up_for_min_height() {
+    let anchor = LayoutNode::new(Style {
+        position: PositionStyle {
+            kind: Position::Absolute,
+            bottom: LengthOrAuto::Length(Length::Px(0.0)),
+            ..Default::default()
+        },
+        size: SizeStyle {
+            width: LengthOrAuto::Length(Length::Px(30.0)),
+            height: LengthOrAuto::Length(Length::Px(40.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    // Root must be positioned so that absolute children use it as
+    // their containing block rather than the viewport.
+    let mut root = LayoutNode::with_children(
+        Style {
+            position: PositionStyle {
+                kind: Position::Relative,
+                ..Default::default()
+            },
+            size: SizeStyle {
+                height: LengthOrAuto::Length(Length::Px(100.0)),
+                min_height: LengthOrAuto::Length(Length::Px(200.0)),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        [anchor],
+    );
+
+    LayoutEngine::layout(&mut root, 300.0, 400.0);
+
+    let root_h = block_box(&root).border_box.height;
+    assert_eq!(root_h, 200.0, "min-height should be enforced");
+
+    // The anchor has bottom=0 and height=40 inside a 200-tall container,
+    // so its bottom edge should be at y=200 and top at y=160.
+    let anchor_box = block_box(node(&root, 0));
+    let anchor_bottom = anchor_box.border_box.y + anchor_box.border_box.height;
+    assert!(
+        (anchor_bottom - 200.0).abs() < 1.0,
+        "bottom-anchored element's bottom should be near container bottom (200), got {}",
+        anchor_bottom
+    );
+}
