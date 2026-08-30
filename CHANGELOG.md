@@ -11,59 +11,79 @@ and this project loosely follows Semantic Versioning.
 
 ### Added
 
-* **`AutoSizeBehavior` + `SizeStyle::auto_behavior`**: controls how a block
-  replaced-element leaf resolves `auto` width/height.
-
-  * `AutoSizeBehavior::Fill` (default) — stretches to the containing block.
-  * `AutoSizeBehavior::ShrinkToFit` — sizes to the custom child's intrinsic
+* **Positioned layout**: support `relative`, `absolute`, `fixed`, and
+  `sticky` positioning with inset edges and sticky positioning constraints.
+* **Grid layout**: add grid layout with explicit and implicit tracks,
+  repeated tracks, named areas, negative line placement, and grid item
+  alignment.
+* **Multi-line flex layout**: support `flex-wrap` and multi-line flex item
+  placement.
+* **Grid alignment**: support `align-*`, `justify-items`, and `justify-self`
+  in the grid formatting context.
+* **Custom object sizing**: add `AutoSizeBehavior` and
+  `SizeStyle::auto_behavior` to control how block replaced-element leaves
+  resolve `auto` width/height.
+  * `AutoSizeBehavior::Fill` (default) stretches to the containing block.
+  * `AutoSizeBehavior::ShrinkToFit` sizes to the custom child's intrinsic
     box, allowing `margin: auto` to center the element.
-* **Unified `CustomLayouter::layout()`**: replaces the separate `layout_flow()`
-  and `layout_block()` methods with a single entry point returning a
-  [`LayoutBox`].
-* **Styled `CustomChild`**: custom objects now carry their own [`Style`], so
-  their participation in the parent's formatting context is determined by
-  `display`.
-
-  * `OuterDisplay::Block` — participates as a block-level object.
-  * `OuterDisplay::Inline` — participates inline.
-  * `OuterDisplay::None` — is skipped.
-* **Custom object results**: `LayoutChild::custom_result()` exposes the result
-  of laying out a custom object without downcasting.
-
-  * Inline objects retain their `spans`.
-  * Block and flex objects retain their final `box_model`.
-* **Graceful `LayoutBox` mismatches**: custom objects may return a
-  [`LayoutBox`] variant that differs from their declared display.
-
-  * Inline objects returning `BlockBox` are placed atomically in the current
-    inline flow and wrap as a whole when necessary.
-  * Block objects returning `InlineBox` are wrapped in an anonymous block box
-    while preserving their inline spans.
-* **Block-level custom objects in flow**: custom children with
-  `OuterDisplay::Block` are now laid out and tracked like regular block-level
-  boxes.
-* **Custom flex results**: flex custom objects now retain their final
-  border-box rectangle.
+* **Unified custom layout API**: replace the separate `layout_flow()` and
+  `layout_block()` methods with a single `CustomLayouter::layout()` entry
+  point returning a [`LayoutBox`].
+* **Styled custom children**: `CustomChild` now carries its own [`Style`],
+  allowing custom objects to participate in the parent's formatting context
+  through `display`.
+  * `OuterDisplay::Block` participates as a block-level object.
+  * `OuterDisplay::Inline` participates inline.
+  * `OuterDisplay::None` is skipped.
+* **Custom layout results**: expose custom layout results through
+  `LayoutChild::custom_result()` without downcasting.
+* **Graceful `LayoutBox` mismatches**: handle custom objects whose returned
+  [`LayoutBox`] variant differs from their declared display, including
+  atomic inline placement of block boxes and anonymous block wrapping of
+  inline boxes.
+* **Custom flex results**: retain the final border-box rectangle of custom
+  flex items.
 
 ### Changed
 
+* **Custom child layout model**: `LayoutChild::Custom` now wraps a
+  `CustomChild` containing the layouter and its layout result, while
+  `LayoutChild::from(obj)` remains available for ergonomic construction.
+* **Custom formatting context**: custom objects now derive their formatting
+  context from the [`Style`] carried by `CustomChild` rather than reporting
+  it through the layouter trait.
+* **Inline-flow context**: move `start_pos`, `available_inline_size`, and
+  `line_height` into [`LayoutContext`], removing the separate
+  `FlowLayoutContext` type.
 * **Block replaced-element sizing**: `auto` width/height now fill the
   containing block by default. Use
-  `SizeStyle::auto_behavior = AutoSizeBehavior::ShrinkToFit` to opt into
+  `SizeStyle::auto_behavior = AutoSizeBehavior::ShrinkToFit` for
   shrink-to-fit behavior.
-* **`LayoutChild::Custom` representation**: custom children now wrap their
-  layouter and layout result in `CustomChild`. Existing construction through
-  `LayoutChild::from(obj)` remains unchanged.
-* **Inline-flow context**: `start_pos`, `available_inline_size`, and
-  `line_height` now live in [`LayoutContext`]. The separate
-  `FlowLayoutContext` type has been removed.
+* **Flex sizing**: make `flex-basis` account for the flex item's box sizing
+  and content size.
+* **Grid sizing and placement**: improve implicit track sizing, prevent
+  excessive track expansion, and correctly account for content offsets.
+* **LayoutBox inline representation**: enhance the representation of
+  `LayoutBox::InlineBox` and preserve inline line information across breaks.
+
+### Fixed
+
+* Correct application of min/max size constraints to block-level nodes.
+* Correct block-level sizing to fit the available width.
+* Correct inline-level placement inside flex and grid containers.
+* Correct inline-flow state and line indices across line breaks.
+* Correct custom inline available width after a line break.
+* Correct `box-sizing` handling and `flex-basis` resolution.
+* Correct sticky edge representation and positioning.
+* Correct handling of auto margins with negative free space.
+* Prevent overflow and out-of-bounds vector access in edge cases.
+* Correct grid placement and track sizing.
+* Prevent double application of content offsets during grid layout.
 
 ### Removed
 
-* **`CustomLayouter::formatting_context()`**: custom objects no longer report
-  their formatting context through the trait. The engine uses the resolved
-  [`Display`] from the [`Style`] carried by `CustomChild`.
-
+* **`CustomLayouter::formatting_context()`**: formatting context is now
+  determined from the custom child's [`Style`].
 
 ---
 
