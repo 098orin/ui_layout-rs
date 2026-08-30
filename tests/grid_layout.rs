@@ -111,6 +111,68 @@ fn explicit_item_can_span_tracks() {
 }
 
 #[test]
+fn item_negative_end_spans_to_last_line() {
+    let style = grid_container(
+        300.0,
+        vec![
+            GridTrack::Flex(1.0),
+            GridTrack::Flex(1.0),
+            GridTrack::Flex(1.0),
+        ],
+    );
+    let child = LayoutNode::new(Style {
+        grid_column: GridPlacement {
+            start: Some(1),
+            end: GridPlacementEnd::NegativeLine(1),
+        },
+        size: SizeStyle {
+            height: LengthOrAuto::Length(Length::Px(25.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+    let mut root = LayoutNode::with_children(style, [child]);
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    assert_eq!(
+        block_box(node(&root, 0)).border_box,
+        rect(0.0, 0.0, 300.0, 25.0)
+    );
+}
+
+#[test]
+fn item_negative_end_counts_tracks_backwards() {
+    let style = grid_container(
+        300.0,
+        vec![
+            GridTrack::Flex(1.0),
+            GridTrack::Flex(1.0),
+            GridTrack::Flex(1.0),
+        ],
+    );
+    let child = LayoutNode::new(Style {
+        grid_column: GridPlacement {
+            start: Some(1),
+            end: GridPlacementEnd::NegativeLine(2),
+        },
+        size: SizeStyle {
+            height: LengthOrAuto::Length(Length::Px(25.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+    let mut root = LayoutNode::with_children(style, [child]);
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    assert_eq!(
+        block_box(node(&root, 0)).border_box,
+        rect(0.0, 0.0, 200.0, 25.0)
+    );
+}
+
+#[test]
 fn align_items_center_in_implicit_row() {
     let mut style = grid_container(200.0, vec![GridTrack::Flex(1.0)]);
     style.size.height = LengthOrAuto::Length(Length::Px(200.0));

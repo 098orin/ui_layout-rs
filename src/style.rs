@@ -600,6 +600,9 @@ pub enum GridPlacementEnd {
     Span(usize),
     /// End at a one-based grid line.
     Line(usize),
+    /// End at a line counted backwards from the last grid line (`1` is the
+    /// last line).
+    NegativeLine(usize),
 }
 
 impl Default for GridPlacementEnd {

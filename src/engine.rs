@@ -3625,14 +3625,33 @@ fn build_grid_slots(
     explicit_column_count: usize,
 ) -> Vec<GridItemSlot> {
     let mut column_count = explicit_column_count.max(1);
+    let mut row_count = 0usize;
     for item in items {
-        let (column, _) = grid_item_placements(node, item);
-        if let Some(start) = column.start {
-            let span = grid_placement_span(column);
+        let (column, row) = grid_item_placements(node, item);
+        if let Some(start) = column.start
+            && matches!(
+                column.end,
+                GridPlacementEnd::Span(_) | GridPlacementEnd::Line(_)
+            )
+        {
+            let span = grid_placement_span(column, column_count);
             let end = start.saturating_sub(1).saturating_add(span);
 
             if end <= MAX_GRID_TRACKS {
                 column_count = column_count.max(end);
+            }
+        }
+        if let Some(start) = row.start
+            && matches!(
+                row.end,
+                GridPlacementEnd::Span(_) | GridPlacementEnd::Line(_)
+            )
+        {
+            let span = grid_placement_span(row, row_count);
+            let end = start.saturating_sub(1).saturating_add(span);
+
+            if end <= MAX_GRID_TRACKS {
+                row_count = row_count.max(end);
             }
         }
     }
@@ -3642,8 +3661,8 @@ fn build_grid_slots(
     let mut slots = Vec::with_capacity(items.len());
     for &item in items {
         let (column, row) = grid_item_placements(node, &item);
-        let column_span = grid_placement_span(column).min(column_count);
-        let row_span = grid_placement_span(row);
+        let column_span = grid_placement_span(column, column_count).min(column_count);
+        let row_span = grid_placement_span(row, row_count);
         let explicit_column = column.start.map(|line| line.saturating_sub(1));
         let explicit_row = row.start.map(|line| line.saturating_sub(1));
 
@@ -3712,11 +3731,30 @@ fn build_grid_slots(
     slots
 }
 
-fn grid_placement_span(placement: GridPlacement) -> usize {
+/// Computes how many tracks a placement spans, resolving negative end lines
+/// against `line_count` (the number of tracks on that axis).
+fn grid_placement_span(placement: GridPlacement, line_count: usize) -> usize {
     match (placement.start, placement.end) {
         (_, GridPlacementEnd::Span(span)) => span.max(1),
-        (Some(start), GridPlacementEnd::Line(end)) => end.saturating_sub(start).max(1),
-        (None, GridPlacementEnd::Line(_)) => 1,
+        (Some(start), end) => resolve_grid_end_line(end, line_count)
+            .map(|end_line| end_line.saturating_sub(start).max(1))
+            .unwrap_or(1),
+        (None, _) => 1,
+    }
+}
+
+/// Resolves the end of a placement to a one-based grid line. `line_count` is
+/// the number of tracks on the axis; negative lines count backwards from the
+/// last line, so `NegativeLine(1)` is the line just past the last track.
+fn resolve_grid_end_line(end: GridPlacementEnd, line_count: usize) -> Option<usize> {
+    match end {
+        GridPlacementEnd::Span(_) => None,
+        GridPlacementEnd::Line(line) => Some(line),
+        GridPlacementEnd::NegativeLine(n) => {
+            let n = n.max(1);
+            let last = line_count.saturating_add(1);
+            Some(last.saturating_sub(n - 1).max(1))
+        }
     }
 }
 
