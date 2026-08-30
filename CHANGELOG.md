@@ -82,8 +82,8 @@ and this project loosely follows Semantic Versioning.
 
 ### Removed
 
-* **`CustomLayouter::formatting_context()`**: formatting context is now
-  determined from the custom child's [`Style`].
+* **`BlockLayouter` and `unstable` feature flag**: remove the legacy
+  `BlockLayouter` API and the `unstable` feature flag.
 
 ---
 
