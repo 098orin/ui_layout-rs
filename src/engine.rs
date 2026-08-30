@@ -4591,79 +4591,49 @@ pub fn resolve_custom_box_size(
         aspect_ratio.is_some_and(|r| r > 0.0) && (!width_specified || !height_specified);
 
     if preserves_ratio {
-        if let Some(max_w) = style.size.max_width.resolve_with(
+        let ratio = aspect_ratio.unwrap();
+
+        let min_width = style.size.min_width.resolve_with(
             containing_block_width,
             viewport_width,
             viewport_height,
-        ) && width > max_w
-        {
-            width = max_w;
-            height = width / aspect_ratio.unwrap();
-            if let Some(min_h) = style.size.min_height.resolve_with(
-                containing_block_height,
-                viewport_width,
-                viewport_height,
-            ) && height < min_h
-            {
-                height = min_h;
-                width = height * aspect_ratio.unwrap();
-            }
-        }
-        if let Some(max_h) = style.size.max_height.resolve_with(
-            containing_block_height,
-            viewport_width,
-            viewport_height,
-        ) && height > max_h
-        {
-            height = max_h;
-            width = height * aspect_ratio.unwrap();
-            if let Some(min_w) = style.size.min_width.resolve_with(
-                containing_block_width,
-                viewport_width,
-                viewport_height,
-            ) && width < min_w
-            {
-                width = min_w;
-                height = width / aspect_ratio.unwrap();
-            }
-        }
-        if let Some(min_w) = style.size.min_width.resolve_with(
+        );
+
+        let max_width = style.size.max_width.resolve_with(
             containing_block_width,
             viewport_width,
             viewport_height,
-        ) && width < min_w
-        {
-            width = min_w;
-            height = width / aspect_ratio.unwrap();
-            if let Some(max_h) = style.size.max_height.resolve_with(
-                containing_block_height,
-                viewport_width,
-                viewport_height,
-            ) && height > max_h
-            {
-                height = max_h;
-                width = height * aspect_ratio.unwrap();
-            }
-        }
-        if let Some(min_h) = style.size.min_height.resolve_with(
+        );
+
+        let min_height = style.size.min_height.resolve_with(
             containing_block_height,
             viewport_width,
             viewport_height,
-        ) && height < min_h
-        {
-            height = min_h;
-            width = height * aspect_ratio.unwrap();
-            if let Some(max_w) = style.size.max_width.resolve_with(
-                containing_block_width,
-                viewport_width,
-                viewport_height,
-            ) && width > max_w
-            {
-                width = max_w;
-                height = width / aspect_ratio.unwrap();
-            }
-        }
+        );
+
+        let max_height = style.size.max_height.resolve_with(
+            containing_block_height,
+            viewport_width,
+            viewport_height,
+        );
+
+        // Convert all constraints into a valid height interval while
+        // preserving the aspect ratio.
+        let lower_height = min_height
+            .into_iter()
+            .chain(min_width.map(|w| w / ratio))
+            .fold(0.0, f32::max);
+
+        let upper_height = max_height
+            .into_iter()
+            .chain(max_width.map(|w| w / ratio))
+            .fold(f32::INFINITY, f32::min);
+
+        // Clamp the candidate height to the constraint interval.
+        height = height.clamp(lower_height, upper_height);
+        width = height * ratio;
     } else {
+        // Independent min/max constraints.
         if let Some(min_w) = style.size.min_width.resolve_with(
             containing_block_width,
             viewport_width,
@@ -4671,6 +4641,7 @@ pub fn resolve_custom_box_size(
         ) {
             width = width.max(min_w);
         }
+
         if let Some(max_w) = style.size.max_width.resolve_with(
             containing_block_width,
             viewport_width,
@@ -4678,6 +4649,7 @@ pub fn resolve_custom_box_size(
         ) {
             width = width.min(max_w);
         }
+
         if let Some(min_h) = style.size.min_height.resolve_with(
             containing_block_height,
             viewport_width,
@@ -4685,6 +4657,7 @@ pub fn resolve_custom_box_size(
         ) {
             height = height.max(min_h);
         }
+
         if let Some(max_h) = style.size.max_height.resolve_with(
             containing_block_height,
             viewport_width,
