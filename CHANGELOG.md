@@ -11,69 +11,59 @@ and this project loosely follows Semantic Versioning.
 
 ### Added
 
-- **`AutoSizeBehavior` + `SizeStyle::auto_behavior`**: controls how a block
-  replaced-element leaf (a block-level node wrapping exactly one
-  `LayoutChild::Custom`, e.g. `<button>/<img>/<input>`) resolves an `auto`
-  width/height.
-  - `AutoSizeBehavior::Fill` (default) — stretches to the containing block.
-  - `AutoSizeBehavior::ShrinkToFit` — shrinks to the custom child's
-    intrinsic-based box, which also lets `margin: auto` center such elements.
-- **`CustomLayouter::layout()`**: replaces the separate `layout_flow` /
-  `layout_block` methods with a single unified entry point that returns a
-  [`LayoutBox`] (`BlockBox` for block-level objects, `InlineBox` for inline
-  objects, `None` for nothing).
-- **`CustomChild` carries its own `Style`**: the object's participation in its
-  parent's formatting context is now declared by the style's `display`, exactly
-  as for a childless [`LayoutNode`].
-  - `OuterDisplay::Block` → the object is laid out as a block (forces a new line
-    and stacks vertically).
-  - `OuterDisplay::Inline` → the object is laid out inline (shares the current
-    line).
-  - `OuterDisplay::None` → the object is skipped (display: none).
-  - `CustomChild::new` / `CustomChild::from_box` take the [`Style`] as their
-    first argument, and `LayoutChild::from((Style, L))` builds a custom child
-    from a style and a [`CustomLayouter`].
-- **Graceful `LayoutBox` mismatches**: the returned [`LayoutBox`] variant need
-  not match the display declared by the custom child's style.
-  - An inline-level object returning `BlockBox` is placed atomically on the
-    current line like a fragment (the box is never split; it wraps whole to the
-    next line when it does not fit), with its `box_model` shifted to the placed
-    position.
-  - A block-level object returning `InlineBox` is wrapped in an anonymous block
-  box: its `box_model` is placed on its own line and its `spans` are preserved
-    in the result.
-- **Block-level custom objects in flow**: the engine now dispatches block layout
-  for custom children reporting `OuterDisplay::Block`, placing them like
-  block-level boxes (line break, vertical stacking, extent tracking).
-- **`LayoutChild::custom_result()`**: layout results are stored on the custom
-  child as a [`CustomObjectResult`] (`spans` for inline objects, `box_model` for
-  block/flex placement), observable via `LayoutChild::Custom` without
-  downcasting.
+* **`AutoSizeBehavior` + `SizeStyle::auto_behavior`**: controls how a block
+  replaced-element leaf resolves `auto` width/height.
+
+  * `AutoSizeBehavior::Fill` (default) — stretches to the containing block.
+  * `AutoSizeBehavior::ShrinkToFit` — sizes to the custom child's intrinsic
+    box, allowing `margin: auto` to center the element.
+* **Unified `CustomLayouter::layout()`**: replaces the separate `layout_flow()`
+  and `layout_block()` methods with a single entry point returning a
+  [`LayoutBox`].
+* **Styled `CustomChild`**: custom objects now carry their own [`Style`], so
+  their participation in the parent's formatting context is determined by
+  `display`.
+
+  * `OuterDisplay::Block` — participates as a block-level object.
+  * `OuterDisplay::Inline` — participates inline.
+  * `OuterDisplay::None` — is skipped.
+* **Custom object results**: `LayoutChild::custom_result()` exposes the result
+  of laying out a custom object without downcasting.
+
+  * Inline objects retain their `spans`.
+  * Block and flex objects retain their final `box_model`.
+* **Graceful `LayoutBox` mismatches**: custom objects may return a
+  [`LayoutBox`] variant that differs from their declared display.
+
+  * Inline objects returning `BlockBox` are placed atomically in the current
+    inline flow and wrap as a whole when necessary.
+  * Block objects returning `InlineBox` are wrapped in an anonymous block box
+    while preserving their inline spans.
+* **Block-level custom objects in flow**: custom children with
+  `OuterDisplay::Block` are now laid out and tracked like regular block-level
+  boxes.
+* **Custom flex results**: flex custom objects now retain their final
+  border-box rectangle.
 
 ### Changed
 
-- **Block replaced-element leaves no longer shrink-to-fit by default**: `auto`
-  width/height now stretch to the containing block (`AutoSizeBehavior::Fill`).
-  Opt into shrink-to-fit per-style via `SizeStyle::auto_behavior =
-  AutoSizeBehavior::ShrinkToFit`.
+* **Block replaced-element sizing**: `auto` width/height now fill the
+  containing block by default. Use
+  `SizeStyle::auto_behavior = AutoSizeBehavior::ShrinkToFit` to opt into
+  shrink-to-fit behavior.
+* **`LayoutChild::Custom` representation**: custom children now wrap their
+  layouter and layout result in `CustomChild`. Existing construction through
+  `LayoutChild::from(obj)` remains unchanged.
+* **Inline-flow context**: `start_pos`, `available_inline_size`, and
+  `line_height` now live in [`LayoutContext`]. The separate
+  `FlowLayoutContext` type has been removed.
 
 ### Removed
 
-- **`CustomLayouter::formatting_context()`**: custom objects no longer report
-  their formatting context from the trait. The engine reads the resolved
-  [`Display`] from the [`Style`] carried by the wrapping [`CustomChild`], so
-  custom children participate exactly like childless [`LayoutNode`]s.
-- **Flex custom result**: `position_flex_custom` now records the final
-  border-box rect of custom flex items instead of discarding it.
+* **`CustomLayouter::formatting_context()`**: custom objects no longer report
+  their formatting context through the trait. The engine uses the resolved
+  [`Display`] from the [`Style`] carried by `CustomChild`.
 
-### Changed
-
-- `LayoutChild::Custom` now wraps a `CustomChild { layouter, result }` instead of
-  a bare `Box<dyn CustomLayouter>`. Construction via `LayoutChild::from(obj)`
-  (or `CustomChild::new(obj)`) is unchanged ergonomically.
-- The inline-flow context (`start_pos`, `available_inline_size`, `line_height`)
-  moved into [`LayoutContext`]; the separate `FlowLayoutContext` type was
-  removed.
 
 ---
 
