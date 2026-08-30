@@ -118,7 +118,7 @@ see the unit tests in the [`tests/`](tests/) directory. They provide practical u
 This implementation follows CSS3 specifications with current focus on:
 
 - ✅ **CSS Box Model Module Level 3**: Margin collapsing, padding, border, box-sizing support
-- ✅ **CSS Flexible Box Layout Module Level 1**: Core flexbox algorithm including flex-grow, flex-shrink, flex-basis (flex-wrap not yet implemented)
+- ✅ **CSS Flexible Box Layout Module Level 1**: Core flexbox algorithm including flex-grow, flex-shrink, flex-basis, flex-wrap
 - ✅ **CSS Display Module Level 3**: Block, Inline, Flex, FlowRoot, InlineBlock, and None display values
 - ✅ **CSS Values and Units Module Level 3**: px, %, vw, vh, auto, and calc() support
 
