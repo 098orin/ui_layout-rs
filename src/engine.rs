@@ -2,8 +2,8 @@ use crate::{
     AlignContent, AlignItems, AutoSizeBehavior, BoxModel, BoxSizing, CustomObjectResult, Edge,
     EdgeOption, FlexDirection, FlexWrap, FragmentNode, GridPlacement, GridPlacementEnd, GridRepeat,
     GridTrack, InlineBox, InnerDisplay, ItemFragment, JustifyContent, JustifyItems, LayoutBox,
-    LayoutChild, LayoutNode, LengthOrAuto, LineSpan, OuterDisplay, Placement, Position, Rect,
-    Spacing, Style,
+    LayoutChild, LayoutNode, Length, LengthOrAuto, LineSpan, OuterDisplay, Placement, Position,
+    Rect, Spacing, Style,
 };
 
 const EPSILON: f32 = 0.001;
@@ -812,6 +812,8 @@ impl LayoutEngine {
             );
         }
 
+        enforce_fixed_layout_height(node);
+
         LineContext {
             end_pos: match node.style.display.outer {
                 OuterDisplay::Block => (0.0, line_ctx.end_pos.1 + node.layout_box.height_box()),
@@ -1331,7 +1333,7 @@ impl LayoutEngine {
 
         let (child_right, child_bottom) = compute_child_layout_extent(child_node);
 
-        state.accum.children_width = state.accum.children_width.max(child_right);
+        state.accum.children_width = state.accum.children_width.max(child_right + mr);
 
         let inline_extent = compute_inline_extent(
             child_node,
@@ -1769,9 +1771,9 @@ impl LayoutEngine {
                 }
             }
 
-            let block_height = box_model.border_box.height;
-
             node.layout_box = LayoutBox::BlockBox(box_model);
+            enforce_fixed_layout_height(node);
+            let block_height = node.layout_box.height_box();
 
             LineContext {
                 end_pos: (0.0, end_y + block_height),
@@ -1929,6 +1931,46 @@ impl LayoutEngine {
 
         if !intrinsic_pass {
             self.position_flex_children(node, axis, ctx);
+
+            // --- Flex post-corrections ---
+            // Expand auto-width flex items to their children's margin-box
+            // width, then reposition subsequent items to eliminate overlap.
+            // Only applies to Row (not RowReverse) flex containers.
+            if matches!(axis, Axis::Horizontal) && node.style.flex_direction == FlexDirection::Row {
+                self.expand_auto_flex_item_widths(node);
+                self.reposition_flex_items_after_expansion(node);
+            }
+            // Expand auto-size flex containers to fit their children.
+            if node.style.size.width == LengthOrAuto::Auto {
+                self.expand_auto_flex_width_to_children(node);
+            }
+            if node.style.size.height == LengthOrAuto::Auto {
+                self.expand_auto_flex_height_to_children(node);
+            }
+
+            // Rebuild the box model with corrected dimensions.
+            let padding = self.resolve_padding(&node.style.spacing, ctx);
+            let border = self.resolve_border(&node.style.spacing, ctx);
+            if let Some(model) = node.layout_box.iter().next() {
+                let children_width = model.children_box.width;
+                let children_height = model.children_box.height;
+                node.layout_box = LayoutBox::BlockBox(create_box_model(
+                    node.layout_box.width_box()
+                        - border.left
+                        - border.right
+                        - padding.left
+                        - padding.right,
+                    node.layout_box.height_box()
+                        - border.top
+                        - border.bottom
+                        - padding.top
+                        - padding.bottom,
+                    children_width,
+                    children_height,
+                    padding,
+                    border,
+                ));
+            }
         }
 
         LineContext {
@@ -1943,6 +1985,97 @@ impl LayoutEngine {
             margin_start: 0.0,
             margin_end: 0.0,
         }
+    }
+
+    /// Expand auto-width flex items in a row flex container so they
+    /// shrink-wrap to their children's margin-box width.
+    fn expand_auto_flex_item_widths(&self, node: &mut LayoutNode) {
+        for child in &mut node.children {
+            let LayoutChild::Node(child) = child else {
+                continue;
+            };
+            if child.style.size.width != LengthOrAuto::Auto {
+                continue;
+            }
+            let required_width = required_children_margin_box_width(child);
+            grow_auto_layout_width(child, required_width);
+        }
+    }
+
+    /// Reposition flex items on the same line after width expansion
+    /// to eliminate overlap.
+    fn reposition_flex_items_after_expansion(&self, node: &mut LayoutNode) {
+        let snapshots: Vec<(f32, f32, f32)> = node
+            .children
+            .iter()
+            .filter_map(LayoutChild::node)
+            .filter(|child| !child.style.position.kind.is_out_of_flow())
+            .map(|child| match child.layout_box.iter().next() {
+                Some(m) => (m.border_box.x, m.border_box.width, m.border_box.y),
+                None => (0.0, 0.0, 0.0),
+            })
+            .collect();
+
+        let mut prev_margin_box_right = 0.0f32;
+        let mut prev_y = f32::NAN;
+        let mut snap_idx = 0;
+
+        for child in &mut node.children {
+            let LayoutChild::Node(child) = child else {
+                continue;
+            };
+            if child.style.position.kind.is_out_of_flow() {
+                continue;
+            }
+            if snap_idx >= snapshots.len() {
+                break;
+            }
+            let (snap_x, snap_w, snap_y) = snapshots[snap_idx];
+            snap_idx += 1;
+
+            // Detect new flex line: reset when y changes.
+            if !prev_y.is_nan() && (snap_y - prev_y).abs() > 1.0 {
+                prev_margin_box_right = 0.0;
+            }
+            prev_y = snap_y;
+
+            // On the same line, shift this item right to eliminate overlap.
+            if prev_margin_box_right > 0.0 {
+                let shift = (prev_margin_box_right - snap_x).max(0.0);
+                if shift > 0.01 {
+                    shift_layout_box_x(&mut child.layout_box, shift);
+                }
+            }
+
+            // Update the right edge of this item's margin box.
+            let mr = fixed_nonnegative_px(&child.style.spacing.margin_right);
+            let actual_x = prev_margin_box_right.max(snap_x);
+            prev_margin_box_right = actual_x + snap_w + mr;
+        }
+    }
+
+    /// Expand an auto-width flex container to the widest child's
+    /// margin-box width.
+    fn expand_auto_flex_width_to_children(&self, node: &mut LayoutNode) {
+        let required_width = required_children_margin_box_width(node);
+        grow_auto_layout_width(node, required_width);
+    }
+
+    /// Expand an auto-height flex container to account for child bottom
+    /// margins.
+    fn expand_auto_flex_height_to_children(&self, node: &mut LayoutNode) {
+        let required_height = node
+            .children
+            .iter()
+            .filter_map(LayoutChild::node)
+            .filter_map(|child| {
+                child.layout_box.iter().next().map(|model| {
+                    model.border_box.bottom()
+                        + fixed_nonnegative_px(&child.style.spacing.margin_bottom)
+                })
+            })
+            .fold(0.0, f32::max);
+        grow_auto_layout_height(node, required_height);
     }
 
     /// Layout of Flex child elements
@@ -4668,4 +4801,176 @@ pub fn resolve_custom_box_size(
     }
 
     (width, height)
+}
+
+// ---------------------------------------------------------------------------
+// Post-layout utilities
+// ---------------------------------------------------------------------------
+
+/// Enforce declared height/min-height and shift bottom-anchored
+/// out-of-flow elements upward so the bottom edge stays in place.
+fn enforce_fixed_layout_height(node: &mut LayoutNode) {
+    let declared = match (&node.style.size.height, &node.style.size.min_height) {
+        (LengthOrAuto::Length(Length::Px(height)), LengthOrAuto::Length(Length::Px(minimum))) => {
+            Some(height.max(*minimum))
+        }
+        (LengthOrAuto::Length(Length::Px(height)), _) => Some(*height),
+        (_, LengthOrAuto::Length(Length::Px(minimum))) => Some(*minimum),
+        _ => None,
+    };
+    let Some(declared) = declared else {
+        return;
+    };
+    let Some(model) = node.layout_box.iter().next() else {
+        return;
+    };
+    let current = if node.style.box_sizing == BoxSizing::BorderBox {
+        model.border_box.height
+    } else {
+        model.content_box.height
+    };
+    let extra = declared - current;
+    if extra <= 0.0 {
+        return;
+    }
+
+    grow_layout_height(&mut node.layout_box, extra);
+    if node.style.position.kind.is_out_of_flow()
+        && node.style.position.top == LengthOrAuto::Auto
+        && node.style.position.bottom != LengthOrAuto::Auto
+    {
+        shift_layout_box_y(&mut node.layout_box, -extra);
+    }
+}
+
+fn required_children_margin_box_width(node: &LayoutNode) -> f32 {
+    node.children
+        .iter()
+        .filter_map(LayoutChild::node)
+        .filter_map(|child| {
+            child.layout_box.iter().next().map(|model| {
+                model.border_box.right() + fixed_nonnegative_px(&child.style.spacing.margin_right)
+            })
+        })
+        .fold(0.0, f32::max)
+}
+
+fn grow_auto_layout_width(node: &mut LayoutNode, required_width: f32) {
+    let Some(model) = node.layout_box.iter().next() else {
+        return;
+    };
+    let extra = required_width - model.content_box.width;
+    if extra <= 0.0 {
+        return;
+    }
+
+    match &mut node.layout_box {
+        LayoutBox::BlockBox(model) => {
+            model.content_box.width += extra;
+            model.padding_box.width += extra;
+            model.border_box.width += extra;
+            model.children_box.width = model.children_box.width.max(required_width);
+        }
+        LayoutBox::InlineBox(inline) => {
+            inline.box_model.content_box.width += extra;
+            inline.box_model.padding_box.width += extra;
+            inline.box_model.border_box.width += extra;
+            inline.box_model.children_box.width =
+                inline.box_model.children_box.width.max(required_width);
+            if let Some(last) = inline.line_spans.last_mut() {
+                last.x_range.end += extra;
+            }
+        }
+        LayoutBox::None => {}
+    }
+}
+
+fn grow_auto_layout_height(node: &mut LayoutNode, required_height: f32) {
+    let Some(model) = node.layout_box.iter().next() else {
+        return;
+    };
+    let extra = required_height - model.content_box.height;
+    if extra <= 0.0 {
+        return;
+    }
+
+    match &mut node.layout_box {
+        LayoutBox::BlockBox(model) => {
+            model.content_box.height += extra;
+            model.padding_box.height += extra;
+            model.border_box.height += extra;
+            model.children_box.height = model.children_box.height.max(required_height);
+        }
+        LayoutBox::InlineBox(inline) => {
+            inline.box_model.content_box.height += extra;
+            inline.box_model.padding_box.height += extra;
+            inline.box_model.border_box.height += extra;
+            inline.box_model.children_box.height =
+                inline.box_model.children_box.height.max(required_height);
+        }
+        LayoutBox::None => {}
+    }
+}
+
+fn grow_layout_height(layout_box: &mut LayoutBox, extra: f32) {
+    match layout_box {
+        LayoutBox::BlockBox(model) => {
+            model.content_box.height += extra;
+            model.padding_box.height += extra;
+            model.border_box.height += extra;
+            model.children_box.height += extra;
+        }
+        LayoutBox::InlineBox(inline) => {
+            inline.box_model.content_box.height += extra;
+            inline.box_model.padding_box.height += extra;
+            inline.box_model.border_box.height += extra;
+            inline.box_model.children_box.height += extra;
+        }
+        LayoutBox::None => {}
+    }
+}
+
+fn shift_layout_box_x(layout_box: &mut LayoutBox, shift_x: f32) {
+    let shift_model = |model: &mut crate::BoxModel| {
+        model.border_box.x += shift_x;
+        model.padding_box.x += shift_x;
+        model.content_box.x += shift_x;
+        model.children_box.x += shift_x;
+    };
+    match layout_box {
+        LayoutBox::None => {}
+        LayoutBox::BlockBox(model) => shift_model(model),
+        LayoutBox::InlineBox(inline) => {
+            shift_model(&mut inline.box_model);
+            for span in &mut inline.line_spans {
+                span.line_pos.0 += shift_x;
+            }
+        }
+    }
+}
+
+fn shift_layout_box_y(layout_box: &mut LayoutBox, shift_y: f32) {
+    let shift_model = |model: &mut crate::BoxModel| {
+        model.border_box.y += shift_y;
+        model.padding_box.y += shift_y;
+        model.content_box.y += shift_y;
+        model.children_box.y += shift_y;
+    };
+    match layout_box {
+        LayoutBox::None => {}
+        LayoutBox::BlockBox(model) => shift_model(model),
+        LayoutBox::InlineBox(inline) => {
+            shift_model(&mut inline.box_model);
+            for span in &mut inline.line_spans {
+                span.line_pos.1 += shift_y;
+            }
+        }
+    }
+}
+
+fn fixed_nonnegative_px(value: &LengthOrAuto) -> f32 {
+    match value {
+        LengthOrAuto::Length(Length::Px(value)) => value.max(0.0),
+        _ => 0.0,
+    }
 }
