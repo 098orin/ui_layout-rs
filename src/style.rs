@@ -6,7 +6,6 @@ pub enum OuterDisplay {
     #[default]
     Block,
     Inline,
-    None,
 }
 
 /// Represents the inner display type of a box.
@@ -25,23 +24,55 @@ pub enum InnerDisplay {
 // for future implementation:
 // https://drafts.csswg.org/css-display/#the-display-properties
 
-/// Full representation of the CSS `display` property,
-/// split into outer and inner display types.
+/// Full representation of the CSS `display` property.
 ///
 /// This follows the modern CSS Display specification:
 /// <https://www.w3.org/TR/css-display-3/>
 ///
-/// Examples:
-/// - `block`        => (Block, Flow)
-/// - `inline`       => (Inline, Flow)
-/// - `flex`         => (Block, Flex)
-/// - `inline-flex`  => (Inline, Flex)
-/// - `flow-root`    => (Block, FlowRoot)
-/// - `inline-block` => (Inline, FlowRoot)
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct Display {
-    pub outer: OuterDisplay,
-    pub inner: InnerDisplay,
+/// # Variants
+///
+/// - `OutsideInner { outer, inner }` — the two-keyword form:
+///   outer + inner display types.
+/// - `None` — the element generates no box (`display: none`).
+/// - `Contents` — the element generates no box but its children
+///   are treated as direct children of the element's parent
+///   (`display: contents`).
+///
+/// # Examples
+///
+/// ```rust
+/// # use ui_layout::*;
+/// // Single-keyword values parse into OutsideInner:
+/// let d = Display::parse("block").unwrap();
+/// assert!(matches!(d, Display::OutsideInner { outer: OuterDisplay::Block, inner: InnerDisplay::Flow }));
+///
+/// let d = Display::parse("none").unwrap();
+/// assert!(matches!(d, Display::None));
+///
+/// let d = Display::parse("contents").unwrap();
+/// assert!(matches!(d, Display::Contents));
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Display {
+    /// Two-keyword form: outer + inner display types.
+    OutsideInner {
+        outer: OuterDisplay,
+        inner: InnerDisplay,
+    },
+    /// `display: none` — the element generates no box.
+    None,
+    /// `display: contents` — the element generates no box;
+    /// children participate in the parent formatting context.
+    Contents,
+}
+
+impl Default for Display {
+    fn default() -> Self {
+        Self::OutsideInner {
+            outer: OuterDisplay::Block,
+            inner: InnerDisplay::Flow,
+        }
+    }
 }
 
 impl Display {
@@ -63,39 +94,37 @@ impl Display {
     /// `display: inline flex`. Use `from_css` for that.
     pub fn from_css_name(name: &str) -> Option<Self> {
         match name {
-            "block" => Some(Self {
+            "block" => Some(Self::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flow,
             }),
-            "inline" => Some(Self {
+            "inline" => Some(Self::OutsideInner {
                 outer: OuterDisplay::Inline,
                 inner: InnerDisplay::Flow,
             }),
-            "none" => Some(Self {
-                outer: OuterDisplay::None,
-                inner: InnerDisplay::Flow,
-            }),
-            "flex" => Some(Self {
+            "none" => Some(Self::None),
+            "contents" => Some(Self::Contents),
+            "flex" => Some(Self::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             }),
-            "inline-flex" => Some(Self {
+            "inline-flex" => Some(Self::OutsideInner {
                 outer: OuterDisplay::Inline,
                 inner: InnerDisplay::Flex,
             }),
-            "grid" => Some(Self {
+            "grid" => Some(Self::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Grid,
             }),
-            "inline-grid" => Some(Self {
+            "inline-grid" => Some(Self::OutsideInner {
                 outer: OuterDisplay::Inline,
                 inner: InnerDisplay::Grid,
             }),
-            "flow-root" => Some(Self {
+            "flow-root" => Some(Self::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::FlowRoot,
             }),
-            "inline-block" => Some(Self {
+            "inline-block" => Some(Self::OutsideInner {
                 outer: OuterDisplay::Inline,
                 inner: InnerDisplay::FlowRoot,
             }),
@@ -148,8 +177,7 @@ impl Display {
             match token {
                 "block" => outer = Some(OuterDisplay::Block),
                 "inline" => outer = Some(OuterDisplay::Inline),
-                "none" => outer = Some(OuterDisplay::None),
-
+                // "none" is handled by from_css_name before this fallback.
                 "flow" => inner = Some(InnerDisplay::Flow),
                 "flow-root" => inner = Some(InnerDisplay::FlowRoot),
                 "flex" => inner = Some(InnerDisplay::Flex),
@@ -179,12 +207,12 @@ impl Display {
     /// ```
     /// # use ui_layout::*;
     /// let d = Display::parse("block").unwrap();
-    /// assert_eq!(d.outer, OuterDisplay::Block);
-    /// assert_eq!(d.inner, InnerDisplay::Flow);
+    /// assert_eq!(d.outer(), Some(OuterDisplay::Block));
+    /// assert_eq!(d.inner(), Some(InnerDisplay::Flow));
     ///
     /// let d = Display::parse("inline").unwrap();
-    /// assert_eq!(d.outer, OuterDisplay::Inline);
-    /// assert_eq!(d.inner, InnerDisplay::Flow);
+    /// assert_eq!(d.outer(), Some(OuterDisplay::Inline));
+    /// assert_eq!(d.inner(), Some(InnerDisplay::Flow));
     /// ```
     ///
     /// Flex values:
@@ -192,12 +220,12 @@ impl Display {
     /// ```
     /// # use ui_layout::*;
     /// let d = Display::parse("flex").unwrap();
-    /// assert_eq!(d.outer, OuterDisplay::Block);
-    /// assert_eq!(d.inner, InnerDisplay::Flex);
+    /// assert_eq!(d.outer(), Some(OuterDisplay::Block));
+    /// assert_eq!(d.inner(), Some(InnerDisplay::Flex));
     ///
     /// let d = Display::parse("inline-flex").unwrap();
-    /// assert_eq!(d.outer, OuterDisplay::Inline);
-    /// assert_eq!(d.inner, InnerDisplay::Flex);
+    /// assert_eq!(d.outer(), Some(OuterDisplay::Inline));
+    /// assert_eq!(d.inner(), Some(InnerDisplay::Flex));
     /// ```
     ///
     /// Flow-root values:
@@ -205,12 +233,12 @@ impl Display {
     /// ```
     /// # use ui_layout::*;
     /// let d = Display::parse("flow-root").unwrap();
-    /// assert_eq!(d.outer, OuterDisplay::Block);
-    /// assert_eq!(d.inner, InnerDisplay::FlowRoot);
+    /// assert_eq!(d.outer(), Some(OuterDisplay::Block));
+    /// assert_eq!(d.inner(), Some(InnerDisplay::FlowRoot));
     ///
     /// let d = Display::parse("inline-block").unwrap();
-    /// assert_eq!(d.outer, OuterDisplay::Inline);
-    /// assert_eq!(d.inner, InnerDisplay::FlowRoot);
+    /// assert_eq!(d.outer(), Some(OuterDisplay::Inline));
+    /// assert_eq!(d.inner(), Some(InnerDisplay::FlowRoot));
     /// ```
     ///
     /// Multi-keyword syntax:
@@ -218,20 +246,20 @@ impl Display {
     /// ```
     /// # use ui_layout::*;
     /// let d = Display::parse("inline flex").unwrap();
-    /// assert_eq!(d.outer, OuterDisplay::Inline);
-    /// assert_eq!(d.inner, InnerDisplay::Flex);
+    /// assert_eq!(d.outer(), Some(OuterDisplay::Inline));
+    /// assert_eq!(d.inner(), Some(InnerDisplay::Flex));
     ///
     /// let d = Display::parse("block flow").unwrap();
-    /// assert_eq!(d.outer, OuterDisplay::Block);
-    /// assert_eq!(d.inner, InnerDisplay::Flow);
+    /// assert_eq!(d.outer(), Some(OuterDisplay::Block));
+    /// assert_eq!(d.inner(), Some(InnerDisplay::Flow));
     ///
     /// let d = Display::parse("block flow-root").unwrap();
-    /// assert_eq!(d.outer, OuterDisplay::Block);
-    /// assert_eq!(d.inner, InnerDisplay::FlowRoot);
+    /// assert_eq!(d.outer(), Some(OuterDisplay::Block));
+    /// assert_eq!(d.inner(), Some(InnerDisplay::FlowRoot));
     ///
     /// let d = Display::parse("inline flow-root").unwrap();
-    /// assert_eq!(d.outer, OuterDisplay::Inline);
-    /// assert_eq!(d.inner, InnerDisplay::FlowRoot);
+    /// assert_eq!(d.outer(), Some(OuterDisplay::Inline));
+    /// assert_eq!(d.inner(), Some(InnerDisplay::FlowRoot));
     /// ```
     ///
     /// Missing parts are filled with defaults:
@@ -240,11 +268,11 @@ impl Display {
     /// # use ui_layout::*;
     /// let d = Display::parse("flex").unwrap();
     /// // outer defaults to Block
-    /// assert_eq!(d.outer, OuterDisplay::Block);
+    /// assert_eq!(d.outer(), Some(OuterDisplay::Block));
     ///
     /// let d = Display::parse("inline").unwrap();
     /// // inner defaults to Flow
-    /// assert_eq!(d.inner, InnerDisplay::Flow);
+    /// assert_eq!(d.inner(), Some(InnerDisplay::Flow));
     /// ```
     ///
     /// Special case: `none`
@@ -252,8 +280,15 @@ impl Display {
     /// ```
     /// # use ui_layout::*;
     /// let d = Display::parse("none").unwrap();
-    /// assert_eq!(d.outer, OuterDisplay::None);
-    /// assert_eq!(d.inner, InnerDisplay::Flow);
+    /// assert!(matches!(d, Display::None));
+    /// ```
+    ///
+    /// Special case: `contents`
+    ///
+    /// ```
+    /// # use ui_layout::*;
+    /// let d = Display::parse("contents").unwrap();
+    /// assert!(matches!(d, Display::Contents));
     /// ```
     ///
     /// Invalid input:
@@ -277,19 +312,29 @@ impl Display {
             return None;
         }
 
-        // Special case: none
-        if matches!(outer, Some(OuterDisplay::None)) {
-            return Some(Self {
-                outer: OuterDisplay::None,
-                inner: InnerDisplay::Flow,
-            });
-        }
-
         // Resolve defaults
         let outer = outer.unwrap_or(OuterDisplay::Block);
         let inner = inner.unwrap_or(InnerDisplay::Flow);
 
-        Some(Self { outer, inner })
+        Some(Self::OutsideInner { outer, inner })
+    }
+
+    /// Returns the outer display type, or `None` for `display: none` /
+    /// `display: contents` (which generate no box).
+    pub fn outer(&self) -> Option<OuterDisplay> {
+        match self {
+            Display::OutsideInner { outer, .. } => Some(*outer),
+            Display::None | Display::Contents => None,
+        }
+    }
+
+    /// Returns the inner display type for a box, or `None` for
+    /// `display: none` / `display: contents` (which generate no box).
+    pub fn inner(&self) -> Option<InnerDisplay> {
+        match self {
+            Display::OutsideInner { inner, .. } => Some(*inner),
+            Display::None | Display::Contents => None,
+        }
     }
 }
 
