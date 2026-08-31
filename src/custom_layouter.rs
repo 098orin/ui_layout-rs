@@ -79,10 +79,11 @@ pub struct LayoutContext {
 /// owned by the wrapping [`crate::CustomChild`] (exactly as for a childless
 /// [`crate::LayoutNode`]):
 ///
-/// - [`crate::OuterDisplay::Block`] → block-level layout: forces a new line and stacks
+/// - [`Display::OutsideInner`](crate::Display::OutsideInner) with `outer: OuterDisplay::Block` → block-level layout: forces a new line and stacks
 ///   vertically.
-/// - [`crate::OuterDisplay::Inline`] → inline-level layout: shares the current line.
-/// - [`crate::OuterDisplay::None`] → the object is skipped entirely.
+/// - [`Display::OutsideInner`](crate::Display::OutsideInner) with `outer: OuterDisplay::Inline` → inline-level layout: shares the current line.
+/// - [`Display::None`](crate::Display::None) → the object is skipped entirely.
+/// - [`Display::Contents`](crate::Display::Contents) → the object is skipped (children participate in parent context).
 ///
 /// The returned [`LayoutBox`] need not match the declared context. Mismatches
 /// are handled gracefully:
