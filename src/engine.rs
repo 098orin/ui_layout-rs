@@ -1,9 +1,9 @@
 use crate::{
-    AlignContent, AlignItems, AutoSizeBehavior, BoxModel, BoxSizing, CustomObjectResult, Edge,
-    EdgeOption, FlexDirection, FlexWrap, FragmentNode, GridPlacement, GridPlacementEnd, GridRepeat,
-    GridTrack, InlineBox, InnerDisplay, ItemFragment, JustifyContent, JustifyItems, LayoutBox,
-    LayoutChild, LayoutNode, Length, LengthOrAuto, LineSpan, OuterDisplay, Placement, Position,
-    Rect, Spacing, Style,
+    AlignContent, AlignItems, AutoSizeBehavior, BoxModel, BoxSizing, CustomObjectResult, Display,
+    Edge, EdgeOption, FlexDirection, FlexWrap, FragmentNode, GridPlacement, GridPlacementEnd,
+    GridRepeat, GridTrack, InlineBox, InnerDisplay, ItemFragment, JustifyContent, JustifyItems,
+    LayoutBox, LayoutChild, LayoutNode, Length, LengthOrAuto, LineSpan, OuterDisplay, Placement,
+    Position, Rect, Spacing, Style,
 };
 
 const EPSILON: f32 = 0.001;
@@ -459,6 +459,8 @@ impl LayoutEngine {
             layout_metrics: LayoutMetrics::new(),
         };
 
+        flatten_display_contents(root);
+
         let _ = engine.layout_node(root, &ctx, EMPTY_LINE_CONTEXT, false);
         engine.apply_positioning(
             root,
@@ -470,6 +472,8 @@ impl LayoutEngine {
                 height,
             },
         );
+
+        restore_flattened_children(root);
 
         #[cfg(feature = "layout-bench")]
         println!(
@@ -532,13 +536,22 @@ impl LayoutEngine {
         line_ctx: LineContext,
         intrinsic_pass: bool,
     ) -> LineContext {
-        match node.style.display.outer {
-            OuterDisplay::None => {
+        match node.style.display {
+            Display::None | Display::Contents => {
+                // `display: contents` nodes are normally flattened away during
+                // child collection, so they never reach here. As a safety net,
+                // treat them like `display: none`: no layout box.
                 node.layout_box = LayoutBox::None;
                 line_ctx
             }
-            OuterDisplay::Block => self.layout_block_level(node, ctx, line_ctx, intrinsic_pass),
-            OuterDisplay::Inline => self.layout_inline_level(node, ctx, line_ctx, intrinsic_pass),
+            Display::OutsideInner {
+                outer: OuterDisplay::Block,
+                ..
+            } => self.layout_block_level(node, ctx, line_ctx, intrinsic_pass),
+            Display::OutsideInner {
+                outer: OuterDisplay::Inline,
+                ..
+            } => self.layout_inline_level(node, ctx, line_ctx, intrinsic_pass),
         }
     }
 
@@ -632,12 +645,17 @@ impl LayoutEngine {
         size_opt: (Option<f32>, Option<f32>),
         intrinsic_pass: bool,
     ) -> LineContext {
-        match node.style.display.inner {
-            InnerDisplay::Flow | InnerDisplay::FlowRoot => {
+        match node.style.display.inner() {
+            Some(InnerDisplay::Flow | InnerDisplay::FlowRoot) => {
                 self.layout_flow(node, ctx, line_ctx, size_opt, intrinsic_pass)
             }
-            InnerDisplay::Flex => self.layout_flex(node, ctx, line_ctx, size_opt, intrinsic_pass),
-            InnerDisplay::Grid => self.layout_grid(node, ctx, line_ctx, size_opt, intrinsic_pass),
+            Some(InnerDisplay::Flex) => {
+                self.layout_flex(node, ctx, line_ctx, size_opt, intrinsic_pass)
+            }
+            Some(InnerDisplay::Grid) => {
+                self.layout_grid(node, ctx, line_ctx, size_opt, intrinsic_pass)
+            }
+            None => self.layout_flow(node, ctx, line_ctx, size_opt, intrinsic_pass),
         }
     }
 
@@ -815,8 +833,10 @@ impl LayoutEngine {
         enforce_fixed_layout_height(node);
 
         LineContext {
-            end_pos: match node.style.display.outer {
-                OuterDisplay::Block => (0.0, line_ctx.end_pos.1 + node.layout_box.height_box()),
+            end_pos: match node.style.display.outer() {
+                Some(OuterDisplay::Block) => {
+                    (0.0, line_ctx.end_pos.1 + node.layout_box.height_box())
+                }
                 _ => (
                     line_ctx.end_pos.0 + node.layout_box.width_box(),
                     line_ctx.end_pos.1,
@@ -1062,7 +1082,7 @@ impl LayoutEngine {
             // Only InnerDisplay::Flow collapses margins.
             // FlowRoot (flow-root / inline-block) establishes a new
             // Block Formatting Context, which isolates margin collapsing.
-            collapse_margins: node.style.display.inner == InnerDisplay::Flow,
+            collapse_margins: node.style.display.inner() == Some(InnerDisplay::Flow),
         };
 
         let mut items = std::mem::take(&mut node.items_buf);
@@ -1088,9 +1108,9 @@ impl LayoutEngine {
                         .unwrap()
                         .style()
                         .display
-                        .outer
+                        .outer()
                     {
-                        OuterDisplay::Inline => {
+                        Some(OuterDisplay::Inline) => {
                             let mut ctx_for_child = crate::LayoutContext::from(&base_ctx_for_child);
                             ctx_for_child.start_pos = state.cursor.pos();
                             ctx_for_child.available_inline_size =
@@ -1104,7 +1124,7 @@ impl LayoutEngine {
                                 &mut state,
                             );
                         }
-                        OuterDisplay::Block => {
+                        Some(OuterDisplay::Block) => {
                             let ctx_for_child = crate::LayoutContext::from(&base_ctx_for_child);
                             self.process_flow_custom_block_item(
                                 node,
@@ -1113,7 +1133,7 @@ impl LayoutEngine {
                                 &mut state,
                             );
                         }
-                        OuterDisplay::None => {}
+                        None => {}
                     }
                 }
             }
@@ -1191,9 +1211,9 @@ impl LayoutEngine {
             _ => unreachable!(),
         };
 
-        let child_display = child_node.style.display.outer;
-        let child_is_block = child_display == OuterDisplay::Block;
-        let child_is_inline = child_display == OuterDisplay::Inline;
+        let child_display = child_node.style.display.outer();
+        let child_is_block = child_display == Some(OuterDisplay::Block);
+        let child_is_inline = child_display == Some(OuterDisplay::Inline);
 
         if child_node.style.position.kind.is_out_of_flow() {
             let _ = self.layout_node(
@@ -1314,7 +1334,7 @@ impl LayoutEngine {
                 .shift(child_position_x, child_position_y);
         }
 
-        if node.style.display.outer == OuterDisplay::Inline && child_is_inline {
+        if node.style.display.outer() == Some(OuterDisplay::Inline) && child_is_inline {
             collect_inline_spans_from_child(
                 child_node,
                 line_ctx_for_child,
@@ -1577,7 +1597,7 @@ impl LayoutEngine {
         let pb_w = padding.left + padding.right + border.left + border.right;
         let pb_h = padding.top + padding.bottom + border.top + border.bottom;
 
-        if node.style.display.outer == OuterDisplay::Inline {
+        if node.style.display.outer() == Some(OuterDisplay::Inline) {
             let has_only_blocks = line_span_buf.is_empty();
             let content_w = children_width.max(current_x);
             let content_h = if has_only_blocks {
@@ -1590,28 +1610,29 @@ impl LayoutEngine {
             // normal inline box (which shrink-wraps), its explicit dimensions
             // (width/height, min/max constraints) are always applied — even
             // when the box has no children.
-            let (content_w, content_h) = if node.style.display.inner == InnerDisplay::FlowRoot {
-                (
-                    self.apply_size_constraints(
-                        content_width_opt.unwrap_or(content_w),
-                        &node.style.size,
-                        ctx,
-                        true,
-                        &node.style.box_sizing,
-                        pb_w,
-                    ),
-                    self.apply_size_constraints(
-                        content_height_opt.unwrap_or(content_h),
-                        &node.style.size,
-                        ctx,
-                        false,
-                        &node.style.box_sizing,
-                        pb_h,
-                    ),
-                )
-            } else {
-                (content_w, content_h)
-            };
+            let (content_w, content_h) =
+                if node.style.display.inner() == Some(InnerDisplay::FlowRoot) {
+                    (
+                        self.apply_size_constraints(
+                            content_width_opt.unwrap_or(content_w),
+                            &node.style.size,
+                            ctx,
+                            true,
+                            &node.style.box_sizing,
+                            pb_w,
+                        ),
+                        self.apply_size_constraints(
+                            content_height_opt.unwrap_or(content_h),
+                            &node.style.size,
+                            ctx,
+                            false,
+                            &node.style.box_sizing,
+                            pb_h,
+                        ),
+                    )
+                } else {
+                    (content_w, content_h)
+                };
 
             let mut box_model = create_box_model(
                 content_w,
@@ -1626,11 +1647,11 @@ impl LayoutEngine {
             // origin is at (0, 0). Inline-block (FlowRoot) is an atomic box
             // and keeps its border/padding origin unshifted — its content
             // area remains inset relative to the border box, as browsers do.
-            if node.style.display.inner != InnerDisplay::FlowRoot {
+            if node.style.display.inner() != Some(InnerDisplay::FlowRoot) {
                 box_model.shift(-(border.left + padding.left), -(border.top + padding.top));
             }
 
-            let line_spans = if node.style.display.inner == InnerDisplay::FlowRoot {
+            let line_spans = if node.style.display.inner() == Some(InnerDisplay::FlowRoot) {
                 vec![LineSpan {
                     x_range: 0.0..content_w,
                     line_pos: (start_x, end_y),
@@ -1651,7 +1672,8 @@ impl LayoutEngine {
             // Inline-block advances the inline cursor by its full width (it is
             // an atomic inline-level box).  Normal inline boxes only advance
             // by the placed current_x (the line-end position within the line).
-            let (end_pos, current_x) = if node.style.display.inner == InnerDisplay::FlowRoot {
+            let (end_pos, current_x) = if node.style.display.inner() == Some(InnerDisplay::FlowRoot)
+            {
                 let width = node.layout_box.width();
                 ((start_x + width, end_y), parent_current_x + width)
             } else {
@@ -1675,7 +1697,7 @@ impl LayoutEngine {
             // `content_width_opt` may already be Some(available_width) for an
             // `auto` size, so the explicit-ness is read from the style and the
             // parent assignment (flex) instead.
-            let is_custom_leaf = node.style.display.outer == OuterDisplay::Block
+            let is_custom_leaf = node.style.display.outer() == Some(OuterDisplay::Block)
                 && matches!(&node.children[..], [LayoutChild::Custom(_)]);
             let shrink_to_fit =
                 is_custom_leaf && node.style.size.auto_behavior == AutoSizeBehavior::ShrinkToFit;
@@ -1745,29 +1767,23 @@ impl LayoutEngine {
                     ctx.containing_block_width,
                     self.viewport_width,
                     self.viewport_height,
-                ) {
-                    if box_model.border_box.width > specified_w {
-                        let excess = box_model.border_box.width - specified_w;
-                        box_model.border_box.width = specified_w;
-                        box_model.padding_box.width =
-                            (box_model.padding_box.width - excess).max(0.0);
-                        box_model.content_box.width =
-                            (box_model.content_box.width - excess).max(0.0);
-                    }
+                ) && box_model.border_box.width > specified_w
+                {
+                    let excess = box_model.border_box.width - specified_w;
+                    box_model.border_box.width = specified_w;
+                    box_model.padding_box.width = (box_model.padding_box.width - excess).max(0.0);
+                    box_model.content_box.width = (box_model.content_box.width - excess).max(0.0);
                 }
                 if let Some(specified_h) = node.style.size.height.resolve_with(
                     ctx.containing_block_height,
                     self.viewport_width,
                     self.viewport_height,
-                ) {
-                    if box_model.border_box.height > specified_h {
-                        let excess = box_model.border_box.height - specified_h;
-                        box_model.border_box.height = specified_h;
-                        box_model.padding_box.height =
-                            (box_model.padding_box.height - excess).max(0.0);
-                        box_model.content_box.height =
-                            (box_model.content_box.height - excess).max(0.0);
-                    }
+                ) && box_model.border_box.height > specified_h
+                {
+                    let excess = box_model.border_box.height - specified_h;
+                    box_model.border_box.height = specified_h;
+                    box_model.padding_box.height = (box_model.padding_box.height - excess).max(0.0);
+                    box_model.content_box.height = (box_model.content_box.height - excess).max(0.0);
                 }
             }
 
@@ -1974,8 +1990,10 @@ impl LayoutEngine {
         }
 
         LineContext {
-            end_pos: match node.style.display.outer {
-                OuterDisplay::Block => (0.0, line_ctx.end_pos.1 + node.layout_box.height_box()),
+            end_pos: match node.style.display.outer() {
+                Some(OuterDisplay::Block) => {
+                    (0.0, line_ctx.end_pos.1 + node.layout_box.height_box())
+                }
                 _ => (
                     line_ctx.end_pos.0 + node.layout_box.width_box(),
                     line_ctx.end_pos.1,
@@ -2280,7 +2298,7 @@ impl LayoutEngine {
                 }
                 LayoutItem::Custom(index) => {
                     if let LayoutChild::Custom(child) = &mut node.children[index] {
-                        if child.style().display.outer == OuterDisplay::None {
+                        if child.style().display == Display::None {
                             0.0
                         } else {
                             let measured = child
@@ -2617,7 +2635,7 @@ impl LayoutEngine {
     ) {
         let measured = {
             let object = node.children[index].custom_child().unwrap();
-            if object.style().display.outer == OuterDisplay::None {
+            if object.style().display == Display::None {
                 return;
             }
             object.layouter().measure(&crate::LayoutContext::from(ctx))
@@ -3119,7 +3137,7 @@ impl LayoutEngine {
                 }
                 LayoutItem::Custom(index) => {
                     if let LayoutChild::Custom(child) = &mut node.children[index] {
-                        if child.style().display.outer == OuterDisplay::None {
+                        if child.style().display == Display::None {
                             state.main_size = 0.0;
                         } else {
                             let measured = child
@@ -3336,7 +3354,7 @@ impl LayoutEngine {
                         .unwrap()
                         .custom_child()
                         .unwrap();
-                    if object.style().display.outer == OuterDisplay::None {
+                    if object.style().display == Display::None {
                         continue;
                     }
                     let measured = object
@@ -3683,6 +3701,102 @@ impl LayoutEngine {
 }
 
 // ==========================================
+
+/// Flattens `display: contents` nodes out of the layout tree for the duration
+/// of a layout pass.
+///
+/// A `display: contents` node generates no layout box, so its `layout_box` is
+/// `None` — its children still participate in layout. When collecting the
+/// layout children of a parent, the `display: contents` node itself is skipped
+/// and its children are inserted directly into the parent's `children` vector.
+/// Because the node is absent from the (flattened) layout tree, `layout_node`
+/// never receives it.
+///
+/// The original tree shape is recorded in each node's `flatten_restore` buffer
+/// so it can be restored afterwards via [`restore_flattened_children`].
+fn flatten_display_contents(node: &mut LayoutNode) {
+    use crate::RestoreEntry;
+
+    let mut new_children = Vec::with_capacity(node.children.len());
+    let mut restore = Vec::with_capacity(node.children.len());
+
+    for child in std::mem::take(&mut node.children) {
+        match child {
+            LayoutChild::Node(mut child) => {
+                flatten_display_contents(&mut child);
+                if child.style.display == Display::Contents {
+                    child.layout_box = LayoutBox::None;
+                    let child_count = child.children.len();
+                    new_children.append(&mut child.children);
+                    restore.push(RestoreEntry::Contents {
+                        shell: child,
+                        child_count,
+                    });
+                } else {
+                    new_children.push(LayoutChild::Node(child));
+                    restore.push(RestoreEntry::Direct);
+                }
+            }
+            // A `display: contents` custom object generates no box and has no
+            // children to contribute, so it adds nothing to layout.
+            LayoutChild::Custom(c) if c.style().display == Display::Contents => {
+                restore.push(RestoreEntry::CustomContents { shell: c });
+            }
+            other => {
+                new_children.push(other);
+                restore.push(RestoreEntry::Direct);
+            }
+        }
+    }
+
+    node.children = new_children;
+    node.flatten_restore = restore;
+}
+
+/// Restores the tree shape after a layout pass temporarily flattened
+/// `display: contents` nodes (see [`flatten_display_contents`]).
+fn restore_flattened_children(node: &mut LayoutNode) {
+    use crate::RestoreEntry;
+
+    let map = std::mem::take(&mut node.flatten_restore);
+    if map.is_empty() && node.children.is_empty() {
+        return;
+    }
+
+    let flat = std::mem::take(&mut node.children);
+    let mut flat_iter = flat.into_iter();
+    let mut new_children = Vec::with_capacity(map.len());
+
+    for entry in map {
+        match entry {
+            RestoreEntry::Direct => {
+                new_children.push(flat_iter.next().expect("missing direct layout child"));
+            }
+            RestoreEntry::Contents {
+                mut shell,
+                child_count,
+            } => {
+                for _ in 0..child_count {
+                    shell
+                        .children
+                        .push(flat_iter.next().expect("missing contents grandchild"));
+                }
+                new_children.push(LayoutChild::Node(shell));
+            }
+            RestoreEntry::CustomContents { shell } => {
+                new_children.push(LayoutChild::Custom(shell));
+            }
+        }
+    }
+
+    node.children = new_children;
+
+    for child in &mut node.children {
+        if let LayoutChild::Node(child) = child {
+            restore_flattened_children(child);
+        }
+    }
+}
 
 fn flex_state_outer_main_size(state: &FlexItemState) -> f32 {
     state.main_size
