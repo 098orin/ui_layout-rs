@@ -50,7 +50,6 @@ impl fmt::Display for OuterDisplay {
         match self {
             OuterDisplay::Block => write!(f, "block"),
             OuterDisplay::Inline => write!(f, "inline"),
-            OuterDisplay::None => write!(f, "none"),
         }
     }
 }
@@ -68,17 +67,19 @@ impl fmt::Display for InnerDisplay {
 
 impl fmt::Display for Display {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match (self.outer, self.inner) {
-            (OuterDisplay::Block, InnerDisplay::Flow) => write!(f, "block"),
-            (OuterDisplay::Inline, InnerDisplay::Flow) => write!(f, "inline"),
-            (OuterDisplay::None, InnerDisplay::Flow) => write!(f, "none"),
-            (OuterDisplay::Block, InnerDisplay::FlowRoot) => write!(f, "flow-root"),
-            (OuterDisplay::Inline, InnerDisplay::FlowRoot) => write!(f, "inline-block"),
-            (OuterDisplay::Block, InnerDisplay::Flex) => write!(f, "flex"),
-            (OuterDisplay::Inline, InnerDisplay::Flex) => write!(f, "inline-flex"),
-            (OuterDisplay::Block, InnerDisplay::Grid) => write!(f, "grid"),
-            (OuterDisplay::Inline, InnerDisplay::Grid) => write!(f, "inline-grid"),
-            (outer, inner) => write!(f, "{} {}", outer, inner),
+        match self {
+            Display::OutsideInner { outer, inner } => match (outer, inner) {
+                (OuterDisplay::Block, InnerDisplay::Flow) => write!(f, "block"),
+                (OuterDisplay::Inline, InnerDisplay::Flow) => write!(f, "inline"),
+                (OuterDisplay::Block, InnerDisplay::FlowRoot) => write!(f, "flow-root"),
+                (OuterDisplay::Inline, InnerDisplay::FlowRoot) => write!(f, "inline-block"),
+                (OuterDisplay::Block, InnerDisplay::Flex) => write!(f, "flex"),
+                (OuterDisplay::Inline, InnerDisplay::Flex) => write!(f, "inline-flex"),
+                (OuterDisplay::Block, InnerDisplay::Grid) => write!(f, "grid"),
+                (OuterDisplay::Inline, InnerDisplay::Grid) => write!(f, "inline-grid"),
+            },
+            Display::None => write!(f, "none"),
+            Display::Contents => write!(f, "contents"),
         }
     }
 }
