@@ -87,9 +87,10 @@
 //! block-level boxes. How the object participates is declared by the
 //! [`Style`] it carries in its [`LayoutChild::Custom`]:
 //!
-//! - `OuterDisplay::Block` → the engine lays the object out as a block
-//! - `OuterDisplay::Inline` → the engine lays the object out inline
-//! - `OuterDisplay::None` → the object is skipped
+//! - `Display::OutsideInner { outer: OuterDisplay::Block, .. }` → the engine lays the object out as a block
+//! - `Display::OutsideInner { outer: OuterDisplay::Inline, .. }` → the engine lays the object out inline
+//! - `Display::None` → the object is skipped
+//! - `Display::Contents` → the object is skipped (children participate in parent context)
 //!
 //! The returned [`LayoutBox`] need not match the declared context. An inline
 //! object returning `BlockBox` is placed atomically on the current line like a
