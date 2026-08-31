@@ -25,21 +25,22 @@ fn node(display: Display) -> LayoutNode {
 
 /// Flex の深い連鎖を作る
 fn make_flex_chain(depth: usize, max_depth: usize) -> LayoutNode {
-    let mut root = node(Display {
+    let mut root = node(Display::OutsideInner {
         outer: OuterDisplay::Block,
         inner: InnerDisplay::Flex,
     });
 
     if depth >= max_depth {
-        root.children.push(LayoutChild::Node(Box::new(node(Display {
-            outer: OuterDisplay::Block,
-            inner: InnerDisplay::Flow,
-        }))));
+        root.children
+            .push(LayoutChild::Node(Box::new(node(Display::OutsideInner {
+                outer: OuterDisplay::Block,
+                inner: InnerDisplay::Flow,
+            }))));
         return root;
     }
 
     // 子1: Block（文脈は切れない）
-    let mut block = node(Display {
+    let mut block = node(Display::OutsideInner {
         outer: OuterDisplay::Block,
         inner: InnerDisplay::Flow,
     });
@@ -58,7 +59,7 @@ fn make_flex_chain(depth: usize, max_depth: usize) -> LayoutNode {
 
 /// 実サイトっぽい「枝」を追加
 fn make_branch(depth: usize, max_depth: usize) -> LayoutNode {
-    let mut flex = node(Display {
+    let mut flex = node(Display::OutsideInner {
         outer: OuterDisplay::Block,
         inner: InnerDisplay::Flex,
     });
@@ -72,14 +73,15 @@ fn make_branch(depth: usize, max_depth: usize) -> LayoutNode {
         ))));
 
     if depth.is_multiple_of(3) {
-        let mut side = node(Display {
+        let mut side = node(Display::OutsideInner {
             outer: OuterDisplay::Block,
             inner: InnerDisplay::Flex,
         });
-        side.children.push(LayoutChild::Node(Box::new(node(Display {
-            outer: OuterDisplay::Block,
-            inner: InnerDisplay::Flex,
-        }))));
+        side.children
+            .push(LayoutChild::Node(Box::new(node(Display::OutsideInner {
+                outer: OuterDisplay::Block,
+                inner: InnerDisplay::Flex,
+            }))));
         flex.children.push(LayoutChild::Node(Box::new(side)));
     }
 
@@ -87,16 +89,17 @@ fn make_branch(depth: usize, max_depth: usize) -> LayoutNode {
 }
 
 fn make_tree() -> LayoutNode {
-    let mut root = node(Display {
+    let mut root = node(Display::OutsideInner {
         outer: OuterDisplay::Block,
         inner: InnerDisplay::Flex,
     });
 
     // 上位は Block
-    root.children.push(LayoutChild::Node(Box::new(node(Display {
-        outer: OuterDisplay::Block,
-        inner: InnerDisplay::Flex,
-    }))));
+    root.children
+        .push(LayoutChild::Node(Box::new(node(Display::OutsideInner {
+            outer: OuterDisplay::Block,
+            inner: InnerDisplay::Flex,
+        }))));
 
     // 問題の塊
     root.children

@@ -4,12 +4,12 @@ use ui_layout::*;
 fn make_node(is_flex: bool) -> LayoutNode {
     LayoutNode::new(Style {
         display: if is_flex {
-            Display {
+            Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             }
         } else {
-            Display {
+            Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flow,
             }
