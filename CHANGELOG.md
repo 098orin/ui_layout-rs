@@ -11,6 +11,11 @@ and this project loosely follows Semantic Versioning.
 
 ### Added
 
+* **`display: contents`**: a `display: contents` node generates no layout box
+  (`layout_box` is `None`) but its children participate in the parent's
+  formatting context across flow, flex, and grid. The node itself is flattened
+  out of the layout tree during child collection, so `layout_node` never
+  receives it, and the original tree shape is preserved after layout.
 * **Positioned layout**: support `relative`, `absolute`, `fixed`, and
   `sticky` positioning with inset edges and sticky positioning constraints.
 * **Grid layout**: add grid layout with explicit and implicit tracks,
@@ -46,6 +51,7 @@ and this project loosely follows Semantic Versioning.
 
 ### Changed
 
+* `Display { outer, inner }` is now `Display::OutsideInner { outer, inner }`
 * **Custom child layout model**: `LayoutChild::Custom` now wraps a
   `CustomChild` containing the layouter and its layout result, while
   `LayoutChild::from(obj)` remains available for ergonomic construction.
