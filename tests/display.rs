@@ -279,53 +279,47 @@ fn length_or_auto_resolve_with() {
 fn display_from_css_name_all_variants() {
     assert_eq!(
         Display::from_css_name("block").unwrap(),
-        Display {
+        Display::OutsideInner {
             outer: OuterDisplay::Block,
             inner: InnerDisplay::Flow,
         }
     );
     assert_eq!(
         Display::from_css_name("inline").unwrap(),
-        Display {
+        Display::OutsideInner {
             outer: OuterDisplay::Inline,
             inner: InnerDisplay::Flow,
         }
     );
     assert_eq!(
         Display::from_css_name("flex").unwrap(),
-        Display {
+        Display::OutsideInner {
             outer: OuterDisplay::Block,
             inner: InnerDisplay::Flex,
         }
     );
     assert_eq!(
         Display::from_css_name("inline-flex").unwrap(),
-        Display {
+        Display::OutsideInner {
             outer: OuterDisplay::Inline,
             inner: InnerDisplay::Flex,
         }
     );
     assert_eq!(
         Display::from_css_name("grid").unwrap(),
-        Display {
+        Display::OutsideInner {
             outer: OuterDisplay::Block,
             inner: InnerDisplay::Grid,
         }
     );
     assert_eq!(
         Display::from_css_name("inline-grid").unwrap(),
-        Display {
+        Display::OutsideInner {
             outer: OuterDisplay::Inline,
             inner: InnerDisplay::Grid,
         }
     );
-    assert_eq!(
-        Display::from_css_name("none").unwrap(),
-        Display {
-            outer: OuterDisplay::None,
-            inner: InnerDisplay::Flow,
-        }
-    );
+    assert_eq!(Display::from_css_name("none").unwrap(), Display::None);
     assert!(Display::from_css_name("unknown").is_none());
 }
 
@@ -356,8 +350,8 @@ fn display_from_css_multi_token() {
 fn display_from_str() {
     use std::str::FromStr;
     let d = Display::from_str("flex").unwrap();
-    assert_eq!(d.outer, OuterDisplay::Block);
-    assert_eq!(d.inner, InnerDisplay::Flex);
+    assert_eq!(d.outer(), Some(OuterDisplay::Block));
+    assert_eq!(d.inner(), Some(InnerDisplay::Flex));
 
     assert!(Display::from_str("invalid").is_err());
 }

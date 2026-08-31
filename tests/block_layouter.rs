@@ -176,7 +176,7 @@ fn block_in_flex_column() {
 fn block_with_gap_in_flex() {
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -201,7 +201,7 @@ fn block_with_gap_in_flex() {
 fn block_align_items_center_in_flex() {
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -227,7 +227,7 @@ fn block_align_items_center_in_flex() {
 fn block_justify_center_in_flex() {
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -253,7 +253,7 @@ fn block_justify_center_in_flex() {
 fn block_in_flex_auto_height() {
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -295,7 +295,7 @@ fn block_row_reverse() {
 
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -329,7 +329,7 @@ fn block_column_reverse() {
 
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -358,7 +358,7 @@ fn block_column_reverse() {
 fn block_mixed_with_fragments_in_flex() {
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -562,7 +562,7 @@ fn flex_column_with_multiple_blocks() {
 fn block_with_row_gap_in_flex_column() {
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },

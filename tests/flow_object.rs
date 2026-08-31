@@ -296,7 +296,7 @@ fn flex_row_with_object_and_fragments() {
 
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -375,7 +375,7 @@ fn flex_object_contributes_to_container_auto_height() {
 
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -413,7 +413,7 @@ fn flex_object_with_gap() {
 
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -447,7 +447,7 @@ fn flex_object_align_items_center() {
 
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -484,7 +484,7 @@ fn flex_object_justify_center() {
 
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -529,7 +529,7 @@ fn flex_row_reverse_with_object() {
 
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -569,7 +569,7 @@ fn flex_column_reverse_with_object() {
 
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },

@@ -61,7 +61,7 @@ pub fn block_child(height: f32, mt: f32, mb: f32) -> LayoutNode {
 
 pub fn flex_container(width: f32, height: f32, direction: FlexDirection) -> Style {
     Style {
-        display: Display {
+        display: Display::OutsideInner {
             outer: OuterDisplay::Block,
             inner: InnerDisplay::Flex,
         },
@@ -86,9 +86,9 @@ pub fn rect(x: f32, y: f32, width: f32, height: f32) -> Rect {
 
 fn style_with_outer(outer: OuterDisplay) -> Style {
     Style {
-        display: Display {
+        display: Display::OutsideInner {
             outer,
-            ..Default::default()
+            inner: InnerDisplay::Flow,
         },
         ..Default::default()
     }
@@ -107,7 +107,13 @@ pub fn custom_block(obj: impl CustomLayouter + 'static) -> LayoutChild {
 /// Wraps a hidden (display: none) [`CustomLayouter`] object as a
 /// [`LayoutChild::Custom`].
 pub fn custom_none(obj: impl CustomLayouter + 'static) -> LayoutChild {
-    LayoutChild::from((style_with_outer(OuterDisplay::None), obj))
+    LayoutChild::from((
+        Style {
+            display: Display::None,
+            ..Style::default()
+        },
+        obj,
+    ))
 }
 
 pub fn approx_eq(a: f32, b: f32) -> bool {

@@ -141,7 +141,7 @@ fn flex_children_coordinates() {
 
     let mut flex_container = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },

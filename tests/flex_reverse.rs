@@ -48,7 +48,7 @@ fn row_reverse_flex_end_positions_children_left_to_right() {
     });
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -116,7 +116,7 @@ fn row_reverse_center() {
     });
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -158,7 +158,7 @@ fn row_reverse_column_reverse_with_gap() {
     });
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -203,7 +203,7 @@ fn column_reverse_flex_end() {
     });
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },

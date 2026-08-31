@@ -228,7 +228,7 @@ fn flex_row_margin_on_child_affects_spacing_between_items() {
 
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -276,7 +276,7 @@ fn flex_row_margin_left_shifts_node() {
 
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -323,7 +323,7 @@ fn flex_children_with_margins_justify_center() {
 
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -371,7 +371,7 @@ fn flex_children_with_margins_justify_space_between() {
 
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -428,7 +428,7 @@ fn flex_children_with_margins_justify_space_evenly() {
 
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -481,7 +481,7 @@ fn flex_auto_margin_with_fixed_margin_on_sibling() {
 
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -530,7 +530,7 @@ fn flex_column_margin_between_items() {
 
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -577,7 +577,7 @@ fn flex_column_margin_top_shifts_node() {
 
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -626,7 +626,7 @@ fn flex_margin_with_gap_interaction() {
 
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -662,7 +662,7 @@ fn flex_padding_on_container_affects_children_box() {
 
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -712,7 +712,7 @@ fn flex_padding_with_multiple_children_justify_center() {
 
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -1004,7 +1004,7 @@ fn multiple_flex_children_with_various_margins() {
 
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -1069,7 +1069,7 @@ fn flex_column_auto_height_includes_child_margins() {
 
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -1127,7 +1127,7 @@ fn flex_row_auto_height_includes_child_cross_margins() {
 
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },

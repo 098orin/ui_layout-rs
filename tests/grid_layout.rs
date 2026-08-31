@@ -4,7 +4,7 @@ use ui_layout::*;
 
 fn grid_container(width: f32, columns: Vec<GridTrack>) -> Style {
     Style {
-        display: Display {
+        display: Display::OutsideInner {
             outer: OuterDisplay::Block,
             inner: InnerDisplay::Grid,
         },
@@ -19,7 +19,7 @@ fn grid_container(width: f32, columns: Vec<GridTrack>) -> Style {
 
 fn grid_container_row(height: f32, rows: Vec<GridTrack>) -> Style {
     Style {
-        display: Display {
+        display: Display::OutsideInner {
             outer: OuterDisplay::Block,
             inner: InnerDisplay::Grid,
         },

@@ -278,7 +278,7 @@ fn flex_gap_affects_children_box() {
 
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -317,7 +317,7 @@ fn flex_align_items_stretch() {
 
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -368,7 +368,7 @@ fn flex_align_self_start_and_end() {
 
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -419,7 +419,7 @@ fn flex_justify_content_space_evenly() {
 
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -468,7 +468,7 @@ fn flex_auto_margins_override_justify_content() {
 
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -495,7 +495,7 @@ fn flex_auto_margins_override_justify_content() {
 fn nested_flex_containers() {
     let inner_flex = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -527,7 +527,7 @@ fn nested_flex_containers() {
 
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -611,7 +611,7 @@ fn flex_row_places_fragments_and_nodes() {
 
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -648,7 +648,7 @@ fn flex_row_places_fragments_and_nodes() {
 fn flex_row_with_only_fragments() {
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -688,7 +688,7 @@ fn flex_row_with_only_fragments() {
 fn flex_column_with_only_fragments() {
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -750,7 +750,7 @@ fn flex_row_with_inline_children() {
 
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -793,7 +793,7 @@ fn flex_column_with_inline_children() {
 
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -830,7 +830,7 @@ fn flex_row_with_fragments_and_inline_children() {
 
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -878,7 +878,7 @@ fn flex_gap_with_fragments() {
 
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -932,7 +932,7 @@ fn flex_multiple_fragment_groups() {
 
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -1008,7 +1008,7 @@ fn flex_justify_content_space_around() {
 
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -1052,7 +1052,7 @@ fn flex_justify_content_end() {
 
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -1090,7 +1090,7 @@ fn flex_align_items_center() {
 
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -1125,7 +1125,7 @@ fn flex_align_items_end() {
 
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -1171,7 +1171,7 @@ fn flex_column_row_gap() {
 
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -1217,7 +1217,7 @@ fn auto_sized_flex_row_uses_flow_child_min_height() {
 
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -1303,10 +1303,7 @@ fn flex_display_none_child() {
     });
 
     let hidden = LayoutNode::new(Style {
-        display: Display {
-            outer: OuterDisplay::None,
-            inner: InnerDisplay::Flow,
-        },
+        display: Display::None,
         ..Default::default()
     });
 
@@ -1337,7 +1334,7 @@ fn flex_inline_flex_layout() {
 
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Inline,
                 inner: InnerDisplay::Flex,
             },
@@ -1363,7 +1360,7 @@ fn flex_inline_flex_layout() {
 // --- Nested flex stress ---
 
 fn block_flex() -> Display {
-    Display {
+    Display::OutsideInner {
         outer: OuterDisplay::Block,
         inner: InnerDisplay::Flex,
     }
@@ -1504,7 +1501,7 @@ fn flex_wrap_creates_multiple_rows_with_cross_gap() {
     ];
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -1546,7 +1543,7 @@ fn flex_grow_is_resolved_per_wrapped_line() {
     };
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -1573,7 +1570,7 @@ fn flex_grow_is_resolved_per_wrapped_line() {
 fn align_content_centers_flex_lines() {
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -1599,7 +1596,7 @@ fn align_content_centers_flex_lines() {
 fn wrap_reverse_starts_lines_at_cross_end() {
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -1625,7 +1622,7 @@ fn wrap_reverse_starts_lines_at_cross_end() {
 fn flex_column_wrap_creates_multiple_columns() {
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -1662,7 +1659,7 @@ fn align_content_stretch_expands_lines_and_auto_cross_items() {
     };
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -1749,7 +1746,7 @@ fn flex_row_auto_width_item_shrink_wraps_to_child_margin_box() {
     // auto-width item: should expand to child's margin-box width (40 + 10 = 50)
     let item = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flow,
             },
@@ -1762,7 +1759,7 @@ fn flex_row_auto_width_item_shrink_wraps_to_child_margin_box() {
 
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -1792,7 +1789,7 @@ fn flex_row_auto_width_item_shrink_wraps_to_child_margin_box() {
 fn flex_row_reposition_after_auto_width_expansion() {
     let item1 = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flow,
             },
@@ -1804,7 +1801,7 @@ fn flex_row_reposition_after_auto_width_expansion() {
 
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -1837,7 +1834,7 @@ fn flex_row_auto_width_container_expands_to_widest_child() {
 
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },
@@ -1881,7 +1878,7 @@ fn flex_row_auto_height_accounts_for_child_bottom_margins() {
 
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },

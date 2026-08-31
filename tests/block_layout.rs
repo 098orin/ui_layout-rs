@@ -859,7 +859,7 @@ fn block_with_flex_child_followed_by_block_with_margin() {
     });
 
     let child2 = LayoutNode::new(Style {
-        display: Display {
+        display: Display::OutsideInner {
             outer: OuterDisplay::Block,
             inner: InnerDisplay::Flex,
         },
@@ -972,10 +972,7 @@ fn block_sibling_with_margin_after_marginless_sibling() {
 #[test]
 fn block_display_none() {
     let mut root = LayoutNode::new(Style {
-        display: Display {
-            outer: OuterDisplay::None,
-            inner: InnerDisplay::Flow,
-        },
+        display: Display::None,
         ..Default::default()
     });
 

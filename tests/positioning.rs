@@ -125,7 +125,7 @@ fn absolute_box_is_not_a_flex_item() {
     });
     let mut root = LayoutNode::with_children(
         Style {
-            display: Display {
+            display: Display::OutsideInner {
                 outer: OuterDisplay::Block,
                 inner: InnerDisplay::Flex,
             },

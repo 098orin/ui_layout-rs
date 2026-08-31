@@ -16,17 +16,17 @@ fn flow_root_style() -> Style {
 #[test]
 fn display_parsing() {
     let d = Display::parse("flow-root").unwrap();
-    assert_eq!(d.outer, OuterDisplay::Block);
-    assert_eq!(d.inner, InnerDisplay::FlowRoot);
+    assert_eq!(d.outer(), Some(OuterDisplay::Block));
+    assert_eq!(d.inner(), Some(InnerDisplay::FlowRoot));
 
     let d2 = Display::parse("block flow-root").unwrap();
-    assert_eq!(d2.outer, OuterDisplay::Block);
-    assert_eq!(d2.inner, InnerDisplay::FlowRoot);
+    assert_eq!(d2.outer(), Some(OuterDisplay::Block));
+    assert_eq!(d2.inner(), Some(InnerDisplay::FlowRoot));
 }
 
 #[test]
 fn display_formatting() {
-    let d = Display {
+    let d = Display::OutsideInner {
         outer: OuterDisplay::Block,
         inner: InnerDisplay::FlowRoot,
     };
