@@ -198,3 +198,59 @@ fn flex_wrap_content_box_basis() {
     assert_eq!(fifth.border_box.x, 160.0);
     assert_eq!(fifth.border_box.y, 120.0);
 }
+
+#[test]
+// A wrapped second line must not be shifted to the right because its items
+// happen to share a Y coordinate with the first line (zero-height first line).
+fn flex_wrap_line_of_zero_height_is_not_shifted_right() {
+    let children = vec![
+        LayoutNode::new(Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(800.0)),
+                height: LengthOrAuto::Length(Length::Px(0.0)),
+                ..Default::default()
+            },
+            box_sizing: BoxSizing::BorderBox,
+            ..Default::default()
+        }),
+        LayoutNode::new(Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Auto,
+                height: LengthOrAuto::Length(Length::Px(200.0)),
+                ..Default::default()
+            },
+            box_sizing: BoxSizing::BorderBox,
+            item_style: ItemStyle {
+                flex_grow: 1.0,
+                flex_basis: LengthOrAuto::Length(Length::Px(800.0)),
+                ..Default::default()
+            },
+            ..Default::default()
+        }),
+    ];
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            display: Display::OutsideInner {
+                outer: OuterDisplay::Block,
+                inner: InnerDisplay::Flex,
+            },
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(800.0)),
+                height: LengthOrAuto::Auto,
+                ..Default::default()
+            },
+            box_sizing: BoxSizing::BorderBox,
+            flex_direction: FlexDirection::Row,
+            flex_wrap: FlexWrap::Wrap,
+            ..Default::default()
+        },
+        children,
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    // Both items wrap onto their own lines starting at x == 0.
+    assert_eq!(block_box(node(&root, 0)).border_box.x, 0.0);
+    assert_eq!(block_box(node(&root, 1)).border_box.x, 0.0);
+}

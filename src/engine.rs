@@ -1953,8 +1953,10 @@ impl LayoutEngine {
             // width, then reposition subsequent items to eliminate overlap.
             // Only applies to Row (not RowReverse) flex containers.
             if matches!(axis, Axis::Horizontal) && node.style.flex_direction == FlexDirection::Row {
-                self.expand_auto_flex_item_widths(node);
-                self.reposition_flex_items_after_expansion(node);
+                let expanded = self.expand_auto_flex_item_widths(node);
+                if expanded {
+                    self.reposition_flex_items_after_expansion(node);
+                }
             }
             // Expand auto-size flex containers to fit their children.
             if node.style.size.width == LengthOrAuto::Auto {
@@ -2007,7 +2009,8 @@ impl LayoutEngine {
 
     /// Expand auto-width flex items in a row flex container so they
     /// shrink-wrap to their children's margin-box width.
-    fn expand_auto_flex_item_widths(&self, node: &mut LayoutNode) {
+    fn expand_auto_flex_item_widths(&self, node: &mut LayoutNode) -> bool {
+        let mut expanded = false;
         for child in &mut node.children {
             let LayoutChild::Node(child) = child else {
                 continue;
@@ -2016,8 +2019,11 @@ impl LayoutEngine {
                 continue;
             }
             let required_width = required_children_margin_box_width(child);
-            grow_auto_layout_width(child, required_width);
+            if grow_auto_layout_width(child, required_width) {
+                expanded = true;
+            }
         }
+        expanded
     }
 
     /// Reposition flex items on the same line after width expansion
@@ -4969,13 +4975,13 @@ fn required_children_margin_box_width(node: &LayoutNode) -> f32 {
         .fold(0.0, f32::max)
 }
 
-fn grow_auto_layout_width(node: &mut LayoutNode, required_width: f32) {
+fn grow_auto_layout_width(node: &mut LayoutNode, required_width: f32) -> bool {
     let Some(model) = node.layout_box.iter().next() else {
-        return;
+        return false;
     };
     let extra = required_width - model.content_box.width;
     if extra <= 0.0 {
-        return;
+        return false;
     }
 
     match &mut node.layout_box {
@@ -4997,6 +5003,7 @@ fn grow_auto_layout_width(node: &mut LayoutNode, required_width: f32) {
         }
         LayoutBox::None => {}
     }
+    true
 }
 
 fn grow_auto_layout_height(node: &mut LayoutNode, required_height: f32) {
