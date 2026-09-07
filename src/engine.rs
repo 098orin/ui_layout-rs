@@ -185,6 +185,10 @@ struct FlowState {
     end_y: f32,
     parent_current_x: f32,
     content_width_opt: Option<f32>,
+    /// While an auto-width inline formatting context shrink-fits its content,
+    /// the available width handed to children is progressively tightened to the
+    /// computed content width (instead of the parent's raw available).
+    tightened_available: Option<f32>,
     intrinsic_pass: bool,
     /// Whether sibling and parent-child margins should collapse.
     ///
@@ -1034,112 +1038,185 @@ impl LayoutEngine {
             ..
         } = line_ctx;
 
-        let base_ctx_for_child = InternalLayoutContext {
-            containing_block_width: content_width_opt,
-            containing_block_height: content_height_opt,
-            available_width: content_width_opt.or(ctx.available_width),
-            parent_assigned_border_width: None,
-            parent_assigned_border_height: None,
-            viewport_width: ctx.viewport_width,
-            viewport_height: ctx.viewport_height,
-            ..Default::default()
-        };
-
         let line_height = node
             .style
             .line_height
             .resolve_with(None, self.viewport_width, self.viewport_height)
             .unwrap_or_default();
 
-        let outbox_width = content_width_opt
-            .or(ctx.available_width)
+        // Auto-width inline formatting contexts (inline-block / flow-root) are
+        // shrink-to-fit: the box must be as wide as its content, and the
+        // content must actually be laid out within that final width.  If the
+        // parent's available width is handed straight through, centered or
+        // right-aligned content wraps/aligns against it and the resulting line
+        // advance (or a child box) inflates the inline-block far beyond the
+        // text.  Re-run the inner flow with an ever-tighter available width
+        // until the box stops shrinking.
+        let shrink_to_fit = node.style.display.outer() == Some(OuterDisplay::Inline)
+            && node.style.display.inner() == Some(InnerDisplay::FlowRoot)
+            && content_width_opt.is_none();
+
+        const MAX_SHRINK_PASSES: usize = 8;
+        const SHRINK_STOP_EPSILON: f32 = 2.0;
+
+        let mut effective_available = ctx.available_width;
+        let mut outbox_width = content_width_opt
+            .or(effective_available)
             .unwrap_or(self.viewport_width);
+        let mut last_content_w = f32::INFINITY;
 
-        let mut state = FlowState {
-            cursor: FlowCursor {
-                x: line_ctx.end_pos.0,
-                y: end_y,
-                current_x: 0.0,
-                line_index: 0,
-            },
-            accum: FlowAccum {
-                prev_child_margin: 0.0,
-                first_child_margin: 0.0,
-                pending_advance: 0.0,
-                children_width: 0.0,
-                children_height: 0.0,
-                max_inline_line_height: line_height,
-                first_block_child_processed: false,
-                line_span_buf: Vec::new(),
-            },
-            padding,
-            border,
-            start_x: line_ctx.end_pos.0,
-            end_y,
-            parent_current_x,
-            content_width_opt,
-            intrinsic_pass,
-            // Only InnerDisplay::Flow collapses margins.
-            // FlowRoot (flow-root / inline-block) establishes a new
-            // Block Formatting Context, which isolates margin collapsing.
-            collapse_margins: node.style.display.inner() == Some(InnerDisplay::Flow),
-        };
+        let mut final_state = None;
 
-        let mut items = std::mem::take(&mut node.items_buf);
-        items.extend(LayoutItems::new(&node.children));
-        for item in items.drain(..) {
-            match item {
-                LayoutItem::Fragments(start, end) => {
-                    let range = start..end;
-                    self.process_flow_fragment_item(
-                        node,
-                        range,
-                        outbox_width,
-                        line_height,
-                        &mut state,
-                    )
-                }
-                LayoutItem::Node(i) => {
-                    self.process_flow_node_item(node, i, ctx, &base_ctx_for_child, &mut state)
-                }
-                LayoutItem::Custom(i) => {
-                    match node.children[i]
-                        .custom_child()
-                        .unwrap()
-                        .style()
-                        .display
-                        .outer()
-                    {
-                        Some(OuterDisplay::Inline) => {
-                            let mut ctx_for_child = crate::LayoutContext::from(&base_ctx_for_child);
-                            ctx_for_child.start_pos = state.cursor.pos();
-                            ctx_for_child.available_inline_size =
-                                (outbox_width - state.cursor.x).max(0.0);
-                            ctx_for_child.line_height = line_height;
-                            self.process_flow_custom_item(
-                                node,
-                                i,
-                                &ctx_for_child,
-                                outbox_width,
-                                &mut state,
-                            );
+        for _pass in 0..MAX_SHRINK_PASSES {
+            let base_ctx_for_child = InternalLayoutContext {
+                containing_block_width: content_width_opt,
+                containing_block_height: content_height_opt,
+                available_width: content_width_opt.or(effective_available),
+                parent_assigned_border_width: None,
+                parent_assigned_border_height: None,
+                viewport_width: ctx.viewport_width,
+                viewport_height: ctx.viewport_height,
+                ..Default::default()
+            };
+
+            let mut state = FlowState {
+                cursor: FlowCursor {
+                    // An inline-level flow root (inline-block) establishes a new
+                    // formatting context whose contents are laid out relative to
+                    // its own content box, not relative to the position of the
+                    // parent's line. Starting the cursor at the parent's line
+                    // position would turn that position (a coordinate) into a
+                    // width — e.g. `available_inline_size = outbox_width -
+                    // cursor.x` would go negative and text would wrap every
+                    // cluster. The absolute position is still carried by
+                    // `start_x` (used for the atomic span's `line_pos`), and the
+                    // parent re-applies its own line position when shifting the
+                    // child box and its spans.
+                    x: if node.style.display.inner() == Some(InnerDisplay::FlowRoot) {
+                        0.0
+                    } else {
+                        line_ctx.end_pos.0
+                    },
+                    y: end_y,
+                    current_x: 0.0,
+                    line_index: 0,
+                },
+                accum: FlowAccum {
+                    prev_child_margin: 0.0,
+                    first_child_margin: 0.0,
+                    pending_advance: 0.0,
+                    children_width: 0.0,
+                    children_height: 0.0,
+                    max_inline_line_height: line_height,
+                    first_block_child_processed: false,
+                    line_span_buf: Vec::new(),
+                },
+                padding,
+                border,
+                start_x: line_ctx.end_pos.0,
+                end_y,
+                parent_current_x,
+                content_width_opt,
+                tightened_available: if shrink_to_fit {
+                    effective_available
+                } else {
+                    None
+                },
+                intrinsic_pass,
+                // Only InnerDisplay::Flow collapses margins.
+                // FlowRoot (flow-root / inline-block) establishes a new
+                // Block Formatting Context, which isolates margin collapsing.
+                collapse_margins: node.style.display.inner() == Some(InnerDisplay::Flow),
+            };
+
+            let mut items = std::mem::take(&mut node.items_buf);
+            items.extend(LayoutItems::new(&node.children));
+            for item in items.drain(..) {
+                match item {
+                    LayoutItem::Fragments(start, end) => {
+                        let range = start..end;
+                        self.process_flow_fragment_item(
+                            node,
+                            range,
+                            outbox_width,
+                            line_height,
+                            &mut state,
+                        )
+                    }
+                    LayoutItem::Node(i) => {
+                        self.process_flow_node_item(node, i, ctx, &base_ctx_for_child, &mut state)
+                    }
+                    LayoutItem::Custom(i) => {
+                        match node.children[i]
+                            .custom_child()
+                            .unwrap()
+                            .style()
+                            .display
+                            .outer()
+                        {
+                            Some(OuterDisplay::Inline) => {
+                                let mut ctx_for_child =
+                                    crate::LayoutContext::from(&base_ctx_for_child);
+                                ctx_for_child.start_pos = state.cursor.pos();
+                                ctx_for_child.available_inline_size =
+                                    (outbox_width - state.cursor.x).max(0.0);
+                                ctx_for_child.line_height = line_height;
+                                self.process_flow_custom_item(
+                                    node,
+                                    i,
+                                    &ctx_for_child,
+                                    outbox_width,
+                                    &mut state,
+                                );
+                            }
+                            Some(OuterDisplay::Block) => {
+                                let ctx_for_child = crate::LayoutContext::from(&base_ctx_for_child);
+                                self.process_flow_custom_block_item(
+                                    node,
+                                    i,
+                                    &ctx_for_child,
+                                    &mut state,
+                                );
+                            }
+                            None => {}
                         }
-                        Some(OuterDisplay::Block) => {
-                            let ctx_for_child = crate::LayoutContext::from(&base_ctx_for_child);
-                            self.process_flow_custom_block_item(
-                                node,
-                                i,
-                                &ctx_for_child,
-                                &mut state,
-                            );
-                        }
-                        None => {}
                     }
                 }
             }
-        }
-        node.items_buf = items;
+            node.items_buf = items;
 
+            final_state = Some(state);
+
+            if !shrink_to_fit {
+                break;
+            }
+
+            let content_w = final_state
+                .as_ref()
+                .map(|s| s.accum.children_width.max(s.cursor.current_x))
+                .unwrap_or(0.0);
+            let pb_w = padding.left + padding.right + border.left + border.right;
+            let constrained_content = self.apply_size_constraints(
+                content_width_opt.unwrap_or(content_w),
+                &node.style.size,
+                ctx,
+                true,
+                &node.style.box_sizing,
+                pb_w,
+            );
+
+            if (constrained_content - last_content_w).abs() < SHRINK_STOP_EPSILON
+                || constrained_content >= outbox_width
+            {
+                break;
+            }
+
+            last_content_w = constrained_content;
+            effective_available = Some(constrained_content);
+            outbox_width = constrained_content;
+        }
+
+        let state = final_state.expect("layout_flow always computes a state");
         self.finalize_flow_box(node, ctx, content_width_opt, content_height_opt, state)
     }
 
@@ -1229,7 +1306,8 @@ impl LayoutEngine {
 
         let ctx_for_child = InternalLayoutContext {
             available_width: state
-                .content_width_opt
+                .tightened_available
+                .or(state.content_width_opt)
                 .or(ctx.available_width)
                 .map(|width| {
                     width
