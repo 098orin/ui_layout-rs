@@ -4449,14 +4449,18 @@ fn clamp_flex_main_size(
 
 fn item_participates_in_normal_flow(children: &[LayoutChild], item: &LayoutItem) -> bool {
     match item {
-        LayoutItem::Node(index) => !children[*index]
-            .node()
-            .unwrap()
-            .style
-            .position
-            .kind
-            .is_out_of_flow(),
-        LayoutItem::Fragments(..) | LayoutItem::Custom(_) => true,
+        LayoutItem::Node(index) => {
+            let child = children[*index].node().unwrap();
+            // `display: none` elements generate no box and must not take part
+            // in flex/grid distribution (they would otherwise consume grow
+            // space and gap slots as if they were visible).
+            child.style.display != Display::None && !child.style.position.kind.is_out_of_flow()
+        }
+        LayoutItem::Fragments(..) => true,
+        LayoutItem::Custom(index) => children[*index].custom_child().map_or(true, |object| {
+            object.style().display != Display::None
+                && !object.style().position.kind.is_out_of_flow()
+        }),
     }
 }
 
