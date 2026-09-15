@@ -566,13 +566,23 @@ impl LayoutEngine {
         line_ctx: LineContext,
         intrinsic_pass: bool,
     ) -> LineContext {
-        let ((content_width_opt, content_height_opt), border, padding) = self
+        let ((mut content_width_opt, mut content_height_opt), border, padding) = self
             .resolve_base_content_size_and_spacing(
                 &node.style.size,
                 &node.style.spacing,
                 &node.style.box_sizing,
                 ctx,
             );
+
+        // Out-of-flow boxes with an `auto` dimension bounded by both opposite
+        // offsets stretch to fill the containing block between them.
+        if node.style.position.kind.is_out_of_flow() {
+            let margin = self.resolve_margin(&node.style.spacing, ctx);
+            let (stretch_width, stretch_height) =
+                self.resolve_out_of_flow_stretch(node, ctx, &border, &padding, &margin);
+            content_width_opt = content_width_opt.or(stretch_width);
+            content_height_opt = content_height_opt.or(stretch_height);
+        }
 
         // --- Intrinsic pass ---
         if intrinsic_pass && let (Some(cw), Some(ch)) = (content_width_opt, content_height_opt) {
@@ -3781,6 +3791,99 @@ impl LayoutEngine {
                 .margin_bottom
                 .resolve_with(ctx.containing_block_width, vw, vh),
         }
+    }
+
+    /// Resolves the used content size of an out-of-flow box whose `auto`
+    /// dimension is bounded by both opposite offsets.
+    ///
+    /// CSS 2.1 §10.3.7 / §10.6.4: when `width` is `auto` and both `left` and
+    /// `right` are non-`auto`, the used border-box width is
+    /// `containing-block width − margins − left − right` (and likewise for
+    /// `height` with `top`/`bottom`). The containing block is the viewport for
+    /// `position: fixed` and the ancestor padding box otherwise. This lets
+    /// full-viewport overlays (`position: fixed; inset: 0`) fill the viewport
+    /// instead of shrink-wrapping their content.
+    fn resolve_out_of_flow_stretch(
+        &self,
+        node: &LayoutNode,
+        ctx: &InternalLayoutContext,
+        border: &Edge,
+        padding: &Edge,
+        margin: &EdgeOption,
+    ) -> (Option<f32>, Option<f32>) {
+        let position = &node.style.position;
+        if !position.kind.is_out_of_flow() {
+            return (None, None);
+        }
+
+        let fixed = position.kind == Position::Fixed;
+        let cb_width = if fixed {
+            Some(self.viewport_width)
+        } else {
+            ctx.containing_block_width
+        };
+        let cb_height = if fixed {
+            Some(self.viewport_height)
+        } else {
+            ctx.containing_block_height
+        };
+
+        let resolve = |value: &LengthOrAuto, basis: f32| {
+            value.resolve_with(Some(basis), self.viewport_width, self.viewport_height)
+        };
+
+        let pb_w = border.left + border.right + padding.left + padding.right;
+        let pb_h = border.top + border.bottom + padding.top + padding.bottom;
+
+        let mut width = None;
+        if matches!(node.style.size.width, LengthOrAuto::Auto)
+            && let Some(cb_width) = cb_width
+            && let (Some(left), Some(right)) = (
+                resolve(&position.left, cb_width),
+                resolve(&position.right, cb_width),
+            )
+        {
+            let border_box_width = (cb_width
+                - left
+                - right
+                - margin.left.unwrap_or(0.0)
+                - margin.right.unwrap_or(0.0))
+            .max(0.0);
+            width = Some(self.apply_size_constraints(
+                (border_box_width - pb_w).max(0.0),
+                &node.style.size,
+                ctx,
+                true,
+                &node.style.box_sizing,
+                pb_w,
+            ));
+        }
+
+        let mut height = None;
+        if matches!(node.style.size.height, LengthOrAuto::Auto)
+            && let Some(cb_height) = cb_height
+            && let (Some(top), Some(bottom)) = (
+                resolve(&position.top, cb_height),
+                resolve(&position.bottom, cb_height),
+            )
+        {
+            let border_box_height = (cb_height
+                - top
+                - bottom
+                - margin.top.unwrap_or(0.0)
+                - margin.bottom.unwrap_or(0.0))
+            .max(0.0);
+            height = Some(self.apply_size_constraints(
+                (border_box_height - pb_h).max(0.0),
+                &node.style.size,
+                ctx,
+                false,
+                &node.style.box_sizing,
+                pb_h,
+            ));
+        }
+
+        (width, height)
     }
 }
 
