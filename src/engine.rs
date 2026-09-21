@@ -9,6 +9,9 @@ use crate::{
 const EPSILON: f32 = 0.001;
 const MAX_GRID_TRACKS: usize = 10_000;
 
+use std::cell::RefCell;
+use std::rc::Rc;
+
 //=====================
 // Benchmark
 //=====================
@@ -257,6 +260,11 @@ pub(crate) struct InternalLayoutContext {
     /// inline flow context; zero otherwise.
     pub(crate) line_height: f32,
 
+    /// The block formatting context's floats and this flow's origin inside
+    /// them, for float-aware in-line wrapping. `None` when the context does
+    /// not participate in a flow formatting context (flex/grid items).
+    pub(crate) space: Option<FloatSpaceState>,
+
     /// Viewport width, used for resolving `Vw` units.
     pub(crate) viewport_width: f32,
 
@@ -289,6 +297,7 @@ impl From<&InternalLayoutContext> for crate::LayoutContext {
             containing_block_height: ctx.containing_block_height,
             start_pos: ctx.start_pos,
             available_inline_size: ctx.available_inline_size,
+            float_space: ctx.space.as_ref().map(|s| s.avoider_with_origin(s.origin)),
             line_height: ctx.line_height,
             viewport_width: ctx.viewport_width,
             viewport_height: ctx.viewport_height,
@@ -440,6 +449,177 @@ pub(crate) const EMPTY_LINE_CONTEXT: LineContext = LineContext {
     margin_start: 0.0,
     margin_end: 0.0,
 };
+
+/// A floated box's outer (margin) extent, recorded in the coordinate space of
+/// the block formatting context that owns it.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct FloatBox {
+    pub(crate) side: crate::Float,
+    /// Left edge of the margin box, in formatting-context coordinates.
+    pub(crate) x: f32,
+    /// Top edge of the margin box, in formatting-context coordinates.
+    pub(crate) y: f32,
+    /// Width of the margin box.
+    pub(crate) w: f32,
+    /// Height of the margin box.
+    pub(crate) h: f32,
+}
+
+/// Computes the usable horizontal span `(start, end)` for an in-flow line at
+/// vertical position `line_y` (relative to the start of the line).
+///
+/// Float coordinates are formatting-context-absolute; `origin` maps the
+/// current flow's line space into that context's space. `begin` starts at
+/// `0.0` and `end` is capped by `line_width` (the containing block width the
+/// line is being laid out against). When floats on both sides leave no room,
+/// `end` is clamped down to `start`.
+pub(crate) fn floats_avail_at(
+    floats: &[FloatBox],
+    origin: (f32, f32),
+    line_y: f32,
+    line_width: f32,
+) -> (f32, f32) {
+    let y = origin.1 + line_y;
+    let mut start = 0.0_f32;
+    let mut end = line_width;
+    for f in floats {
+        if f.h <= 0.0 {
+            continue;
+        }
+        if !(y >= f.y && y < f.y + f.h) {
+            continue;
+        }
+        let rel = f.x - origin.0;
+        match f.side {
+            crate::Float::Left => start = start.max(rel + f.w),
+            crate::Float::Right => end = end.min(rel),
+            crate::Float::None => {}
+        }
+    }
+    if end < start {
+        // Floats from both sides collide on this line: nothing is usable.
+        end = start;
+    }
+    (start.max(0.0), end)
+}
+
+/// The shared set of floats belonging to a block formatting context, visible
+/// to every in-flow line box laid out inside it.
+///
+/// Plain `display: flow` containers share the float list with their parent
+/// formatting context (the `Rc` is cloned), while `flow-root`, floated and
+/// absolutely-positioned boxes (and flex/grid containers) establish a fresh
+/// set. `origin` maps the current flow's line coordinates into the shared
+/// context's coordinate space, so the same float list can be queried from
+/// nested flows at different offsets.
+#[derive(Debug, Clone)]
+pub(crate) struct FloatSpaceState {
+    pub(crate) floats: Rc<RefCell<Vec<FloatBox>>>,
+    pub(crate) origin: (f32, f32),
+    pub(crate) line_width: f32,
+}
+
+impl FloatSpaceState {
+    pub(crate) fn fresh(line_width: f32) -> Self {
+        Self {
+            floats: Rc::new(RefCell::new(Vec::new())),
+            origin: (0.0, 0.0),
+            line_width,
+        }
+    }
+
+    /// Usable `(start, end)` horizontal span at flow-local line `y`.
+    pub(crate) fn avail_at(&self, line_y: f32) -> (f32, f32) {
+        floats_avail_at(&self.floats.borrow(), self.origin, line_y, self.line_width)
+    }
+
+    pub(crate) fn place(&self, f: FloatBox) {
+        self.floats.borrow_mut().push(f);
+    }
+
+    /// Bottom of the tallest `float: {side}` box in formatting-context
+    /// coordinates, or `0.0` when there is none. Used for `clear:`.
+    pub(crate) fn clear_bottom(&self, side: crate::Float) -> f32 {
+        self.floats
+            .borrow()
+            .iter()
+            .filter(|f| f.side == side && f.h > 0.0)
+            .map(|f| f.y + f.h)
+            .max_by(f32::total_cmp)
+            .unwrap_or(0.0)
+    }
+
+    /// The greatest outer-top of any float currently in this formatting
+    /// context, in formatting-context coordinates, or `None` when empty.
+    ///
+    /// CSS 2.1 9.5.1 rule 5: a floating box may not be placed higher than any
+    /// floated (or block) box that precedes it in the source. Since floats are
+    /// placed in source order, clamping a new float's top to this value
+    /// enforces that rule.
+    pub(crate) fn latest_top(&self) -> Option<f32> {
+        self.floats
+            .borrow()
+            .iter()
+            .filter(|f| f.h > 0.0)
+            .map(|f| f.y)
+            .max_by(f32::total_cmp)
+    }
+
+    /// Places a float of margin-box width `margin_w` on `side`, returning the
+    /// flow-local `(margin_x, y)` of its margin box.
+    ///
+    /// Implements the CSS 2.1 9.5.1 placement order: the float is put as high
+    /// as possible and then as far to `side` as possible. When it does not fit
+    /// beside the floats already on its tentative line, it is shifted downward
+    /// past obstructing floats until it fits (or no candidate helps, in which
+    /// case it is placed in the lowest, widest slot). Candidate heights are the
+    /// starting line plus every existing float's bottom below it; between those
+    /// events the available span is constant, so testing them is sufficient.
+    pub(crate) fn place_float_slot(
+        &self,
+        side: crate::Float,
+        margin_w: f32,
+        start_y: f32,
+    ) -> (f32, f32) {
+        let floats = self.floats.borrow();
+        let start_bfc = self.origin.1 + start_y;
+
+        let mut candidates: Vec<f32> = Vec::with_capacity(floats.len() + 1);
+        candidates.push(start_y);
+        for f in floats.iter() {
+            if f.h > 0.0 && f.y + f.h > start_bfc {
+                candidates.push(f.y + f.h - self.origin.1);
+            }
+        }
+        candidates.sort_by(f32::total_cmp);
+        candidates.dedup_by(|a, b| (*a - *b).abs() <= 0.01);
+
+        let x_for = |begin: f32, end: f32| match side {
+            crate::Float::Right => end - margin_w,
+            _ => begin,
+        };
+
+        for y in candidates.iter().copied() {
+            let (begin, end) = floats_avail_at(&floats, self.origin, y, self.line_width);
+            if (end - begin).max(0.0) >= margin_w {
+                return (x_for(begin, end), y);
+            }
+        }
+
+        let y = candidates.last().copied().unwrap_or(start_y);
+        let (begin, end) = floats_avail_at(&floats, self.origin, y, self.line_width);
+        (x_for(begin, end).max(begin), y)
+    }
+
+    /// Exposes this space to a custom layouter with a caller-supplied origin.
+    pub(crate) fn avoider_with_origin(&self, origin: (f32, f32)) -> crate::FloatAvoider {
+        crate::FloatAvoider {
+            floats: Rc::clone(&self.floats),
+            origin,
+            line_width: self.line_width,
+        }
+    }
+}
 
 impl LayoutEngine {
     /// Main layout entry point.
@@ -952,6 +1132,7 @@ impl LayoutEngine {
                         available_width: Some(width),
                         parent_assigned_border_width: assigned_width,
                         parent_assigned_border_height: assigned_height,
+                        space: None,
                         ..*base_ctx
                     };
                     let _ = self.layout_node(child, &child_ctx, EMPTY_LINE_CONTEXT, false);
@@ -1078,12 +1259,29 @@ impl LayoutEngine {
         let mut final_state = None;
 
         for _pass in 0..MAX_SHRINK_PASSES {
+            // The flow's block formatting context for floats. A `flow-root`
+            // (including floats, which are blockified to flow-root) and any
+            // out-of-flow box begin a fresh float list; plain `display: flow`
+            // containers share the list of their parent formatting context
+            // (whose `origin` was pointed at this flow before descending).
+            let fresh_bfc = node.style.display.inner() == Some(InnerDisplay::FlowRoot)
+                || node.style.position.kind.is_out_of_flow();
+            let flow_space = match ctx.space.as_ref().filter(|_| !fresh_bfc) {
+                Some(parent) => FloatSpaceState {
+                    floats: Rc::clone(&parent.floats),
+                    origin: parent.origin,
+                    line_width: outbox_width,
+                },
+                None => FloatSpaceState::fresh(outbox_width),
+            };
+
             let base_ctx_for_child = InternalLayoutContext {
                 containing_block_width: content_width_opt,
                 containing_block_height: content_height_opt,
                 available_width: content_width_opt.or(effective_available),
                 parent_assigned_border_width: None,
                 parent_assigned_border_height: None,
+                space: Some(flow_space.clone()),
                 viewport_width: ctx.viewport_width,
                 viewport_height: ctx.viewport_height,
                 ..Default::default()
@@ -1150,12 +1348,18 @@ impl LayoutEngine {
                             range,
                             outbox_width,
                             line_height,
+                            &flow_space,
                             &mut state,
                         )
                     }
-                    LayoutItem::Node(i) => {
-                        self.process_flow_node_item(node, i, ctx, &base_ctx_for_child, &mut state)
-                    }
+                    LayoutItem::Node(i) => self.process_flow_node_item(
+                        node,
+                        i,
+                        ctx,
+                        &base_ctx_for_child,
+                        &flow_space,
+                        &mut state,
+                    ),
                     LayoutItem::Custom(i) => {
                         match node.children[i]
                             .custom_child()
@@ -1167,9 +1371,16 @@ impl LayoutEngine {
                             Some(OuterDisplay::Inline) => {
                                 let mut ctx_for_child =
                                     crate::LayoutContext::from(&base_ctx_for_child);
-                                ctx_for_child.start_pos = state.cursor.pos();
+                                let cursor_pos = state.cursor.pos();
+                                let (line_start, line_end) = flow_space.avail_at(cursor_pos.1);
+                                let start_pos = (cursor_pos.0.max(line_start), cursor_pos.1);
+                                ctx_for_child.start_pos = start_pos;
                                 ctx_for_child.available_inline_size =
-                                    (outbox_width - state.cursor.x).max(0.0);
+                                    (line_end - start_pos.0).max(0.0);
+                                ctx_for_child.float_space = Some(flow_space.avoider_with_origin((
+                                    flow_space.origin.0,
+                                    flow_space.origin.1 + cursor_pos.1,
+                                )));
                                 ctx_for_child.line_height = line_height;
                                 self.process_flow_custom_item(
                                     node,
@@ -1180,7 +1391,13 @@ impl LayoutEngine {
                                 );
                             }
                             Some(OuterDisplay::Block) => {
-                                let ctx_for_child = crate::LayoutContext::from(&base_ctx_for_child);
+                                let mut ctx_for_child =
+                                    crate::LayoutContext::from(&base_ctx_for_child);
+                                let child_position_y = state.cursor.y + state.accum.pending_advance;
+                                ctx_for_child.float_space = Some(flow_space.avoider_with_origin((
+                                    flow_space.origin.0,
+                                    flow_space.origin.1 + child_position_y,
+                                )));
                                 self.process_flow_custom_block_item(
                                     node,
                                     i,
@@ -1236,6 +1453,7 @@ impl LayoutEngine {
         range: std::ops::Range<usize>,
         outbox_width: f32,
         line_height: f32,
+        space: &FloatSpaceState,
         state: &mut FlowState,
     ) {
         let mut fragment_node_buffer = node.children[range.clone()]
@@ -1254,6 +1472,7 @@ impl LayoutEngine {
             state.cursor.line_index,
             line_height,
             outbox_width,
+            space,
         );
 
         let had_line_spans = !line_spans.is_empty();
@@ -1291,8 +1510,10 @@ impl LayoutEngine {
         i: usize,
         ctx: &InternalLayoutContext,
         base_ctx_for_child: &InternalLayoutContext,
+        flow_space: &FloatSpaceState,
         state: &mut FlowState,
     ) {
+        let outbox_width = flow_space.line_width;
         let child_node = match &mut node.children[i] {
             LayoutChild::Node(node) => node,
             _ => unreachable!(),
@@ -1312,18 +1533,107 @@ impl LayoutEngine {
             return;
         }
 
+        // Floats are removed from the flow: they are placed against the edges
+        // of the containing block and do not advance the vertical cursor.
+        if child_node.style.float != crate::Float::None {
+            self.process_flow_float_item(node, i, ctx, flow_space, outbox_width, state);
+            return;
+        }
+
         let child_margin = self.resolve_margin(&child_node.style.spacing, ctx);
+        let EdgeOption {
+            left: ml_opt,
+            top,
+            right: mr_opt,
+            bottom,
+        } = child_margin;
+
+        // A block-level box with `clear` is moved below the floats on the
+        // requested side(s) before it is laid out.
+        if child_is_block && child_node.style.clear != crate::Clear::None {
+            let clear = child_node.style.clear;
+            let target = match clear {
+                crate::Clear::Left => flow_space.clear_bottom(crate::Float::Left),
+                crate::Clear::Right => flow_space.clear_bottom(crate::Float::Right),
+                crate::Clear::Both => flow_space
+                    .clear_bottom(crate::Float::Left)
+                    .max(flow_space.clear_bottom(crate::Float::Right)),
+                crate::Clear::None => unreachable!(),
+            };
+            let shift = (target - (flow_space.origin.1 + state.cursor.y)).max(0.0);
+            if shift > 0.0 {
+                state.cursor.shift_y(shift);
+            }
+        }
+
+        let available_for_child = state
+            .tightened_available
+            .or(state.content_width_opt)
+            .or(ctx.available_width)
+            .map(|width| width - ml_opt.unwrap_or_default() - mr_opt.unwrap_or_default());
+
+        // The child's own float context. `flow-root` boxes (and the floats
+        // themselves, which are blockified to flow-root) start a fresh float
+        // list; plain `display: flow` blocks share the parent formatting
+        // context's list, with the origin advanced to the child's content box
+        // so its line boxes wrap around floats it overlaps after the CSS rule.
+        let child_space = if child_node.style.display.inner() == Some(InnerDisplay::FlowRoot)
+            || child_node.style.position.kind.is_out_of_flow()
+        {
+            FloatSpaceState::fresh(available_for_child.unwrap_or(outbox_width))
+        } else if child_is_block {
+            let c_border = self.resolve_border(&child_node.style.spacing, ctx);
+            let c_padding = self.resolve_padding(&child_node.style.spacing, ctx);
+            // The vertical origin is the child's content-box top in the shared
+            // formatting context, so its line boxes wrap around any float they
+            // overlap. It mirrors the margin-collapse logic applied when the
+            // child is placed; only a first-child margin that collapses into
+            // the child's own content (`updated_line_ctx.margin_start`) can
+            // shift the real position slightly lower than this estimate.
+            let top_collapses = state.collapse_margins
+                && !state.accum.first_block_child_processed
+                && state.border.top == 0.0
+                && state.padding.top == 0.0;
+            let estimated_margin_top = if state.collapse_margins {
+                if top_collapses {
+                    0.0
+                } else {
+                    state.accum.prev_child_margin.max(top.unwrap_or_default())
+                }
+            } else {
+                state.accum.prev_child_margin + top.unwrap_or_default()
+            };
+            let origin_y = state.cursor.y
+                + state.accum.pending_advance
+                + estimated_margin_top
+                + c_border.top
+                + c_padding.top;
+            FloatSpaceState {
+                floats: Rc::clone(&flow_space.floats),
+                origin: (
+                    flow_space.origin.0
+                        + ml_opt.unwrap_or_default()
+                        + c_border.left
+                        + c_padding.left,
+                    flow_space.origin.1 + origin_y,
+                ),
+                line_width: outbox_width,
+            }
+        } else {
+            // Inline-level: the line-space origin follows the current cursor.
+            FloatSpaceState {
+                floats: Rc::clone(&flow_space.floats),
+                origin: (
+                    flow_space.origin.0 + state.cursor.x,
+                    flow_space.origin.1 + state.cursor.y,
+                ),
+                line_width: outbox_width,
+            }
+        };
 
         let ctx_for_child = InternalLayoutContext {
-            available_width: state
-                .tightened_available
-                .or(state.content_width_opt)
-                .or(ctx.available_width)
-                .map(|width| {
-                    width
-                        - child_margin.left.unwrap_or_default()
-                        - child_margin.right.unwrap_or_default()
-                }),
+            available_width: available_for_child,
+            space: Some(child_space),
             ..*base_ctx_for_child
         };
 
@@ -1350,13 +1660,6 @@ impl LayoutEngine {
         } else {
             line_ctx_for_child.end_pos
         };
-
-        let EdgeOption {
-            left: ml_opt,
-            top,
-            right: mr_opt,
-            bottom,
-        } = child_margin;
 
         let (ml, mr) = resolve_flow_margin_auto(
             ml_opt,
@@ -1459,6 +1762,158 @@ impl LayoutEngine {
         } else {
             0.0
         };
+    }
+
+    /// Lays out a float's contents against `avail_w`, using `outbox_width` as
+    /// the containing-block width. A float's interior is its own block
+    /// formatting context, so it gets a fresh [`FloatSpaceState`].
+    fn layout_float_child(
+        &self,
+        child_node: &mut LayoutNode,
+        ctx: &InternalLayoutContext,
+        outbox_width: f32,
+        avail_w: f32,
+        intrinsic_pass: bool,
+    ) {
+        let ctx_for_child = InternalLayoutContext {
+            containing_block_width: Some(outbox_width.max(0.0)),
+            containing_block_height: None,
+            available_width: Some(avail_w),
+            parent_assigned_border_width: None,
+            parent_assigned_border_height: None,
+            space: Some(FloatSpaceState::fresh(avail_w)),
+            viewport_width: ctx.viewport_width,
+            viewport_height: ctx.viewport_height,
+            ..Default::default()
+        };
+        let _ = self.layout_node(
+            child_node,
+            &ctx_for_child,
+            EMPTY_LINE_CONTEXT,
+            intrinsic_pass,
+        );
+    }
+
+    /// Lays out a floated child and parks it against the left or right edge of
+    /// the containing block.
+    ///
+    /// Floats are removed from the flow: the vertical cursor is not advanced
+    /// (later siblings and line boxes flow around it), gaps left by floats are
+    /// tracked in [`FloatSpaceState`] so in-line content wraps around them, and
+    /// the float always contributes to the parent's content height.
+    ///
+    /// `clear` on the float forces it below earlier floats on that side.
+    ///
+    /// Placement follows CSS 2.1 9.5.1: as high as possible, then as far to the
+    /// requested side as possible, shifting down past obstructing floats (and
+    /// never above a preceding float). Documented simplification: a float's
+    /// height is measured once per candidate slot, and an auto width is
+    /// shrink-to-fit against the free slot it finally lands in.
+    fn process_flow_float_item(
+        &self,
+        node: &mut LayoutNode,
+        i: usize,
+        ctx: &InternalLayoutContext,
+        flow_space: &FloatSpaceState,
+        outbox_width: f32,
+        state: &mut FlowState,
+    ) {
+        let child_node = match &mut node.children[i] {
+            LayoutChild::Node(node) => node,
+            _ => unreachable!(),
+        };
+
+        // A float is blockified but its auto width shrinks to fit instead of
+        // stretching. For ordinary flow boxes reuse the inline flow-root shrink
+        // machinery by treating them as inline flow-roots; boxes with a
+        // different inner display (flex/grid) keep their layout mode and are
+        // merely flagged shrink-to-fit.
+        child_node.style.size.auto_behavior = AutoSizeBehavior::ShrinkToFit;
+        if matches!(
+            child_node.style.display.inner(),
+            Some(InnerDisplay::Flow) | Some(InnerDisplay::FlowRoot)
+        ) {
+            child_node.style.display = Display::OutsideInner {
+                outer: OuterDisplay::Inline,
+                inner: InnerDisplay::FlowRoot,
+            };
+        }
+
+        let child_margin = self.resolve_margin(&child_node.style.spacing, ctx);
+        let ml = child_margin.left.unwrap_or_default();
+        let mr = child_margin.right.unwrap_or_default();
+        let mt = child_margin.top.unwrap_or_default();
+        let mb = child_margin.bottom.unwrap_or_default();
+
+        let side = child_node.style.float;
+        debug_assert!(matches!(side, crate::Float::Left | crate::Float::Right));
+
+        // Rule 5 of CSS 2.1 9.5.1: a float may not be placed higher than a
+        // float that precedes it in source order.
+        let floor_y = flow_space
+            .latest_top()
+            .map(|top| top - flow_space.origin.1)
+            .unwrap_or(f32::NEG_INFINITY);
+
+        // `clear` first moves the float below the floats on the given side.
+        let clear_target = match child_node.style.clear {
+            crate::Clear::None => f32::NEG_INFINITY,
+            crate::Clear::Left => flow_space.clear_bottom(crate::Float::Left),
+            crate::Clear::Right => flow_space.clear_bottom(crate::Float::Right),
+            crate::Clear::Both => flow_space
+                .clear_bottom(crate::Float::Left)
+                .max(flow_space.clear_bottom(crate::Float::Right)),
+        };
+        let start_y = state
+            .cursor
+            .y
+            .max(clear_target - flow_space.origin.1)
+            .max(floor_y);
+
+        // A float's auto width is shrink-to-fit against its containing block
+        // (CSS 2.1 10.3.5), not the narrow free slot. Whether the resulting
+        // margin box fits the current line is decided by `place_float_slot`,
+        // which drops the float below obstructing floats when it does not.
+        let content_available = (outbox_width - ml - mr).max(0.0);
+        self.layout_float_child(
+            child_node,
+            ctx,
+            outbox_width,
+            content_available,
+            state.intrinsic_pass,
+        );
+
+        let bw = child_node.layout_box.width();
+        let bh = child_node.layout_box.height();
+        let margin_w = ml + bw + mr;
+        let margin_h = mt + bh + mb;
+
+        let (margin_x_flow, float_y_local) = flow_space.place_float_slot(side, margin_w, start_y);
+
+        let border_x = margin_x_flow + ml;
+        let border_y = float_y_local + mt;
+
+        // Park the box.
+        let current = child_node
+            .layout_box
+            .iter()
+            .next()
+            .map(|m| m.border_box)
+            .unwrap_or_default();
+        child_node
+            .layout_box
+            .shift_with_spans(border_x - current.x, border_y - current.y);
+
+        flow_space.place(FloatBox {
+            side,
+            x: flow_space.origin.0 + margin_x_flow,
+            y: flow_space.origin.1 + float_y_local,
+            w: margin_w,
+            h: margin_h,
+        });
+
+        state.accum.children_width = state.accum.children_width.max(margin_x_flow + margin_w);
+        state.accum.children_height = state.accum.children_height.max(float_y_local + margin_h);
     }
 
     fn process_flow_custom_item(
@@ -3402,6 +3857,7 @@ impl LayoutEngine {
                     let ctx_for_child = InternalLayoutContext {
                         parent_assigned_border_width,
                         parent_assigned_border_height,
+                        space: None,
                         ..*base_ctx_for_children
                     };
 
@@ -3511,18 +3967,30 @@ impl LayoutEngine {
         line_ctx: LineContext,
         line_index: usize,
         line_height: f32,
-        outbox_width: f32,
+        _outbox_width: f32,
+        space: &FloatSpaceState,
     ) -> (Vec<LineSpan>, LineContext, usize) {
         let mut cursor_x = line_ctx.end_pos.0;
         let mut cursor_y = line_ctx.end_pos.1;
 
         let mut current_x = line_ctx.current_x;
-        let mut line_start_x = line_ctx.current_x;
-        let mut visual_line_start_x = cursor_x;
 
         let mut line_index = line_index;
 
         let mut if_first_of_line = true;
+
+        // Line-wrap against floats: each line is confined to the horizontal
+        // span its vertical position leaves free (`line_origin`..`line_end`),
+        // rather than the full `outbox_width`. `line_origin` is the local x
+        // where the current line visually begins; `line_start_x` is the flat
+        // (accumulated) coordinate used for span extents.
+        let (line_origin_start, line_end_first) = space.avail_at(cursor_y);
+        let mut line_origin = line_origin_start;
+        let mut line_end = line_end_first;
+        current_x = current_x.max(line_origin);
+        cursor_x = cursor_x.max(line_origin);
+        let mut line_start_x = current_x;
+        let mut visual_line_start_x = cursor_x;
 
         let mut line_span_buf = Vec::new();
 
@@ -3546,19 +4014,23 @@ impl LayoutEngine {
                         line_index,
                     };
 
-                    cursor_x = 0.0;
                     cursor_y += line_height;
                     line_index += 1;
+                    let (start, end) = space.avail_at(cursor_y);
+                    line_origin = start;
+                    cursor_x = start;
                     line_start_x = current_x;
-                    visual_line_start_x = 0.0;
+                    visual_line_start_x = start;
+                    line_end = end;
                     if_first_of_line = true;
                 }
 
                 ItemFragment::Fragment(fragment_item) => {
-                    // Wrap if fragment doesn't fit and line isn't physically empty (cursor_x > 0
+                    // Wrap if fragment doesn't fit the line's float-free span
+                    // and the line isn't physically empty (cursor_x > line_origin
                     // catches inline child mid-line after previous siblings).
-                    if cursor_x + fragment_item.width > outbox_width
-                        && (!if_first_of_line || cursor_x > 0.0)
+                    if cursor_x + fragment_item.width > line_end
+                        && (!if_first_of_line || cursor_x > line_origin)
                     {
                         if line_start_x != current_x {
                             push_or_merge_line_span(
@@ -3571,11 +4043,14 @@ impl LayoutEngine {
                             );
                         }
 
-                        cursor_x = 0.0;
                         cursor_y += line_height;
                         line_index += 1;
+                        let (start, end) = space.avail_at(cursor_y);
+                        line_origin = start;
+                        cursor_x = start;
                         line_start_x = current_x;
-                        visual_line_start_x = 0.0;
+                        visual_line_start_x = start;
+                        line_end = end;
                     }
 
                     fragment_node.placement = Placement {
@@ -4643,6 +5118,7 @@ fn flow_fragment_range(
         line_index,
         line_height,
         outbox_width,
+        &FloatSpaceState::fresh(outbox_width),
     );
 
     let width = line_spans

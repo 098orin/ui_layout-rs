@@ -696,9 +696,49 @@ impl PercentCheck for LengthOrAuto {
     }
 }
 
+/// CSS `float` property, controlling whether a box is floated out of the
+/// normal flow to the left or right edge of its containing block.
+///
+/// Floats take the box out of the vertical flow of its parent (later siblings
+/// and line boxes are laid out as if the box were not there, though line boxes
+/// are shortened to avoid it), while the box itself is shifted to the
+/// requested edge of the containing block.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum Float {
+    /// The box is not floated (`float: none`).
+    #[default]
+    None,
+    /// The box is floated to the left edge (`float: left`).
+    Left,
+    /// The box is floated to the right edge (`float: right`).
+    Right,
+}
+
+/// CSS `clear` property, forcing a block-level box to be placed below any
+/// floats on the requested side(s).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum Clear {
+    /// No clearance is requested (`clear: none`).
+    #[default]
+    None,
+    /// The box (or float) is placed below all earlier `float: left` boxes.
+    Left,
+    /// The box (or float) is placed below all earlier `float: right` boxes.
+    Right,
+    /// The box (or float) is placed below all earlier floats.
+    Both,
+}
+
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Style {
     pub display: Display,
+
+    /// Whether the box is floated to the left or right edge of its
+    /// containing block.
+    pub float: Float,
+
+    /// Which side(s) must be free of floats before this box is placed.
+    pub clear: Clear,
 
     pub position: PositionStyle,
 

@@ -1,5 +1,86 @@
 use crate::LayoutBox;
+use std::cell::RefCell;
 use std::fmt::{self, Debug};
+use std::rc::Rc;
+
+/// Horizontal space left free by floats (obstacles) on a line.
+///
+/// Floats are removed from the normal flow and parked against the left or
+/// right edge of their containing block. In-line content that would be laid
+/// out next to a float must wrap around it instead. Rather than threading the
+/// raw float list through every layout pass, this handle is handed to custom
+/// layouters so they can *query* how much room remains at any vertical
+/// position on the line.
+///
+/// Coordinates are relative to the containing block's content-box origin (the
+/// x/y origin of the flow the object is laid out in):
+///
+/// - The first tuple component is the left edge of the usable horizontal span
+///   (sum of `float: left` outer edges overlapping `y`).
+/// - The second component is the right edge of the usable span (left edge of
+///   `float: right` overlapping `y`, limited by the containing block width
+///   the engine laid the line out with). It is *not* further clamped, so the
+///   caller should cap it with its own available width.
+///
+/// When no float overlaps the queried `y`, the query returns `(0.0, width)`,
+/// i.e. the whole line is usable. Because the origin is the containing block
+/// (not [`LayoutContext::start_pos`]), a multi-line object can query every one
+/// of its lines at `y = line_index * line_height` and place each line at the
+/// returned `start`.
+///
+/// The handle is cheap to clone; it borrows the floats of the current
+/// formatting context behind an `Rc`, and the queried registry is only as
+/// current as the layout pass that constructed the handle.
+#[derive(Debug, Clone)]
+pub struct FloatAvoider {
+    pub(crate) floats: Rc<RefCell<Vec<crate::engine::FloatBox>>>,
+    pub(crate) origin: (f32, f32),
+    pub(crate) line_width: f32,
+}
+
+impl Default for FloatAvoider {
+    fn default() -> Self {
+        Self {
+            floats: Rc::new(RefCell::new(Vec::new())),
+            origin: (0.0, 0.0),
+            line_width: 0.0,
+        }
+    }
+}
+
+impl FloatAvoider {
+    /// Builds a handle from an explicit set of obstacle rectangles.
+    ///
+    /// Each rectangle is `(side, x, y, width, height)` in the coordinate space
+    /// of the containing block (the space [`Self::avail_at`] reports in),
+    /// matching the margin boxes the engine records for floats. This is
+    /// primarily a test hook so custom layouters can be exercised against a
+    /// known set of floats; during layout the engine builds the handle itself.
+    #[doc(hidden)]
+    pub fn from_rects(
+        rects: impl IntoIterator<Item = (crate::Float, f32, f32, f32, f32)>,
+        line_width: f32,
+    ) -> Self {
+        let floats = rects
+            .into_iter()
+            .map(|(side, x, y, w, h)| crate::engine::FloatBox { side, x, y, w, h })
+            .collect();
+        Self {
+            floats: Rc::new(RefCell::new(floats)),
+            origin: (0.0, 0.0),
+            line_width,
+        }
+    }
+
+    /// Returns the usable horizontal span `(start, end)` — relative to the
+    /// containing block's content-box origin — that floats leave free at
+    /// vertical position `y` (also relative to that origin). `start` is
+    /// clamped to `>= 0` and `end` is capped by the containing block width the
+    /// layout pass ran with.
+    pub fn avail_at(&self, y: f32) -> (f32, f32) {
+        crate::engine::floats_avail_at(&self.floats.borrow(), self.origin, y, self.line_width)
+    }
+}
 
 /// The measured size of a [`CustomLayouter`] object.
 ///
@@ -25,7 +106,7 @@ pub struct MeasureResult {
 /// The engine constructs a `LayoutContext` for every custom object at each
 /// layout / measure call, so the values describe the *current* pass and must
 /// not be cached across calls.
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct LayoutContext {
     /// Containing block width, used for resolving percentage lengths and
     /// intrinsic sizing. `None` when unknown.
@@ -46,6 +127,15 @@ pub struct LayoutContext {
     /// Only meaningful for objects participating in an inline flow context;
     /// zero otherwise.
     pub available_inline_size: f32,
+
+    /// Reads how much of the current line is left free by floats, so custom
+    /// objects can wrap around them. `None` when the object is not laid out
+    /// inside a flow formatting context (flex/grid, or no floats around).
+    ///
+    /// Floats are removed from the normal flow, so this handle is only as
+    /// current as the layout pass that produced it. Query it with line-relative
+    /// coordinates.
+    pub float_space: Option<FloatAvoider>,
 
     /// Line height of the containing inline formatting context.
     ///
