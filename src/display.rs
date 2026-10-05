@@ -6,6 +6,17 @@ use crate::*;
 //  Display implementations for primitive style types
 // ============================================================
 
+impl fmt::Display for RoundingStrategy {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            RoundingStrategy::Nearest => "nearest",
+            RoundingStrategy::Up => "up",
+            RoundingStrategy::Down => "down",
+            RoundingStrategy::ToZero => "to-zero",
+        })
+    }
+}
+
 impl fmt::Display for Length {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -20,6 +31,13 @@ impl fmt::Display for Length {
             Length::Min(a, b) => write!(f, "min({}, {})", a, b),
             Length::Max(a, b) => write!(f, "max({}, {})", a, b),
             Length::Clamp { min, val, max } => write!(f, "clamp({}, {}, {})", min, val, max),
+            Length::Round {
+                strategy,
+                value,
+                step,
+            } => {
+                write!(f, "round({}, {}, {})", strategy, value, step)
+            }
         }
     }
 }

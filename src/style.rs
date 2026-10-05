@@ -356,6 +356,26 @@ pub enum FlexWrap {
     WrapReverse,
 }
 
+/// CSS `<rounding-strategy>` keyword of the `round()` function.
+///
+/// Selects how [`Length::Round`] chooses between the two multiples of the
+/// rounding step that bracket the value.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum RoundingStrategy {
+    /// Picks the multiple of the step closest to the value. Ties go to the
+    /// upper multiple, i.e. the one closer to `+∞`.
+    ///
+    /// This is the CSS initial value.
+    #[default]
+    Nearest,
+    /// Picks the multiple of the step closer to `+∞`.
+    Up,
+    /// Picks the multiple of the step closer to `-∞`.
+    Down,
+    /// Picks the multiple of the step closer to zero.
+    ToZero,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Length {
     Px(f32),
@@ -374,6 +394,12 @@ pub enum Length {
         min: Box<Length>,
         val: Box<Length>,
         max: Box<Length>,
+    },
+    /// `round()`: the value snapped to a multiple of `step`.
+    Round {
+        strategy: RoundingStrategy,
+        value: Box<Length>,
+        step: Box<Length>,
     },
 }
 
@@ -430,6 +456,58 @@ impl Length {
                 let max_v = max.resolve_with(percentage_base, viewport_width, viewport_height)?;
 
                 Some(v.clamp(min_v, max_v))
+            }
+            Length::Round {
+                strategy,
+                value,
+                step,
+            } => {
+                let value = value.resolve_with(percentage_base, viewport_width, viewport_height)?;
+                let step = step.resolve_with(percentage_base, viewport_width, viewport_height)?;
+
+                if step == 0.0 {
+                    None
+                } else {
+                    Some(round_to_step(*strategy, value, step))
+                }
+            }
+        }
+    }
+}
+
+/// Snaps `value` to a multiple of `step` following the CSS `round()` definition.
+///
+/// The two multiples of `abs(step)` that bracket `value` are computed directly
+/// rather than rounding `value / step`. The two are not equivalent for a
+/// negative step: `nearest` ties resolve to the numerically larger multiple, so
+/// `round(15px, -10px)` is `20px` and not the `10px` that rounding the quotient
+/// would produce.
+fn round_to_step(strategy: RoundingStrategy, value: f32, step: f32) -> f32 {
+    let magnitude = step.abs();
+    let lower = (value / magnitude).floor() * magnitude;
+
+    // A value that is already an exact multiple of the step resolves to itself
+    // under every strategy, so `up` and `to-zero` must not nudge it off.
+    if value == lower {
+        return value;
+    }
+
+    let upper = lower + magnitude;
+    match strategy {
+        RoundingStrategy::Nearest => {
+            if value - lower < upper - value {
+                lower
+            } else {
+                upper
+            }
+        }
+        RoundingStrategy::Up => upper,
+        RoundingStrategy::Down => lower,
+        RoundingStrategy::ToZero => {
+            if value > 0.0 {
+                lower
+            } else {
+                upper
             }
         }
     }

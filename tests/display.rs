@@ -401,6 +401,166 @@ fn length_resolve_with_all_variants() {
     assert_eq!(mul.resolve_with(None, 800.0, 600.0), Some(30.0));
 }
 
+#[test]
+fn length_round_strategies() {
+    // `round(15px, 10px)` sits exactly between 10px and 20px: `nearest` must
+    // pick the upper multiple while `down` picks the lower one.
+    let r = |strategy, value: f32, step: f32| Length::Round {
+        strategy,
+        value: Box::new(Length::Px(value)),
+        step: Box::new(Length::Px(step)),
+    };
+
+    // Cases mirrored from wpt css/css-values/round-function.html.
+    let cases: &[(RoundingStrategy, f32, f32, f32)] = &[
+        (RoundingStrategy::Nearest, 23.0, 10.0, 20.0),
+        (RoundingStrategy::Nearest, 18.0, 10.0, 20.0),
+        (RoundingStrategy::Nearest, 15.0, 10.0, 20.0),
+        (RoundingStrategy::Nearest, 13.0, 10.0, 10.0),
+        (RoundingStrategy::Nearest, -13.0, 10.0, -10.0),
+        (RoundingStrategy::Nearest, -18.0, 10.0, -20.0),
+        (RoundingStrategy::Down, 23.0, 10.0, 20.0),
+        (RoundingStrategy::Down, 18.0, 10.0, 10.0),
+        (RoundingStrategy::Down, 15.0, 10.0, 10.0),
+        (RoundingStrategy::Down, -13.0, 10.0, -20.0),
+        (RoundingStrategy::Down, -18.0, 10.0, -20.0),
+        (RoundingStrategy::Up, 23.0, 10.0, 30.0),
+        (RoundingStrategy::Up, 18.0, 10.0, 20.0),
+        (RoundingStrategy::Up, 15.0, 10.0, 20.0),
+        (RoundingStrategy::Up, 13.0, 10.0, 20.0),
+        (RoundingStrategy::Up, -13.0, 10.0, -10.0),
+        (RoundingStrategy::Up, -18.0, 10.0, -10.0),
+        (RoundingStrategy::ToZero, 23.0, 10.0, 20.0),
+        (RoundingStrategy::ToZero, 18.0, 10.0, 10.0),
+        (RoundingStrategy::ToZero, 15.0, 10.0, 10.0),
+        (RoundingStrategy::ToZero, 13.0, 10.0, 10.0),
+        (RoundingStrategy::ToZero, -13.0, 10.0, -10.0),
+        (RoundingStrategy::ToZero, -18.0, 10.0, -10.0),
+    ];
+
+    for (strategy, value, step, expected) in cases {
+        assert_eq!(
+            r(*strategy, *value, *step).resolve_with(None, 800.0, 600.0),
+            Some(*expected),
+            "round({:?}, {:?}px, {:?}px)",
+            strategy,
+            value,
+            step
+        );
+    }
+}
+
+#[test]
+fn length_round_default_strategy_is_nearest() {
+    assert_eq!(RoundingStrategy::default(), RoundingStrategy::Nearest);
+}
+
+#[test]
+fn length_round_negative_step() {
+    // With a negative step, `nearest` ties still resolve to the numerically
+    // larger multiple: 15px is between 10px and 20px, so it rounds to 20px.
+    // Rounding the quotient instead would yield 10px here.
+    let r = |value: f32| Length::Round {
+        strategy: RoundingStrategy::Nearest,
+        value: Box::new(Length::Px(value)),
+        step: Box::new(Length::Px(-10.0)),
+    };
+
+    assert_eq!(r(23.0).resolve_with(None, 800.0, 600.0), Some(20.0));
+    assert_eq!(r(18.0).resolve_with(None, 800.0, 600.0), Some(20.0));
+    assert_eq!(r(15.0).resolve_with(None, 800.0, 600.0), Some(20.0));
+    assert_eq!(r(13.0).resolve_with(None, 800.0, 600.0), Some(10.0));
+    assert_eq!(r(-13.0).resolve_with(None, 800.0, 600.0), Some(-10.0));
+    assert_eq!(r(-18.0).resolve_with(None, 800.0, 600.0), Some(-20.0));
+}
+
+#[test]
+fn length_round_exact_multiple() {
+    // A value that is already a multiple of the step resolves to itself under
+    // every strategy, including `up` and `to-zero`.
+    for strategy in [
+        RoundingStrategy::Nearest,
+        RoundingStrategy::Up,
+        RoundingStrategy::Down,
+        RoundingStrategy::ToZero,
+    ] {
+        let r = |value: f32| Length::Round {
+            strategy,
+            value: Box::new(Length::Px(value)),
+            step: Box::new(Length::Px(5.0)),
+        };
+
+        assert_eq!(r(10.0).resolve_with(None, 800.0, 600.0), Some(10.0));
+        assert_eq!(r(-10.0).resolve_with(None, 800.0, 600.0), Some(-10.0));
+        assert_eq!(r(0.0).resolve_with(None, 800.0, 600.0), Some(0.0));
+    }
+}
+
+#[test]
+fn length_round_invalid_step() {
+    let zero_step = Length::Round {
+        strategy: RoundingStrategy::Nearest,
+        value: Box::new(Length::Px(10.4)),
+        step: Box::new(Length::Px(0.0)),
+    };
+    assert_eq!(zero_step.resolve_with(None, 800.0, 600.0), None);
+}
+
+#[test]
+fn length_round_unresolvable_operand() {
+    // An unresolvable sub-expression propagates `None`, as with every other
+    // variant.
+    let no_base = Length::Round {
+        strategy: RoundingStrategy::Nearest,
+        value: Box::new(Length::Percent(50.0)),
+        step: Box::new(Length::Px(1.0)),
+    };
+    assert_eq!(no_base.resolve_with(None, 800.0, 600.0), None);
+    assert_eq!(no_base.resolve_with(Some(200.0), 800.0, 600.0), Some(100.0));
+
+    let no_step = Length::Round {
+        strategy: RoundingStrategy::Nearest,
+        value: Box::new(Length::Px(10.0)),
+        step: Box::new(Length::Percent(50.0)),
+    };
+    assert_eq!(no_step.resolve_with(None, 800.0, 600.0), None);
+}
+
+#[test]
+fn length_round_nested_in_calc() {
+    // `round()` is a `<calc-sum>`, so it composes with the arithmetic variants.
+    let value = Length::Add(
+        Box::new(Length::Round {
+            strategy: RoundingStrategy::Nearest,
+            value: Box::new(Length::Px(10.6)),
+            step: Box::new(Length::Px(1.0)),
+        }),
+        Box::new(Length::Px(5.0)),
+    );
+    assert_eq!(value.resolve_with(None, 800.0, 600.0), Some(16.0));
+}
+
+#[test]
+fn length_round_display() {
+    let r = Length::Round {
+        strategy: RoundingStrategy::ToZero,
+        value: Box::new(Length::Px(10.4)),
+        step: Box::new(Length::Px(1.0)),
+    };
+    assert_eq!(format!("{}", r), "round(to-zero, 10.4px, 1px)");
+
+    let r = Length::Round {
+        strategy: RoundingStrategy::Up,
+        value: Box::new(Length::Percent(33.0)),
+        step: Box::new(Length::Percent(1.0)),
+    };
+    assert_eq!(format!("{}", r), "round(up, 33%, 1%)");
+
+    assert_eq!(format!("{}", RoundingStrategy::Nearest), "nearest");
+    assert_eq!(format!("{}", RoundingStrategy::Down), "down");
+    assert_eq!(format!("{}", RoundingStrategy::ToZero), "to-zero");
+}
+
 // --- LayoutChild accessors ---
 
 #[test]
