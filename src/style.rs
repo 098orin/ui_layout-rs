@@ -764,13 +764,28 @@ trait PercentCheck {
 
 impl PercentCheck for Length {
     fn is_pct(&self) -> bool {
-        matches!(self, Length::Percent(_))
+        match self {
+            Length::Percent(_) => true,
+            // Recurse into every compound variant: a percentage nested in a
+            // `calc()`-style expression still resolves against the containing
+            // block, so it must trigger a relayout just like a bare one.
+            Length::Add(a, b) | Length::Sub(a, b) | Length::Min(a, b) | Length::Max(a, b) => {
+                a.is_pct() || b.is_pct()
+            }
+            Length::Mul(a, _) | Length::Div(a, _) => a.is_pct(),
+            Length::Clamp { min, val, max } => min.is_pct() || val.is_pct() || max.is_pct(),
+            Length::Round { value, step, .. } => value.is_pct() || step.is_pct(),
+            Length::Px(_) | Length::Vw(_) | Length::Vh(_) => false,
+        }
     }
 }
 
 impl PercentCheck for LengthOrAuto {
     fn is_pct(&self) -> bool {
-        matches!(self, LengthOrAuto::Length(Length::Percent(_)))
+        match self {
+            LengthOrAuto::Length(l) => l.is_pct(),
+            LengthOrAuto::Auto => false,
+        }
     }
 }
 
