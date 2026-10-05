@@ -11,6 +11,10 @@ and this project loosely follows Semantic Versioning.
 
 ### Added
 
+* **`round()`**: add `Length::Round` and the `RoundingStrategy` keyword
+  (`nearest`, `up`, `down`, `to-zero`) following CSS Values 4 §10.3. The value
+  is snapped to a multiple of a rounding step, and a zero step resolves to
+  `None`.
 * **`display: contents`**: a `display: contents` node generates no layout box
   (`layout_box` is `None`) but its children participate in the parent's
   formatting context across flow, flex, and grid. The node itself is flattened
@@ -74,6 +78,10 @@ and this project loosely follows Semantic Versioning.
 
 ### Fixed
 
+* Percentage-based sizes nested inside a `calc()`-style expression (`Add`,
+  `Sub`, `Mul`, `Div`, `Min`, `Max`, `Clamp`, `Round`) are now detected, so a
+  flex relayout is triggered when such a child's resolved size depends on the
+  final containing block.
 * Correct application of min/max size constraints to block-level nodes.
 * Correct block-level sizing to fit the available width.
 * Correct inline-level placement inside flex and grid containers.

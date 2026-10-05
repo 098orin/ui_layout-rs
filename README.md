@@ -40,7 +40,7 @@ custom GUI frameworks, editors, and experimental UI engines.
 ### Values & Units
 
 - `Length` types: `Px`, `Percent`, `Vw`, `Vh`
-- `calc()`-style expressions: `Add`, `Sub`, `Mul`, `Div`, `Min`, `Max`, `Clamp`
+- `calc()`-style expressions: `Add`, `Sub`, `Mul`, `Div`, `Min`, `Max`, `Clamp`, `Round`
 - `LengthOrAuto` for properties that support `auto` sizing
 - Min/max sizing (`min_width`, `max_width`, `min_height`, `max_height`)
 - `line_height` support
