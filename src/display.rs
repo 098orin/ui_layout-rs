@@ -220,6 +220,30 @@ impl fmt::Display for Placement {
     }
 }
 
+impl fmt::Display for EdgeOption {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut first = true;
+
+        for (name, value) in [
+            ("left", self.left),
+            ("top", self.top),
+            ("right", self.right),
+            ("bottom", self.bottom),
+        ] {
+            if let Some(value) = value {
+                if !first {
+                    write!(f, ", ")?;
+                }
+
+                write!(f, "{name}: {value}")?;
+                first = false;
+            }
+        }
+
+        if first { write!(f, "none") } else { Ok(()) }
+    }
+}
+
 impl fmt::Display for LayoutBox {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -227,11 +251,18 @@ impl fmt::Display for LayoutBox {
             LayoutBox::BlockBox(b) => {
                 let w = self.width_box();
                 let h = self.height_box();
+
                 write!(
                     f,
-                    "block({}x{} @{},{})",
+                    "block({}x{} @{},{}",
                     w, h, b.border_box.x, b.border_box.y
-                )
+                )?;
+
+                if let Some(edges) = &b.sticky_edges {
+                    write!(f, " sticky({edges})")?;
+                }
+
+                write!(f, ")")
             }
             LayoutBox::InlineBox(inline) => {
                 let w = self.width_box();
@@ -242,15 +273,22 @@ impl fmt::Display for LayoutBox {
                     .map(|s| format!("({},{})", s.line_pos.0, s.line_pos.1))
                     .collect::<Vec<_>>()
                     .join(", ");
+
                 write!(
                     f,
-                    "inline({}x{} @{},{} [{}])",
+                    "inline({}x{} @{},{} [{}]",
                     w,
                     h,
                     inline.box_model.border_box.x,
                     inline.box_model.border_box.y,
                     line_pos_str
-                )
+                )?;
+
+                if let Some(edges) = &inline.box_model.sticky_edges {
+                    write!(f, " sticky({edges})")?;
+                }
+
+                write!(f, ")")
             }
         }
     }
