@@ -20,6 +20,10 @@ and this project loosely follows Semantic Versioning.
   formatting context across flow, flex, and grid. The node itself is flattened
   out of the layout tree during child collection, so `layout_node` never
   receives it, and the original tree shape is preserved after layout.
+* **Floats and clear**: support `float: left`/`right` and the `clear`
+  property. Floats are taken out of the vertical flow while line boxes and
+  following siblings are laid out around them, and `clear` forces a
+  block-level box below the floats on the requested side(s).
 * **Positioned layout**: support `relative`, `absolute`, `fixed`, and
   `sticky` positioning with inset edges and sticky positioning constraints.
 * **Grid layout**: add grid layout with explicit and implicit tracks,
@@ -75,6 +79,9 @@ and this project loosely follows Semantic Versioning.
   excessive track expansion, and correctly account for content offsets.
 * **LayoutBox inline representation**: enhance the representation of
   `LayoutBox::InlineBox` and preserve inline line information across breaks.
+* **Layout box formatting**: `fmt::Display` for `LayoutBox` now includes
+  sticky edges for block and inline boxes, and `EdgeOption` implements
+  `fmt::Display`.
 
 ### Fixed
 
@@ -84,6 +91,11 @@ and this project loosely follows Semantic Versioning.
   final containing block.
 * Correct application of min/max size constraints to block-level nodes.
 * Correct block-level sizing to fit the available width.
+* Exclude `display: none` items from flow participation.
+* Correct nested inline-block layout and available space calculation.
+* Prevent wrapped flex items from being shifted after lines of zero height.
+* Stretch out-of-flow boxes with an `auto` size between opposite inset
+  offsets, so full-viewport fixed overlays (`inset: 0`) cover the viewport.
 * Correct inline-level placement inside flex and grid containers.
 * Correct inline-flow state and line indices across line breaks.
 * Correct custom inline available width after a line break.
