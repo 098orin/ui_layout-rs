@@ -29,10 +29,10 @@ and this project loosely follows Semantic Versioning.
 * **Grid layout**: add grid layout with explicit and implicit tracks,
   repeated tracks, named areas, negative line placement, and grid item
   alignment.
-* **Multi-line flex layout**: support `flex-wrap` and multi-line flex item
-  placement.
 * **Grid alignment**: support `align-*`, `justify-items`, and `justify-self`
   in the grid formatting context.
+* **Multi-line flex layout**: support `flex-wrap` and multi-line flex item
+  placement.
 * **Custom object sizing**: add `AutoSizeBehavior` and
   `SizeStyle::auto_behavior` to control how block replaced-element leaves
   resolve `auto` width/height.
@@ -75,8 +75,6 @@ and this project loosely follows Semantic Versioning.
   shrink-to-fit behavior.
 * **Flex sizing**: make `flex-basis` account for the flex item's box sizing
   and content size.
-* **Grid sizing and placement**: improve implicit track sizing, prevent
-  excessive track expansion, and correctly account for content offsets.
 * **LayoutBox inline representation**: enhance the representation of
   `LayoutBox::InlineBox` and preserve inline line information across breaks.
 * **Layout box formatting**: `fmt::Display` for `LayoutBox` now includes
