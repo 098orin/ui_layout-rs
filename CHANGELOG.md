@@ -103,8 +103,6 @@ and this project loosely follows Semantic Versioning.
 * Correct sticky edge representation and positioning.
 * Correct handling of auto margins with negative free space.
 * Prevent overflow and out-of-bounds vector access in edge cases.
-* Correct grid placement and track sizing.
-* Prevent double application of content offsets during grid layout.
 
 ### Removed
 
