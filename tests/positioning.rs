@@ -236,3 +236,150 @@ fn fixed_auto_width_shrink_wraps_content() {
     assert_eq!(fixed_box.border_box.x, 690.0);
     assert_eq!(fixed_box.border_box.y, 550.0);
 }
+
+// --- Out-of-flow stretching between opposite offsets ---
+
+#[test]
+fn fixed_inset_zero_fills_the_viewport() {
+    let fixed = LayoutNode::new(Style {
+        position: PositionStyle {
+            kind: Position::Fixed,
+            top: Length::Px(0.0).into(),
+            right: Length::Px(0.0).into(),
+            bottom: Length::Px(0.0).into(),
+            left: Length::Px(0.0).into(),
+        },
+        ..Default::default()
+    });
+    let mut root = LayoutNode::with_children(Style::default(), [fixed]);
+
+    LayoutEngine::layout(&mut root, 300.0, 200.0);
+
+    let fixed_box = block_box(node(&root, 0));
+    assert_eq!(fixed_box.border_box, rect(0.0, 0.0, 300.0, 200.0));
+}
+
+#[test]
+fn absolute_auto_width_stretches_between_left_and_right() {
+    let absolute = LayoutNode::new(Style {
+        position: PositionStyle {
+            kind: Position::Absolute,
+            top: Length::Px(30.0).into(),
+            right: Length::Px(20.0).into(),
+            left: Length::Px(10.0).into(),
+            ..Default::default()
+        },
+        size: SizeStyle {
+            height: Length::Px(40.0).into(),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: size(300.0, 200.0),
+            ..Default::default()
+        },
+        [absolute],
+    );
+
+    LayoutEngine::layout(&mut root, 300.0, 200.0);
+
+    let absolute_box = block_box(node(&root, 0));
+    assert_eq!(absolute_box.border_box, rect(10.0, 30.0, 270.0, 40.0));
+}
+
+#[test]
+fn absolute_auto_height_stretches_between_top_and_bottom() {
+    let absolute = LayoutNode::new(Style {
+        position: PositionStyle {
+            kind: Position::Absolute,
+            top: Length::Px(10.0).into(),
+            bottom: Length::Px(20.0).into(),
+            left: Length::Px(15.0).into(),
+            ..Default::default()
+        },
+        size: SizeStyle {
+            width: Length::Px(50.0).into(),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: size(300.0, 200.0),
+            ..Default::default()
+        },
+        [absolute],
+    );
+
+    LayoutEngine::layout(&mut root, 300.0, 200.0);
+
+    let absolute_box = block_box(node(&root, 0));
+    assert_eq!(absolute_box.border_box, rect(15.0, 10.0, 50.0, 170.0));
+}
+
+#[test]
+fn absolute_stretch_subtracts_margins_border_and_padding() {
+    let absolute = LayoutNode::new(Style {
+        position: PositionStyle {
+            kind: Position::Absolute,
+            top: Length::Px(10.0).into(),
+            right: Length::Px(10.0).into(),
+            bottom: Length::Px(10.0).into(),
+            left: Length::Px(10.0).into(),
+        },
+        spacing: Spacing {
+            margin_left: Length::Px(5.0).into(),
+            margin_right: Length::Px(5.0).into(),
+            border_left: Length::Px(2.0),
+            border_right: Length::Px(2.0),
+            padding_left: Length::Px(3.0),
+            padding_right: Length::Px(3.0),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: size(300.0, 200.0),
+            ..Default::default()
+        },
+        [absolute],
+    );
+
+    LayoutEngine::layout(&mut root, 300.0, 200.0);
+
+    let absolute_box = block_box(node(&root, 0));
+    // 300 - left(10) - right(10) - margins(10) = 270 border-box width.
+    assert_eq!(absolute_box.border_box.width, 270.0);
+    // 270 - border(4) - padding(6) = 260 content-box width.
+    assert_eq!(absolute_box.content_box.width, 260.0);
+}
+
+#[test]
+fn explicit_size_wins_over_opposite_offset_stretch() {
+    let absolute = LayoutNode::new(Style {
+        position: PositionStyle {
+            kind: Position::Absolute,
+            top: Length::Px(0.0).into(),
+            right: Length::Px(10.0).into(),
+            bottom: Length::Px(0.0).into(),
+            left: Length::Px(10.0).into(),
+        },
+        size: size(40.0, 30.0),
+        ..Default::default()
+    });
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: size(300.0, 200.0),
+            ..Default::default()
+        },
+        [absolute],
+    );
+
+    LayoutEngine::layout(&mut root, 300.0, 200.0);
+
+    let absolute_box = block_box(node(&root, 0));
+    assert_eq!(absolute_box.border_box, rect(10.0, 0.0, 40.0, 30.0));
+}
