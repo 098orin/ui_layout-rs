@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 use ui_layout::*;
 
-pub fn node<'a>(n: &'a LayoutNode, idx: usize) -> &'a LayoutNode {
+pub fn node(n: &LayoutNode, idx: usize) -> &LayoutNode {
     n.children[idx].node().expect("expected node child")
 }
 

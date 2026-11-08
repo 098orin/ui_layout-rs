@@ -35,7 +35,17 @@ impl LayoutMetrics {
             cache_miss_match: AtomicUsize::new(0),
         }
     }
+}
 
+#[cfg(feature = "layout-bench")]
+impl Default for LayoutMetrics {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(feature = "layout-bench")]
+impl LayoutMetrics {
     #[inline(always)]
     pub fn reset(&self) {
         self.layout_calls.store(0, Ordering::Relaxed);
@@ -3735,11 +3745,6 @@ impl LayoutEngine {
         let bottom = resolve_y(&node.style.position.bottom);
 
         if node.style.position.kind == Position::Sticky {
-            let left = left;
-            let right = right;
-            let top = top;
-            let bottom = bottom;
-
             node.layout_box.set_sticky_edges(EdgeOption {
                 left,
                 top,
@@ -4068,6 +4073,7 @@ impl LayoutEngine {
         *remaining -= used;
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn finalize_flex_children_layout(
         &self,
         node: &mut LayoutNode,
@@ -4741,9 +4747,11 @@ fn collect_flex_line_ranges(
         return Vec::new();
     }
     let Some(available_main) = available_main else {
+        #[allow(clippy::single_range_in_vec_init)]
         return vec![0..outer_main_sizes.len()];
     };
     if flex_wrap == FlexWrap::NoWrap {
+        #[allow(clippy::single_range_in_vec_init)]
         return vec![0..outer_main_sizes.len()];
     }
 
@@ -5319,7 +5327,7 @@ fn item_participates_in_normal_flow(children: &[LayoutChild], item: &LayoutItem)
             child.style.display != Display::None && !child.style.position.kind.is_out_of_flow()
         }
         LayoutItem::Fragments(..) => true,
-        LayoutItem::Custom(index) => children[*index].custom_child().map_or(true, |object| {
+        LayoutItem::Custom(index) => children[*index].custom_child().is_none_or(|object| {
             object.style().display != Display::None
                 && !object.style().position.kind.is_out_of_flow()
         }),
@@ -5676,6 +5684,7 @@ fn compute_inline_extent(
 ///
 /// Note: This is a helper for engines that manage custom node layout.
 /// The engine is responsible for providing the viewport dimensions and intrinsic size.
+#[allow(clippy::too_many_arguments)]
 pub fn resolve_custom_box_size(
     style: &Style,
     intrinsic_width: f32,

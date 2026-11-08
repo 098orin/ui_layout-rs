@@ -333,7 +333,7 @@ fn margins_affect_positioning() {
     let mut root = LayoutNode::with_children(Style::default(), [inner]);
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
-    let c = node(&root.children[0].node().unwrap(), 0);
+    let c = node(root.children[0].node().unwrap(), 0);
     let b = block_box(c);
     assert_eq!(b.border_box.x, 20.0);
     // margin-top collapses with parent (no border/padding) => child at y=0

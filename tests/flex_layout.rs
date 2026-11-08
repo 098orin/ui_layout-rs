@@ -1389,7 +1389,7 @@ fn branch(depth: usize, max_depth: usize) -> LayoutNode {
     LayoutNode::with_children(
         Style {
             display: block_flex(),
-            flex_direction: if depth % 2 == 0 {
+            flex_direction: if depth.is_multiple_of(2) {
                 FlexDirection::Row
             } else {
                 FlexDirection::Column

@@ -1,4 +1,3 @@
-#![cfg(feature = "unstable")]
 mod common;
 use common::*;
 use ui_layout::*;
@@ -12,8 +11,8 @@ struct MockBlock {
 impl CustomLayouter for MockBlock {
     fn layout(&mut self, ctx: &LayoutContext) -> LayoutBox {
         let w = ctx
-            .available_width
-            .unwrap_or(ctx.containing_block_width.unwrap_or(self.width))
+            .containing_block_width
+            .unwrap_or(self.width)
             .min(self.width);
         let h = ctx
             .containing_block_height
