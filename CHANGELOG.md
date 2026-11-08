@@ -83,6 +83,11 @@ and this project loosely follows Semantic Versioning.
 
 ### Fixed
 
+* Resolve auto-width inline-block/`flow-root` boxes with the CSS 2.1
+  shrink-to-fit formula `min(max(min-content, available), max-content)` using
+  intrinsic content measurement. The previous iterative shrink pass did not
+  converge for centered content and could size custom children against an
+  indefinite containing block.
 * Percentage-based sizes nested inside a `calc()`-style expression (`Add`,
   `Sub`, `Mul`, `Div`, `Min`, `Max`, `Clamp`, `Round`) are now detected, so a
   flex relayout is triggered when such a child's resolved size depends on the

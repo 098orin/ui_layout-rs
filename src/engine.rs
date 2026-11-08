@@ -976,7 +976,7 @@ impl LayoutEngine {
             content_height_opt,
             row_gap,
             &row_intrinsic,
-            content_height_opt,
+            None,
             self.viewport_width,
             self.viewport_height,
         );
@@ -1082,6 +1082,279 @@ impl LayoutEngine {
                 (measured.width, measured.height)
             }
         }
+    }
+
+    /// Computes the min-content and max-content widths of a flow container's
+    /// contents, following the intrinsic sizing rules of CSS 2.1 §10.3.9.
+    ///
+    /// Inline-level content contributes to a line: its max-content width is
+    /// the sum of the inline items and its min-content width is the widest
+    /// item, since a line may break between items. Block-level content is
+    /// stacked, so it contributes its own intrinsic widths directly. Forced
+    /// line breaks end the current inline line.
+    fn measure_flow_intrinsic_width(
+        &self,
+        node: &LayoutNode,
+        ctx: &InternalLayoutContext,
+    ) -> IntrinsicWidths {
+        let mut result = IntrinsicWidths::default();
+        let mut line_max = 0.0;
+        let mut line_min = 0.0;
+        let mut has_line = false;
+
+        for item in LayoutItems::new(&node.children) {
+            match item {
+                LayoutItem::Fragments(start, end) => {
+                    for child in &node.children[start..end] {
+                        let Some(fragment) = child.fragment() else {
+                            continue;
+                        };
+                        if fragment.node.is_line_break() {
+                            flush_intrinsic_line(
+                                &mut result,
+                                &mut line_max,
+                                &mut line_min,
+                                &mut has_line,
+                            );
+                        } else {
+                            let width = fragment.node.width().max(0.0);
+                            line_max += width;
+                            line_min = line_min.max(width);
+                            has_line = true;
+                        }
+                    }
+                }
+                LayoutItem::Node(index) => {
+                    let child = node.children[index].node().unwrap();
+                    if child.style.display == Display::None
+                        || child.style.position.kind.is_out_of_flow()
+                    {
+                        continue;
+                    }
+
+                    let widths = self.intrinsic_widths_for_node(child, ctx);
+                    let margin = self.resolve_margin(&child.style.spacing, ctx);
+                    let margin_w = margin.left.unwrap_or(0.0) + margin.right.unwrap_or(0.0);
+                    let outer_min = (widths.min + margin_w).max(0.0);
+                    let outer_max = (widths.max + margin_w).max(0.0);
+
+                    if child.style.display.outer() == Some(OuterDisplay::Inline) {
+                        line_max += outer_max;
+                        line_min = line_min.max(outer_min);
+                        has_line = true;
+                    } else {
+                        flush_intrinsic_line(
+                            &mut result,
+                            &mut line_max,
+                            &mut line_min,
+                            &mut has_line,
+                        );
+                        result.min = result.min.max(outer_min);
+                        result.max = result.max.max(outer_max);
+                    }
+                }
+                LayoutItem::Custom(index) => {
+                    let object = node.children[index].custom_child().unwrap();
+                    let style = object.style();
+                    if style.display == Display::None || style.position.kind.is_out_of_flow() {
+                        continue;
+                    }
+
+                    let measured = object.layouter().measure(&crate::LayoutContext::from(ctx));
+                    let width = measured.width.max(0.0);
+
+                    if style.display.outer() == Some(OuterDisplay::Inline) {
+                        line_max += width;
+                        line_min = line_min.max(width);
+                        has_line = true;
+                    } else {
+                        flush_intrinsic_line(
+                            &mut result,
+                            &mut line_max,
+                            &mut line_min,
+                            &mut has_line,
+                        );
+                        result.min = result.min.max(width);
+                        result.max = result.max.max(width);
+                    }
+                }
+            }
+        }
+
+        flush_intrinsic_line(&mut result, &mut line_max, &mut line_min, &mut has_line);
+        result
+    }
+
+    /// Returns the min-content and max-content border-box widths of `node`.
+    fn intrinsic_widths_for_node(
+        &self,
+        node: &LayoutNode,
+        ctx: &InternalLayoutContext,
+    ) -> IntrinsicWidths {
+        let style = &node.style;
+        if style.display == Display::None {
+            return IntrinsicWidths::default();
+        }
+
+        let padding = self.resolve_padding(&style.spacing, ctx);
+        let border = self.resolve_border(&style.spacing, ctx);
+        let pb_w = padding.left + padding.right + border.left + border.right;
+
+        let mut content = match style.size.width.resolve_with(
+            ctx.containing_block_width,
+            self.viewport_width,
+            self.viewport_height,
+        ) {
+            Some(width) => {
+                let width = resolve_content_size_with_box_sizing(
+                    &style.box_sizing,
+                    width,
+                    (padding.left, padding.right),
+                    (border.left, border.right),
+                );
+                IntrinsicWidths {
+                    min: width,
+                    max: width,
+                }
+            }
+            None => match style.display.inner() {
+                Some(InnerDisplay::Flow) | Some(InnerDisplay::FlowRoot) => {
+                    self.measure_flow_intrinsic_width(node, ctx)
+                }
+                Some(InnerDisplay::Flex) => self.measure_flex_intrinsic_width(node, ctx),
+                Some(InnerDisplay::Grid) => self.measure_grid_intrinsic_width(node, ctx),
+                None => IntrinsicWidths::default(),
+            },
+        };
+
+        content.min = self
+            .apply_size_constraints(content.min, &style.size, ctx, true, &style.box_sizing, pb_w)
+            .max(0.0);
+        content.max = self
+            .apply_size_constraints(content.max, &style.size, ctx, true, &style.box_sizing, pb_w)
+            .max(0.0)
+            .max(content.min);
+
+        IntrinsicWidths {
+            min: content.min + pb_w,
+            max: content.max + pb_w,
+        }
+    }
+
+    fn measure_flex_intrinsic_width(
+        &self,
+        node: &LayoutNode,
+        ctx: &InternalLayoutContext,
+    ) -> IntrinsicWidths {
+        let is_row = matches!(
+            node.style.flex_direction,
+            FlexDirection::Row | FlexDirection::RowReverse
+        );
+        let gap = if is_row {
+            &node.style.column_gap
+        } else {
+            &node.style.row_gap
+        }
+        .resolve_with(
+            ctx.containing_block_width,
+            self.viewport_width,
+            self.viewport_height,
+        )
+        .unwrap_or(0.0)
+        .max(0.0);
+
+        let mut min = 0.0_f32;
+        let mut max = 0.0_f32;
+        let mut item_count = 0usize;
+
+        for item in LayoutItems::new(&node.children) {
+            let width = match item {
+                LayoutItem::Fragments(start, end) => node.children[start..end]
+                    .iter()
+                    .filter_map(|child| child.fragment())
+                    .map(|fragment| fragment.node.width().max(0.0))
+                    .sum::<f32>(),
+                LayoutItem::Node(index) => {
+                    let child = node.children[index].node().unwrap();
+                    if child.style.display == Display::None
+                        || child.style.position.kind.is_out_of_flow()
+                    {
+                        continue;
+                    }
+                    let widths = self.intrinsic_widths_for_node(child, ctx);
+                    let margin = self.resolve_margin(&child.style.spacing, ctx);
+                    widths.max + margin.left.unwrap_or(0.0) + margin.right.unwrap_or(0.0)
+                }
+                LayoutItem::Custom(index) => {
+                    let object = node.children[index].custom_child().unwrap();
+                    let style = object.style();
+                    if style.display == Display::None || style.position.kind.is_out_of_flow() {
+                        continue;
+                    }
+                    let measured = object.layouter().measure(&crate::LayoutContext::from(ctx));
+                    measured.width.max(0.0)
+                }
+            };
+
+            if is_row {
+                max += width;
+                min = min.max(width);
+                item_count += 1;
+            } else {
+                max = max.max(width);
+                min = min.max(width);
+            }
+        }
+
+        if is_row && item_count > 1 {
+            max += gap * (item_count - 1) as f32;
+        }
+
+        IntrinsicWidths { min, max }
+    }
+
+    fn measure_grid_intrinsic_width(
+        &self,
+        node: &LayoutNode,
+        ctx: &InternalLayoutContext,
+    ) -> IntrinsicWidths {
+        let mut min = 0.0_f32;
+        let mut max = 0.0_f32;
+
+        for item in LayoutItems::new(&node.children) {
+            let width = match item {
+                LayoutItem::Fragments(start, end) => node.children[start..end]
+                    .iter()
+                    .filter_map(|child| child.fragment())
+                    .map(|fragment| fragment.node.width().max(0.0))
+                    .sum::<f32>(),
+                LayoutItem::Node(index) => {
+                    let child = node.children[index].node().unwrap();
+                    if child.style.display == Display::None
+                        || child.style.position.kind.is_out_of_flow()
+                    {
+                        continue;
+                    }
+                    let widths = self.intrinsic_widths_for_node(child, ctx);
+                    let margin = self.resolve_margin(&child.style.spacing, ctx);
+                    widths.max + margin.left.unwrap_or(0.0) + margin.right.unwrap_or(0.0)
+                }
+                LayoutItem::Custom(index) => {
+                    let object = node.children[index].custom_child().unwrap();
+                    let style = object.style();
+                    if style.display == Display::None || style.position.kind.is_out_of_flow() {
+                        continue;
+                    }
+                    let measured = object.layouter().measure(&crate::LayoutContext::from(ctx));
+                    measured.width.max(0.0)
+                }
+            };
+
+            min = min.max(width);
+            max = max.max(width);
+        }
+
+        IntrinsicWidths { min, max }
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -1218,7 +1491,7 @@ impl LayoutEngine {
         content_size_opt: (Option<f32>, Option<f32>),
         intrinsic_pass: bool,
     ) -> LineContext {
-        let (content_width_opt, content_height_opt) = content_size_opt;
+        let (mut content_width_opt, content_height_opt) = content_size_opt;
 
         let border = self.resolve_border(&node.style.spacing, ctx);
         let padding = self.resolve_padding(&node.style.spacing, ctx);
@@ -1236,29 +1509,46 @@ impl LayoutEngine {
             .unwrap_or_default();
 
         // Auto-width inline formatting contexts (inline-block / flow-root) are
-        // shrink-to-fit: the box must be as wide as its content, and the
-        // content must actually be laid out within that final width.  If the
-        // parent's available width is handed straight through, centered or
-        // right-aligned content wraps/aligns against it and the resulting line
-        // advance (or a child box) inflates the inline-block far beyond the
-        // text.  Re-run the inner flow with an ever-tighter available width
-        // until the box stops shrinking.
+        // shrink-to-fit. CSS 2.1 §10.3.9 defines the used width as:
+        //
+        //     min(max(preferred minimum width, available width), preferred width)
+        //
+        // Measure the intrinsic widths before laying out the contents so the
+        // inner flow is laid out against the final width from the start. The
+        // previous approach re-ran the flow with the previously laid-out
+        // content width, which does not converge for centered/right-aligned
+        // content and can leave child boxes sized against an indefinite
+        // containing block.
         let shrink_to_fit = node.style.display.outer() == Some(OuterDisplay::Inline)
             && node.style.display.inner() == Some(InnerDisplay::FlowRoot)
             && content_width_opt.is_none();
 
-        const MAX_SHRINK_PASSES: usize = 8;
-        const SHRINK_STOP_EPSILON: f32 = 2.0;
+        if shrink_to_fit {
+            let pb_w = padding.left + padding.right + border.left + border.right;
+            let available_content = ctx.available_width.map(|width| (width - pb_w).max(0.0));
+            let intrinsic = self.measure_flow_intrinsic_width(node, ctx);
+            let preferred_min = intrinsic.min.max(0.0);
+            let preferred = intrinsic.max.max(0.0);
+            let used = match available_content {
+                Some(available) => preferred.min(preferred_min.max(available)),
+                None => preferred,
+            };
+            content_width_opt = Some(self.apply_size_constraints(
+                used,
+                &node.style.size,
+                ctx,
+                true,
+                &node.style.box_sizing,
+                pb_w,
+            ));
+        }
 
-        let mut effective_available = ctx.available_width;
-        let mut outbox_width = content_width_opt
+        let effective_available = ctx.available_width;
+        let outbox_width = content_width_opt
             .or(effective_available)
             .unwrap_or(self.viewport_width);
-        let mut last_content_w = f32::INFINITY;
 
-        let mut final_state = None;
-
-        for _pass in 0..MAX_SHRINK_PASSES {
+        let state = {
             // The flow's block formatting context for floats. A `flow-root`
             // (including floats, which are blockified to flow-root) and any
             // out-of-flow box begin a fresh float list; plain `display: flow`
@@ -1276,7 +1566,7 @@ impl LayoutEngine {
             };
 
             let base_ctx_for_child = InternalLayoutContext {
-                containing_block_width: content_width_opt,
+                containing_block_width: content_width_opt.or(ctx.containing_block_width),
                 containing_block_height: content_height_opt,
                 available_width: content_width_opt.or(effective_available),
                 parent_assigned_border_width: None,
@@ -1325,11 +1615,7 @@ impl LayoutEngine {
                 end_y,
                 parent_current_x,
                 content_width_opt,
-                tightened_available: if shrink_to_fit {
-                    effective_available
-                } else {
-                    None
-                },
+                tightened_available: None,
                 intrinsic_pass,
                 // Only InnerDisplay::Flow collapses margins.
                 // FlowRoot (flow-root / inline-block) establishes a new
@@ -1412,38 +1698,9 @@ impl LayoutEngine {
             }
             node.items_buf = items;
 
-            final_state = Some(state);
+            state
+        };
 
-            if !shrink_to_fit {
-                break;
-            }
-
-            let content_w = final_state
-                .as_ref()
-                .map(|s| s.accum.children_width.max(s.cursor.current_x))
-                .unwrap_or(0.0);
-            let pb_w = padding.left + padding.right + border.left + border.right;
-            let constrained_content = self.apply_size_constraints(
-                content_width_opt.unwrap_or(content_w),
-                &node.style.size,
-                ctx,
-                true,
-                &node.style.box_sizing,
-                pb_w,
-            );
-
-            if (constrained_content - last_content_w).abs() < SHRINK_STOP_EPSILON
-                || constrained_content >= outbox_width
-            {
-                break;
-            }
-
-            last_content_w = constrained_content;
-            effective_available = Some(constrained_content);
-            outbox_width = constrained_content;
-        }
-
-        let state = final_state.expect("layout_flow always computes a state");
         self.finalize_flow_box(node, ctx, content_width_opt, content_height_opt, state)
     }
 
@@ -4995,6 +5252,29 @@ fn layout_box_content_box(layout_box: &LayoutBox) -> Rect {
         LayoutBox::BlockBox(b) => b.content_box,
         LayoutBox::InlineBox(l) => l.box_model.content_box,
         LayoutBox::None => Rect::default(),
+    }
+}
+
+/// Intrinsic min-content and max-content widths.
+#[derive(Clone, Copy, Default)]
+struct IntrinsicWidths {
+    min: f32,
+    max: f32,
+}
+
+/// Folds the current inline line into the accumulated intrinsic widths.
+fn flush_intrinsic_line(
+    result: &mut IntrinsicWidths,
+    line_max: &mut f32,
+    line_min: &mut f32,
+    has_line: &mut bool,
+) {
+    if *has_line {
+        result.max = result.max.max(*line_max);
+        result.min = result.min.max(*line_min);
+        *line_max = 0.0;
+        *line_min = 0.0;
+        *has_line = false;
     }
 }
 

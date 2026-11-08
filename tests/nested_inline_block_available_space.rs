@@ -165,8 +165,8 @@ fn inline_block_nested_in_midline_flow_gets_positive_available_space() {
 /// Root cause pairing with the giga bug: centered text lays its glyphs out
 /// against the containing width, and the resulting line advance used to widen
 /// the shrink-to-fit inline-block (e.g. the ログイン `<a>` inflating from 85px
-/// to fit a 486px line). The engine re-lays-out the inner flow with an
-/// ever-tighter available width until the box stops shrinking.
+/// to fit a 486px line). The engine now resolves the CSS shrink-to-fit width
+/// from the content's intrinsic min/max-content widths before laying it out.
 #[test]
 fn auto_width_inline_block_with_centered_text_shrinks_to_content() {
     let text = custom_inline(CenteredWrappingText::new(56.0, Rc::new(Cell::new(0.0))));
@@ -207,7 +207,12 @@ fn auto_width_inline_block_with_centered_text_shrinks_to_content() {
 
     LayoutEngine::layout(&mut root, 800.0, 600.0);
 
-    let boxes: Vec<_> = root.layout_box.iter().collect();
+    let a_node = node(&root, 0);
+    let boxes: Vec<_> = root
+        .layout_box
+        .iter()
+        .chain(a_node.layout_box.iter())
+        .collect();
     for b in &boxes {
         assert!(
             b.border_box.x.abs() < 100_000.0 && b.border_box.width.abs() < 100_000.0,
