@@ -417,3 +417,125 @@ fn custom_inline_layouter_is_handed_the_float_free_span() {
     assert_eq!(avail_start, 100.0);
     assert_eq!(avail_end, 400.0);
 }
+
+#[test]
+fn right_float_shortens_lines_from_the_right() {
+    let inline = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline").unwrap(),
+            line_height: Length::Px(20.0),
+            ..Default::default()
+        },
+        vec![fragment(250.0, 20.0), fragment(250.0, 20.0)],
+    );
+    let mut root = root_with(400.0, vec![floated(100.0, 50.0, Float::Right), inline]);
+
+    LayoutEngine::layout(&mut root, 400.0, 600.0);
+
+    let spans = &inline_box(node(&root, 1)).line_spans;
+    assert!(!spans.is_empty());
+
+    // Lines start at the left edge but must end before the right float (x=300).
+    assert_eq!(spans[0].line_pos.0, 0.0);
+    for span in spans {
+        assert!(
+            span.line_pos.0 + span.width() <= 300.0 + 0.01,
+            "line overlaps the right float: {span:?}"
+        );
+    }
+    let max_line = spans.iter().map(|s| s.line_index).max().unwrap();
+    assert!(max_line >= 1, "content did not wrap below the right float");
+}
+
+#[test]
+fn two_right_floats_stack_right_to_left() {
+    let mut root = root_with(
+        400.0,
+        vec![
+            floated(100.0, 50.0, Float::Right),
+            floated(120.0, 50.0, Float::Right),
+        ],
+    );
+
+    LayoutEngine::layout(&mut root, 400.0, 600.0);
+
+    let first = border_box_of(node(&root, 0));
+    let second = border_box_of(node(&root, 1));
+    assert_eq!((first.x, first.y), (300.0, 0.0));
+    assert_eq!((second.x, second.y), (180.0, 0.0));
+}
+
+#[test]
+fn clear_right_moves_block_below_right_float_only() {
+    let mut root = root_with(
+        400.0,
+        vec![
+            floated(100.0, 50.0, Float::Left),
+            floated(80.0, 40.0, Float::Right),
+            fixed_block(200.0, 30.0, Clear::Right),
+        ],
+    );
+
+    LayoutEngine::layout(&mut root, 400.0, 600.0);
+
+    // The right float ends at y=40, the left float at y=50.
+    assert_eq!(border_box_of(node(&root, 2)).y, 40.0);
+}
+
+#[test]
+fn clear_left_moves_block_below_left_float_only() {
+    let mut root = root_with(
+        400.0,
+        vec![
+            floated(100.0, 50.0, Float::Left),
+            floated(80.0, 40.0, Float::Right),
+            fixed_block(200.0, 30.0, Clear::Left),
+        ],
+    );
+
+    LayoutEngine::layout(&mut root, 400.0, 600.0);
+
+    assert_eq!(border_box_of(node(&root, 2)).y, 50.0);
+}
+
+#[test]
+fn clear_both_moves_block_below_the_lower_float() {
+    let mut root = root_with(
+        400.0,
+        vec![
+            floated(100.0, 50.0, Float::Left),
+            floated(80.0, 70.0, Float::Right),
+            fixed_block(200.0, 30.0, Clear::Both),
+        ],
+    );
+
+    LayoutEngine::layout(&mut root, 400.0, 600.0);
+
+    assert_eq!(border_box_of(node(&root, 2)).y, 70.0);
+}
+
+#[test]
+fn auto_width_float_shrinks_to_fit_its_content() {
+    let float = LayoutNode::with_children(
+        Style {
+            float: Float::Left,
+            ..Default::default()
+        },
+        vec![LayoutNode::new(Style {
+            size: SizeStyle {
+                width: Length::Px(40.0).into(),
+                height: Length::Px(20.0).into(),
+                ..Default::default()
+            },
+            ..Default::default()
+        })],
+    );
+    let mut root = root_with(400.0, vec![float]);
+
+    LayoutEngine::layout(&mut root, 400.0, 600.0);
+
+    let float_box = border_box_of(node(&root, 0));
+    assert_eq!((float_box.x, float_box.y), (0.0, 0.0));
+    assert_eq!((float_box.width, float_box.height), (40.0, 20.0));
+    assert!(approx_eq(block_box(&root).border_box.height, 20.0));
+}
