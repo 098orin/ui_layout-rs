@@ -237,6 +237,143 @@ fn fixed_auto_width_shrink_wraps_content() {
     assert_eq!(fixed_box.border_box.y, 550.0);
 }
 
+// --- Sticky positioning ---
+
+fn sticky_style(
+    top: LengthOrAuto,
+    right: LengthOrAuto,
+    bottom: LengthOrAuto,
+    left: LengthOrAuto,
+) -> Style {
+    Style {
+        position: PositionStyle {
+            kind: Position::Sticky,
+            top,
+            right,
+            bottom,
+            left,
+        },
+        size: size(50.0, 20.0),
+        ..Default::default()
+    }
+}
+
+#[test]
+fn sticky_records_resolved_edges_without_moving_the_box() {
+    let sticky = LayoutNode::new(sticky_style(
+        Length::Px(10.0).into(),
+        LengthOrAuto::Auto,
+        LengthOrAuto::Auto,
+        Length::Px(5.0).into(),
+    ));
+    let following = LayoutNode::new(Style {
+        size: size(50.0, 30.0),
+        ..Default::default()
+    });
+    let mut root = LayoutNode::with_children(Style::default(), [sticky, following]);
+
+    LayoutEngine::layout(&mut root, 300.0, 200.0);
+
+    let sticky_box = block_box(node(&root, 0));
+    assert_eq!(
+        (sticky_box.border_box.x, sticky_box.border_box.y),
+        (0.0, 0.0)
+    );
+    let edges = sticky_box
+        .sticky_edges
+        .expect("sticky edges should be recorded");
+    assert_eq!(
+        (edges.left, edges.top, edges.right, edges.bottom),
+        (Some(5.0), Some(10.0), None, None)
+    );
+    // Sticky participates in normal flow, so the sibling still follows it.
+    assert_eq!(block_box(node(&root, 1)).border_box.y, 20.0);
+    assert!(
+        format!("{:#}", node(&root, 0)).contains("sticky(left: 5, top: 10)"),
+        "layout box formatting should include the sticky edges"
+    );
+}
+
+#[test]
+fn sticky_percentage_offsets_resolve_against_containing_block() {
+    let sticky = LayoutNode::new(sticky_style(
+        Length::Percent(10.0).into(),
+        Length::Percent(5.0).into(),
+        LengthOrAuto::Auto,
+        Length::Percent(25.0).into(),
+    ));
+    let mut root = LayoutNode::with_children(
+        Style {
+            position: PositionStyle {
+                kind: Position::Relative,
+                ..Default::default()
+            },
+            size: size(200.0, 100.0),
+            ..Default::default()
+        },
+        [sticky],
+    );
+
+    LayoutEngine::layout(&mut root, 300.0, 200.0);
+
+    let edges = block_box(node(&root, 0))
+        .sticky_edges
+        .expect("sticky edges should be recorded");
+    assert_eq!(edges.left, Some(50.0));
+    assert_eq!(edges.top, Some(10.0));
+    assert_eq!(edges.right, Some(10.0));
+    assert_eq!(edges.bottom, None);
+}
+
+#[test]
+fn sticky_without_offsets_records_all_none() {
+    let sticky = LayoutNode::new(sticky_style(
+        LengthOrAuto::Auto,
+        LengthOrAuto::Auto,
+        LengthOrAuto::Auto,
+        LengthOrAuto::Auto,
+    ));
+    let mut root = LayoutNode::with_children(Style::default(), [sticky]);
+
+    LayoutEngine::layout(&mut root, 300.0, 200.0);
+
+    let edges = block_box(node(&root, 0))
+        .sticky_edges
+        .expect("sticky edges should be recorded");
+    assert_eq!(
+        (edges.left, edges.top, edges.right, edges.bottom),
+        (None, None, None, None)
+    );
+}
+
+#[test]
+fn sticky_inline_box_records_edges() {
+    let inline = LayoutNode::with_children(
+        Style {
+            display: Display::parse("inline").unwrap(),
+            position: PositionStyle {
+                kind: Position::Sticky,
+                top: Length::Px(3.0).into(),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        [LayoutChild::from(fragment(20.0, 10.0))],
+    );
+    let mut root = LayoutNode::with_children(Style::default(), [inline]);
+
+    LayoutEngine::layout(&mut root, 300.0, 200.0);
+
+    let inline_box = inline_box_model(node(&root, 0));
+    let edges = inline_box
+        .sticky_edges
+        .expect("sticky edges should be recorded");
+    assert_eq!(
+        (edges.left, edges.top, edges.right, edges.bottom),
+        (None, Some(3.0), None, None)
+    );
+}
+
 // --- Out-of-flow stretching between opposite offsets ---
 
 #[test]

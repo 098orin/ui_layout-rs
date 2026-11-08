@@ -723,6 +723,100 @@ fn owned_layout_box_into_iter_empty_inline() {
     assert_eq!(boxes.len(), 1);
 }
 
+// --- EdgeOption and sticky edge formatting ---
+
+#[test]
+fn display_edge_option_none_when_empty() {
+    assert_eq!(format!("{}", EdgeOption::default()), "none");
+}
+
+#[test]
+fn display_edge_option_single_edge() {
+    let edges = EdgeOption {
+        top: Some(5.0),
+        ..Default::default()
+    };
+    assert_eq!(format!("{}", edges), "top: 5");
+}
+
+#[test]
+fn display_edge_option_all_edges_in_css_order() {
+    let edges = EdgeOption {
+        left: Some(1.0),
+        top: Some(2.0),
+        right: Some(3.0),
+        bottom: Some(4.0),
+    };
+    assert_eq!(format!("{}", edges), "left: 1, top: 2, right: 3, bottom: 4");
+}
+
+#[test]
+fn display_block_box_with_sticky_edges() {
+    let b = LayoutBox::BlockBox(BoxModel {
+        sticky_edges: Some(EdgeOption {
+            left: Some(0.0),
+            top: Some(8.0),
+            right: Some(0.0),
+            bottom: Some(0.0),
+        }),
+        border_box: rect(10.0, 20.0, 100.0, 50.0),
+        padding_box: rect(10.0, 20.0, 100.0, 50.0),
+        content_box: rect(10.0, 20.0, 100.0, 50.0),
+        children_box: rect(10.0, 20.0, 100.0, 50.0),
+    });
+
+    assert_eq!(
+        format!("{}", b),
+        "block(100x50 @10,20 sticky(left: 0, top: 8, right: 0, bottom: 0))"
+    );
+}
+
+#[test]
+fn display_inline_box_with_sticky_edges() {
+    let inline = LayoutBox::InlineBox(InlineBox {
+        box_model: BoxModel {
+            sticky_edges: Some(EdgeOption {
+                top: Some(4.0),
+                ..Default::default()
+            }),
+            border_box: rect(5.0, 10.0, 200.0, 30.0),
+            padding_box: rect(5.0, 10.0, 200.0, 30.0),
+            content_box: rect(5.0, 10.0, 200.0, 30.0),
+            children_box: rect(5.0, 10.0, 200.0, 30.0),
+        },
+        line_spans: vec![LineSpan {
+            x_range: 5.0..105.0,
+            line_pos: (5.0, 10.0),
+            line_index: 0,
+        }],
+    });
+
+    assert_eq!(
+        format!("{}", inline),
+        "inline(100x30 @5,10 [(5,10)] sticky(top: 4))"
+    );
+}
+
+#[test]
+fn display_node_alternate_includes_sticky_edges() {
+    let mut node = LayoutNode::new(Style::default());
+    node.layout_box = LayoutBox::BlockBox(BoxModel {
+        sticky_edges: Some(EdgeOption {
+            left: Some(2.0),
+            ..Default::default()
+        }),
+        border_box: rect(0.0, 0.0, 80.0, 40.0),
+        padding_box: rect(0.0, 0.0, 80.0, 40.0),
+        content_box: rect(0.0, 0.0, 80.0, 40.0),
+        children_box: rect(0.0, 0.0, 80.0, 40.0),
+    });
+
+    assert_eq!(
+        format!("{:#}", node),
+        "LayoutNode block(80x40 @0,0 sticky(left: 2))\n"
+    );
+}
+
 fn rect(x: f32, y: f32, width: f32, height: f32) -> Rect {
     Rect {
         x,
