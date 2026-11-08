@@ -634,3 +634,19 @@ fn align_items_stretch_does_not_override_fixed_height() {
         rect(0.0, 0.0, 30.0, 20.0)
     );
 }
+
+#[test]
+fn implicit_row_does_not_stretch_to_container_when_align_content_start() {
+    let mut style = grid_container(200.0, vec![GridTrack::Flex(1.0)]);
+    style.size.height = LengthOrAuto::Length(Length::Px(200.0));
+    style.align_content = AlignContent::Start;
+
+    let mut root = LayoutNode::with_children(style, [new_child(50.0, 50.0)]);
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    assert_eq!(
+        block_box(node(&root, 0)).border_box,
+        rect(0.0, 0.0, 50.0, 50.0)
+    );
+}

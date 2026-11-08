@@ -976,7 +976,11 @@ impl LayoutEngine {
             content_height_opt,
             row_gap,
             &row_intrinsic,
-            None,
+            if node.style.align_content == AlignContent::Stretch {
+                content_height_opt
+            } else {
+                None
+            },
             self.viewport_width,
             self.viewport_height,
         );
