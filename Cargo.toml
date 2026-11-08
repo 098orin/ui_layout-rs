@@ -1,6 +1,6 @@
 [package]
 name = "ui_layout"
-version = "0.12.1"
+version = "0.13.0"
 edition = "2024"
 
 description = "A minimal Flexbox-inspired layout engine for Rust GUI"
@@ -11,4 +11,3 @@ categories = ["gui"]
 
 [features]
 layout-bench = []
-unstable = []

@@ -7,7 +7,7 @@ and this project loosely follows Semantic Versioning.
 
 ---
 
-## [Unreleased]
+## [0.13.0]
 
 ### Added
 

@@ -3,19 +3,19 @@
 [![Crates.io](https://img.shields.io/crates/v/ui_layout.svg)](https://crates.io/crates/ui_layout)
 [![Docs.rs](https://docs.rs/ui_layout/badge.svg)](https://docs.rs/ui_layout)
 
-A unified layout engine for Rust GUI development that treats Flexbox as a specialized form of Inline Block Flow layout.
+A minimal CSS-like layout engine for Rust GUI development.
 
-This crate provides predictable layout system designed for
-custom GUI frameworks, editors, and experimental UI engines.
+This crate provides a predictable layout system designed for custom GUI frameworks, editors, and experimental UI engines.
 
 > [!NOTE]
 > This crate is under active development; patch releases may be frequent.
 
 ## Features
 
-### Flexbox Support
+### Flexbox
 
 - Flex layout (Row / Column direction, including `RowReverse` / `ColumnReverse`)
+- `flex-wrap` and multi-line flex item placement
 - `flex_grow` with proportional space distribution
 - `flex_shrink` with proportional space reduction when overflowing
 - `flex_basis` for initial sizing (supports `auto`, pixel values, and percentages)
@@ -23,24 +23,39 @@ custom GUI frameworks, editors, and experimental UI engines.
 - `align_items` with full `stretch` support (Start, Center, End, Stretch)
 - `align_self` for individual item alignment override
 - Row and column gaps (`row_gap` / `column_gap`)
-- Margin collapsing for block-level elements
 
-### Block, Inline & Flow Root
+### Grid
+
+- Grid layout with explicit and implicit tracks
+- Repeated tracks, named areas, and negative line placement
+- Grid item alignment (`align-*`, `justify-items`, `justify-self`)
+
+### Block, Inline & Flow
 
 - Block layout with full CSS Box Model support (margin, padding, border, `box-sizing`)
 - Inline layout with multi-line wrapping
 - `display: flow-root` and `display: inline-block` — establishes a new Block Formatting Context (margin collapsing isolation)
+- `display: contents` — generates no layout box; children participate in the parent's formatting context
+- Floats and `clear` (`float: left`/`right`)
+- Margin collapsing for block-level elements
 - `BoxSizing`: ContentBox and BorderBox
+
+### Positioning
+
+- `relative`, `absolute`, `fixed`, and `sticky` positioning
+- Inset edges and sticky positioning constraints
 
 ### Extensibility
 
-- `FlowLayouter` trait for custom inline flow layout delegation
-- `BlockLayouter` trait for custom block layout delegation (behind `feature = "unstable"`)
+- `CustomLayouter` trait for custom layout objects that can participate in layout
+- Custom children carry their own `Style` and return a `LayoutBox` (`InlineBox`, `BlockBox`, or `None`)
+- `AutoSizeBehavior` / `SizeStyle::auto_behavior` to control `auto` sizing for custom replaced-element leaves
 
 ### Values & Units
 
 - `Length` types: `Px`, `Percent`, `Vw`, `Vh`
 - `calc()`-style expressions: `Add`, `Sub`, `Mul`, `Div`, `Min`, `Max`, `Clamp`, `Round`
+- `Round` supports `nearest`, `up`, `down`, and `to-zero` strategies
 - `LengthOrAuto` for properties that support `auto` sizing
 - Min/max sizing (`min_width`, `max_width`, `min_height`, `max_height`)
 - `line_height` support
@@ -48,7 +63,6 @@ custom GUI frameworks, editors, and experimental UI engines.
 ## Non-goals
 
 - Full CSS compatibility
-- Absolute / fixed positioning
 - Web rendering or HTML/CSS parsing
 
 ## Design goals
@@ -115,23 +129,22 @@ see the unit tests in the [`tests/`](tests/) directory. They provide practical u
 
 ## Specification Compliance
 
-This implementation follows CSS3 specifications with current focus on:
+This implementation follows CSS specifications with a current focus on:
 
 - ✅ **CSS Box Model Module Level 3**: Margin collapsing, padding, border, box-sizing support
-- ✅ **CSS Flexible Box Layout Module Level 1**: Core flexbox algorithm including flex-grow, flex-shrink, flex-basis, flex-wrap
-- ✅ **CSS Display Module Level 3**: Block, Inline, Flex, FlowRoot, InlineBlock, and None display values
-- ✅ **CSS Values and Units Module Level 3**: px, %, vw, vh, auto, and calc() support
+- ✅ **CSS Flexible Box Layout Module Level 1**: Flex algorithm including `flex-grow`, `flex-shrink`, `flex-basis`, and `flex-wrap`
+- ✅ **CSS Grid Layout**: Explicit/implicit tracks, repeated tracks, named areas, negative line placement, and item alignment
+- ✅ **CSS Display Module Level 3**: Block, Inline, Flex, Grid, FlowRoot, InlineBlock, Contents, and None display values
+- ✅ **CSS Positioned Layout**: `relative`, `absolute`, `fixed`, and `sticky` positioning with inset edges and sticky constraints
+- ✅ **Floats and clear**: `float: left`/`right` and `clear`
+- ✅ **CSS Values and Units Module**: `px`, `%`, `vw`, `vh`, `auto`, `calc()`-style expressions, and `round()`
 
 ## Status
 
 See [CHANGELOG.md](CHANGELOG.md) for a detailed list of changes.
 
-- Version: **[Unreleased]**
-- API is evolving but now includes full Flexbox-like alignment, gaps, inline layout, and extensibility via traits
-
-Future versions may add:
-
-- Correct flex-basis priority over width/height in flex item sizing
+- Version: **0.13.0**
+- API is evolving; the layout model now includes flex/grid/flow layout, positioning, floats, and extensibility via `CustomLayouter`
 
 ## License
 
