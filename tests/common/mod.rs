@@ -14,7 +14,16 @@ pub fn block_box(n: &LayoutNode) -> &BoxModel {
 
 pub fn inline_box_model(n: &LayoutNode) -> &BoxModel {
     match &n.layout_box {
-        LayoutBox::InlineBox(inline) => &inline.box_model,
+        LayoutBox::InlineBox(inline) => {
+            if let Some(span) = inline.line_spans.get(0) {
+                assert_eq!(
+                    (inline.box_model.border_box.x, inline.box_model.border_box.y),
+                    span.line_pos
+                );
+            }
+
+            &inline.box_model
+        }
         _ => panic!("expected inline box"),
     }
 }

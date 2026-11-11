@@ -13,6 +13,21 @@ fn flow_root_style() -> Style {
     }
 }
 
+fn grid_container(width: f32, columns: Vec<GridTrack>) -> Style {
+    Style {
+        display: Display::OutsideInner {
+            outer: OuterDisplay::Block,
+            inner: InnerDisplay::Grid,
+        },
+        size: SizeStyle {
+            width: LengthOrAuto::Length(Length::Px(width)),
+            ..Default::default()
+        },
+        grid_template_columns: columns,
+        ..Default::default()
+    }
+}
+
 #[test]
 fn display_parsing() {
     let d = Display::parse("flow-root").unwrap();
@@ -445,4 +460,52 @@ fn with_padding_and_border() {
     // border(2) + padding(10) + child1(30) + child2(40) + padding(10) + border(2) = 94
     assert_eq!(b.border_box.height, 2.0 + 10.0 + 30.0 + 40.0 + 10.0 + 2.0);
     assert_eq!(b.content_box.height, 30.0 + 40.0);
+}
+
+#[test]
+fn sized_inline_blocks_inside_grid_items() {
+    let inline_block = |width: f32, height: f32| {
+        LayoutNode::new(Style {
+            display: Display::parse("inline-block").unwrap(),
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(width)),
+                height: LengthOrAuto::Length(Length::Px(height)),
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+    };
+
+    let first = LayoutNode::with_children(Style::default(), [inline_block(80.0, 30.0)]);
+
+    let second = LayoutNode::with_children(Style::default(), [inline_block(60.0, 40.0)]);
+
+    let mut root = LayoutNode::with_children(
+        grid_container(300.0, vec![GridTrack::Flex(1.0), GridTrack::Flex(1.0)]),
+        [first, second],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    // Grid items should occupy separate columns.
+    assert_eq!(block_box(node(&root, 0)).border_box.x, 0.0);
+    assert_eq!(block_box(node(&root, 1)).border_box.x, 150.0);
+
+    // The inline-block inside each grid item should preserve its explicit size.
+    let first_inline = inline_box_model(node(node(&root, 0), 0));
+    let second_inline = inline_box_model(node(node(&root, 1), 0));
+
+    assert_eq!(first_inline.content_box.width, 80.0);
+    assert_eq!(first_inline.content_box.height, 30.0);
+
+    assert_eq!(second_inline.content_box.width, 60.0);
+    assert_eq!(second_inline.content_box.height, 40.0);
+
+    if let LayoutBox::InlineBox(ref i) = node(node(&root, 0), 0).layout_box {
+        assert_eq!(i.line_spans[0].line_pos.0, 0.0)
+    }
+
+    if let LayoutBox::InlineBox(ref i) = node(node(&root, 1), 0).layout_box {
+        assert_eq!(i.line_spans[0].line_pos.0, 0.0)
+    }
 }
