@@ -143,7 +143,7 @@ This implementation follows CSS specifications with a current focus on:
 
 See [CHANGELOG.md](CHANGELOG.md) for a detailed list of changes.
 
-- Version: **0.13.0**
+- Version: **0.13.1**
 - API is evolving; the layout model now includes flex/grid/flow layout, positioning, floats, and extensibility via `CustomLayouter`
 
 ## License

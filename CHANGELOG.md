@@ -7,6 +7,18 @@ and this project loosely follows Semantic Versioning.
 
 ---
 
+## [0.13.1]
+
+### Fixed
+
+* Correct inline positioning and avoid double-counting margins
+
+### Changed
+
+* Explicitly define the first `LineSpan`'s `line_pos` as the position of the `BoxModel`'s `border_box` (`x` and `y` coordinates).
+
+---
+
 ## [0.13.0]
 
 ### Added
