@@ -1940,11 +1940,12 @@ impl LayoutEngine {
             child_is_block,
         );
 
-        child_node.layout_box.shift(ml, 0.0);
-
         let mut block_margin_top = 0.0;
 
         if child_is_block {
+            // Block margin-left shifts the block within its containing block.
+            child_node.layout_box.shift(ml, 0.0);
+
             let top_collapses = state.collapse_margins
                 && !state.accum.first_block_child_processed
                 && state.border.top == 0.0
@@ -1980,20 +1981,31 @@ impl LayoutEngine {
                 0.0,
                 child_position_y + updated_line_ctx.end_pos.1 + block_margin_top,
             );
+
+            child_node
+                .layout_box
+                .shift(child_position_x, child_position_y);
         } else {
+            // Inline spans are positioned in the parent's line coordinates;
+            // translate the child box from its local origin to the line start.
+            child_node
+                .layout_box
+                .shift(child_position_x, child_position_y);
+
             // Inline-level margins consume inline space on both sides.
             state.cursor.update_from(&updated_line_ctx);
 
             state.cursor.x += ml + mr;
             state.cursor.current_x += ml + mr;
-        }
 
-        if child_is_inline {
-            child_node.layout_box.shift(child_position_x, 0.0);
-        } else {
-            child_node
-                .layout_box
-                .shift(child_position_x, child_position_y);
+            // Inline children are laid out with `line_ctx_for_child`, so their
+            // geometry is already positioned at the current inline cursor.
+            // Apply the left margin once to both the box model and line spans;
+            // shifting by `child_position_x` again would double-count the cursor offset.
+            match &mut child_node.layout_box {
+                LayoutBox::InlineBox(inline) => inline.shift_with_spans(ml, 0.0),
+                layout_box => layout_box.shift(ml, 0.0),
+            }
         }
 
         if node.style.display.outer() == Some(OuterDisplay::Inline) && child_is_inline {
