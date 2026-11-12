@@ -229,6 +229,35 @@ fn sits_inline_in_text_flow() {
     assert_eq!(boxes[0].border_box.height, 30.0);
 }
 
+#[test]
+fn inline_block_after_block_matches_its_first_line_position() {
+    let inline_block = LayoutNode::new(Style {
+        display: Display::parse("inline-block").unwrap(),
+        size: SizeStyle {
+            width: LengthOrAuto::Length(Length::Px(20.0)),
+            height: LengthOrAuto::Length(Length::Px(10.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let mut root = LayoutNode::with_children(
+        Style {
+            size: SizeStyle {
+                width: LengthOrAuto::Length(Length::Px(200.0)),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        [new_child(50.0, 100.0), inline_block],
+    );
+
+    LayoutEngine::layout(&mut root, 800.0, 600.0);
+
+    let inline = inline_box_model(node(&root, 1));
+    assert_eq!(inline.border_box.y, 50.0);
+}
+
 // --- Explicit sizing ---
 
 #[test]
