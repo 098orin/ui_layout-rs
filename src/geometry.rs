@@ -58,7 +58,7 @@ pub struct BoxModel {
 /// A single logical box is represented together with its per-line [`LineSpan`].
 ///
 /// The first span's `line_pos` should match the position of the
-/// `BoxModel`'s `boder_box` (its `x` and `y` coordinates).
+/// `BoxModel`'s `border_box` (its `x` and `y` coordinates).
 #[derive(Debug, Clone)]
 pub struct InlineBox {
     /// The original (unsplit) box model.
